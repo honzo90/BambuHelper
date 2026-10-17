@@ -1,0 +1,20 @@
+--- a/src/lgfx/v1/platforms/esp32/common.cpp
++++ b/src/lgfx/v1/platforms/esp32/common.cpp
+@@ -928,6 +928,9 @@
+ //----------------------------------------------------------------------------
+   static constexpr const int __DECLARE_RCC_ATOMIC_ENV = 0;
+ 
++// WS43B uses the manufacturer's legacy I2C host for GT911 and CH422G.
++// Do not link Lovyan's unused modern driver alongside it (IDF aborts before setup).
++#if !defined(BOARD_IS_WS43B)
+   namespace i2c
+   {
+ #if __has_include( <core_version.h> )
+@@ -2007,6 +2010,7 @@
+     }
+ 
+   }
++#endif // !BOARD_IS_WS43B: I2C is owned exclusively by the manufacturer BSP
+ 
+ //----------------------------------------------------------------------------
+  }

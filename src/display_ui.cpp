@@ -20,6 +20,11 @@
 #include "hms_lookup.h"
 #include <WiFi.h>
 #include <time.h>
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_weather.h"
+#include "display_ws43b.h"
+#include "ws43b_hardware.h"
+#endif
 #if PANEL_HAS_IO_EXPANDER
 #include <Wire.h>     // SenseCAP: PCA9535PW IO expander / ws_lcd_350: TCA9554 LCD reset
 #include "io_expander_tca9554.h"
@@ -141,7 +146,9 @@ void markFrameDirty() {
 }
 
 void flushFrame() {
-#if PANEL_REQUIRES_AXS_FRAME_SPRITE
+#if defined(BOARD_IS_WS43B)
+  _tft_instance.display();
+#elif PANEL_REQUIRES_AXS_FRAME_SPRITE
   if (!g_axs_panel || !_frame_sprite.getBuffer()) return;
   unsigned long now = millis();
   bool keepalive_due = (now - g_last_flush_ms) >= FRAME_KEEPALIVE_MS;
@@ -159,7 +166,12 @@ void flushFrame() {
 // at the sprite level (panel MADCTL stays at 0) while CYD/ws_lcd_200 use real
 // hardware MADCTL via LovyanGFX setRotation().
 static uint8_t sanitizeRotation(uint8_t r) {
+#if defined(BOARD_IS_WS43B)
+  (void)r;
+  return 0; // Native landscape, also when NVS contains another board's settings.
+#else
   return r;
+#endif
 }
 
 // Use user-configured bg color instead of hardcoded CLR_BG
@@ -297,7 +309,9 @@ static bool tickGaugeSmooth(const BambuState& s, bool snap) {
 static uint8_t lastAppliedBrightness = 0;
 
 void setBacklight(uint8_t level) {
-#if defined(BACKLIGHT_PIN) && BACKLIGHT_PIN >= 0
+#if defined(BOARD_IS_WS43B)
+  if (ws43b::ready() && !ws43b::setBacklight(level)) ws43b::fatal("BACKLIGHT");
+#elif defined(BACKLIGHT_PIN) && BACKLIGHT_PIN >= 0
   analogWrite(BACKLIGHT_PIN, level);
 #endif
   lastAppliedBrightness = level;
@@ -496,7 +510,11 @@ void initDisplay() {
   // _tft_instance reference + tft_ptr already point at the same storage.
 #endif
   Serial.println("Display: calling _tft_instance.init()...");
+#if defined(BOARD_IS_WS43B)
+  if (!_tft_instance.init()) ws43b::fatal("DISPLAY_INIT");
+#else
   _tft_instance.init();  // LovyanGFX configures SPI from the board class above
+#endif
   applyPanelInversion();
 #if defined(BOARD_IS_WS28C)
   ioExpanderSet(WS28C_EXP_LCD_CS, true);   // init commands done
@@ -523,7 +541,7 @@ void initDisplay() {
   // rotation is applied to the PSRAM sprite after tft_ptr is redirected.
   tft.setRotation(0);
 #else
-  tft.setRotation(dispSettings.rotation);
+  tft.setRotation(sanitizeRotation(dispSettings.rotation));
 #endif
   applyPanelInversion();
   Serial.println("Display: setRotation done");
@@ -566,6 +584,9 @@ void initDisplay() {
   memset(&prevState, 0, sizeof(prevState));
   resetBatteryRedrawCache();
 
+#if defined(BOARD_IS_WS43B)
+  drawWs43bBootScreen();
+#else
   // Splash screen — center on actual canvas (rotation-aware for 240x320)
   {
     const int16_t sw = uiW();
@@ -580,6 +601,7 @@ void initDisplay() {
     setFont(tft, LY_F_SMALL);
     tft.drawString(FW_VERSION, sw / 2, sh / 2 + LY_SPLASH_VER_DY);
   }
+#endif
 }
 
 // Repaint helper: the clock and the pong screensaver each keep a private
@@ -1686,7 +1708,7 @@ static bool drawIdlePairSlots(const PrinterConfig& cfg, const BambuState& s,
 // with an AMS strip). The HTML row, gauge gating, and dispatch are gated by
 // this macro so layouts with a permanent AMS strip (LAYOUT_HAS_AMS_STRIP)
 // and 480x480 (no LY_AMS_*) skip the new code path.
-#if !defined(LAYOUT_HAS_AMS_STRIP) && !defined(DISPLAY_480x480)
+#if !defined(LAYOUT_HAS_AMS_STRIP) && !defined(DISPLAY_480x480) && !defined(DISPLAY_800x480)
   #define LAYOUT_240x240_AMS_VIEW 1
 #endif
 
@@ -5344,6 +5366,10 @@ static bool isNightHour() {
   localtime_r(&t, &now);
   if (now.tm_year < (2020 - 1900)) return false;  // NTP not synced yet
 
+#if defined(BOARD_IS_WS43B)
+  bool solarNight=false;
+  if(ws43bSolarNight(solarNight))return solarNight;
+#endif
   uint8_t h = now.tm_hour;
   uint8_t s = dpSettings.nightStartHour;
   uint8_t e = dpSettings.nightEndHour;
@@ -5374,7 +5400,12 @@ bool isNightBlackout() {
 // lastNightCheck makes the next checkNightMode() apply it immediately rather
 // than at its next tick.
 void nightWake() {
-  nightWakeUntilMs = millis() + NIGHT_WAKE_MS;
+  nightWakeUntilMs = millis() +
+#if defined(BOARD_IS_WS43B)
+    uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
+#else
+    NIGHT_WAKE_MS;
+#endif
   lastNightCheck = 0;
 }
 
@@ -5862,7 +5893,31 @@ static bool glowScreenEligible() {
 // ---------------------------------------------------------------------------
 //  Main update (called from loop)
 // ---------------------------------------------------------------------------
+#if WS43B_FULL_WEBUI
+void drawWs43bHmsScreen() {
+  const auto &p=displayedPrinter();const auto &s=p.state;
+  beginWs43bErrorScreen(p.config.name[0]?p.config.name:"BambuHelper");
+  const bool pe=s.printError!=0;
+  const unsigned total=s.hmsCount+(pe?1:0);
+  const unsigned shown=total>3?3:total;
+  for(unsigned i=0;i<shown;++i) {
+    const bool printError=pe&&i==0;
+    const uint32_t attr=printError?0:s.hms[pe?i-1:i].attr;
+    const uint32_t code=printError?s.printError:s.hms[pe?i-1:i].code;
+    char title[32],formatted[HMS_CODE_STR_LEN];uint16_t color=CLR_RED;
+    hmsEntryLines(attr,code,title,sizeof(title),formatted,sizeof(formatted),&color);
+    drawWs43bErrorCard(i,title,formatted,hmsEntryText(attr,code),color);
+  }
+  endWs43bErrorScreen(total-shown+(s.hmsOverflow?1:0));
+}
+#endif
+
 void updateDisplay() {
+#if defined(BOARD_IS_WS43B)
+  renderWs43bMonitor(forceRedraw);
+  forceRedraw = false;
+  return;
+#endif
   // Night blackout (nightBrightness == 0): paint the panel black once and stop
   // rendering for the rest of the window. Backlight 0 alone is not enough -
   // boards with BACKLIGHT_PIN < 0 (7-pin round GC9A01) have no dimming at all,

@@ -1,3 +1,4 @@
+#include "ws43b_memory_diag.h"
 #include <Arduino.h>
 #include "display_ui.h"
 #include "thumb_fetch.h"
@@ -7,6 +8,15 @@
 #include "ssdp_discovery.h"
 #include "bambu_mqtt.h"
 #include "config.h"
+#include "ws43b_usb_log.h"
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_weather.h"
+#include "display_ws43b.h"
+#include "ws43b_tls_memory.h"
+// VLW AA temporarily places a native-size glyph on the loop-task stack.
+// 112px Inter requires more than the Arduino default 8 KiB.
+SET_LOOP_TASK_STACK_SIZE(24 * 1024);
+#endif
 #include "bambu_state.h"
 #include "button.h"
 #include "buzzer.h"
@@ -133,16 +143,22 @@ static bool handleSplashPhase() {
   // Hold splash for 2s
   if (splashEnd > 0 && millis() > splashEnd) {
     splashEnd = 0;
-    initWiFi();
+    ws43b_memory::Scope memoryServices(ws43b_memory::Stage::Services);
+    { ws43b_memory::Scope memory(ws43b_memory::Stage::WifiInit); initWiFi(); }
     initWebServer();
     initBambuMqtt();
     initButton();
+#if !BAMBU_MONITOR_ONLY
     initBuzzer();
     initLed();
     tasmotaInit();
+#endif
   }
 
   if (splashEnd > 0) {
+#if defined(BOARD_IS_WS43B)
+    tickWs43bBootScreen();
+#endif
     delay(10);
     return true;
   }
@@ -289,6 +305,13 @@ static void closeHmsScreen() {
   setScreenState(SCREEN_PRINTING);
 }
 
+#if WS43B_FULL_WEBUI
+bool handleWs43bErrorTap(bool open) {
+  if (getScreenState() == SCREEN_HMS) { closeHmsScreen(); return true; }
+  return open && openHmsScreen(30000);
+}
+#endif
+
 // --- Finish vs AMS drying (#183) --------------------------------------------
 // Automatic choice is unchanged: the finish screen keeps the display for its
 // configured window, then drying takes over. A tap overrides it either way.
@@ -370,7 +393,7 @@ static void doTapActions() {
   // it continues into camera / drying rather than dead-ending, so those stay
   // reachable on a printer sitting on a permanent code.
   if (cur == SCREEN_HMS) {
-#if BOARD_HAS_CAMERA
+#if BOARD_HAS_CAMERA && !BAMBU_MONITOR_ONLY
     if (cameraDisplayedHasCameraTile() && cameraCanStreamDisplayedPrinter()) {
       setScreenState(SCREEN_CAMERA);
       return;
@@ -384,7 +407,7 @@ static void doTapActions() {
   if ((cur == SCREEN_PRINTING || cur == SCREEN_IDLE || cur == SCREEN_FINISHED) &&
       hmsScreenAlerting() && openHmsScreen(HMS_SCREEN_MS)) return;
 
-#if BOARD_HAS_CAMERA
+#if BOARD_HAS_CAMERA && !BAMBU_MONITOR_ONLY
   // Camera tap toggle (#120). On a multi-printer setup the camera sits in the
   // tap cycle for the printer that carries the tile: tapping that printer opens
   // fullscreen, and tapping out advances to the next printer (so the cycle keeps
@@ -456,6 +479,9 @@ static void doTapActions() {
 // to the shown printer, and the screen is a single-printer browseable one. When
 // disarmed the tap path stays bit-for-bit unchanged (zero latency).
 static bool powerControlAvailableForSlot(uint8_t slot) {
+#if BAMBU_MONITOR_ONLY
+  return false;
+#endif
   if (!dispSettings.buttonPowerControl) return false;
   if (tasmotaControlPlugForSlot(slot) == 0xFF) return false;
   ScreenState s = getScreenState();
@@ -620,6 +646,11 @@ static void handlePowerConfirmInput(bool held) {
 }
 
 static void handleWakeButton() {
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+  // Touch is display-only; never enter plug confirmation or GPIO gestures.
+  if (wasButtonPressed()) setBacklight(brightness);
+  return;
+#endif
   // Both edge pollers MUST be called every loop unconditionally - each owns its
   // own debounce + held-state machine, and skipping a call would freeze it.
   bool touchPress = wasButtonPressed();
@@ -975,7 +1006,7 @@ static void updateDisplayedPrinterScreenState() {
     return;
   }
 
-#if BOARD_HAS_CAMERA
+#if BOARD_HAS_CAMERA && !BAMBU_MONITOR_ONLY
   // Camera fullscreen (#120) is sticky: entered/exited only by tap. Hold it
   // until the user taps out or the printer can no longer stream, then drop back
   // to the normal flow (which re-derives the screen next loop).
@@ -1557,6 +1588,12 @@ static void handleRotation() {
 
 // ---------------------------------------------------------------------------
 void setup() {
+  ws43b_memory::begin();
+#if defined(BOARD_IS_WS43B)
+  ws43b_tls::begin();
+#endif
+  ws43b_memory::Scope memorySetup(ws43b_memory::Stage::Setup);
+#if !BAMBU_MONITOR_ONLY
 #if defined(BAT_EN)
   // Waveshare ESP32-S3-Touch-LCD-1.54 needs BAT_EN high to keep running
   // after releasing the center PWR button when booting from battery.
@@ -1573,15 +1610,49 @@ void setup() {
 #if defined(BOARD_BTN_3)
   pinMode(BOARD_BTN_3, INPUT_PULLUP);
 #endif
+#endif  // !BAMBU_MONITOR_ONLY: no battery or auxiliary GPIO setup
   Serial.begin(115200);
+#if defined(BOARD_IS_WS43B) && ARDUINO_USB_CDC_ON_BOOT
+  ws43b_usb::beginLogging(Serial);
+#endif
   Serial.printf("\n=== BambuHelper %s Starting ===\n", FW_VERSION);
 
-  loadSettings();
+  { ws43b_memory::Scope memory(ws43b_memory::Stage::Settings); loadSettings(); }
+#if defined(BOARD_IS_WS43B)
+  // No arbitrary GPIO peripherals on the integrated LCD board. Never turn
+  // retained button/buzzer/LED settings into writes to RGB or I2C pins.
+  buttonType = BTN_TOUCHSCREEN;
+  brightness = 255;
+  buzzerSettings.enabled = false;
+  ledSettings.enabled = false;
+  dispSettings.buttonPowerControl = false;
+  dispSettings.rotation = 0;
+  rotState.splitEnabled = false;
+  rotState.splitForce = false;
+#endif
+#if BAMBU_MONITOR_ONLY
+  // Runtime constraints also override settings left by another firmware/profile.
+  // These are not written to NVS here.
+  buttonType = BTN_TOUCHSCREEN;
+  brightness = 255;  // CH422G backlight is on/off; stale NVS must not hide setup.
+  buzzerSettings.enabled = false;
+  ledSettings.enabled = false;
+  dispSettings.buttonPowerControl = false;
+  dpSettings.keepDisplayOn = true;
+  dpSettings.keepPrintScreen = true;
+  dpSettings.nightModeEnabled = false;
+  rotState.splitEnabled = false;
+  rotState.displayIndex = 0;
+  for (uint8_t i = 0; i < MAX_PRINTERS; ++i) printers[i].config.lightFlags = 0;
+  for (uint8_t i = 0; i < TASMOTA_PLUG_COUNT; ++i) tasmotaSettings[i].enabled = false;
+#endif
   recordBootSlotVersion();  // names this slot's fw for the OTA rollback UI
-  initDisplay();
+  { ws43b_memory::Scope memory(ws43b_memory::Stage::DisplayInit); initDisplay(); }
+#if !BAMBU_MONITOR_ONLY
   Battery::begin();
+#endif
   splashEnd = millis() + 2000;
-  startWiFiDuringSplash();
+  { ws43b_memory::Scope memory(ws43b_memory::Stage::WifiInit); startWiFiDuringSplash(); }
   setBacklight(brightness);
 }
 
@@ -1591,18 +1662,35 @@ void loop() {
     return;
   }
 
-  handleWiFi();
-  handleWebServer();
-  ssdpTick();  // closes SSDP scan sockets when the window elapses (no-op otherwise)
-  handleBoardPowerOff();
+  { ws43b_memory::Scope memory(ws43b_memory::Stage::Wifi); handleWiFi(); }
+#if defined(BOARD_IS_WS43B)
+  // Touch first, then live telemetry before weather, UI decisions and drawing.
+  // This board reconnects asynchronously; other boards keep their old order.
   handleWakeButton();
+  if (isWiFiConnected() && !isAPMode() && isAnyPrinterConfigured() && !isOtaAutoInProgress())
+    handleBambuMqtt();
+  tickWs43bWeather();
+#endif
+  { ws43b_memory::Scope memory(ws43b_memory::Stage::Web); handleWebServer(); }
+  ssdpTick();  // closes SSDP scan sockets when the window elapses (no-op otherwise)
+#if !BAMBU_MONITOR_ONLY
+  handleBoardPowerOff();
+#endif
+#if !defined(BOARD_IS_WS43B)
+  handleWakeButton();
+#endif
 
+#if !BAMBU_MONITOR_ONLY
   if (isWiFiConnected() && !isAPMode()) {
     updateDisplayedPrinterScreenState();
   }
 
+#if !defined(BOARD_IS_WS43B)
   handleDisplaySleepTimeouts();
   handleConnectingScreenRecovery();
+#else
+  if (getScreenState() == SCREEN_HMS && (hmsScreenExpired() || !hmsScreenAvailable())) closeHmsScreen();
+#endif
   handleGcodeStateTransitions();
 #if HAS_HMS_UI
   handleErrorAlerts();
@@ -1634,9 +1722,12 @@ void loop() {
     }
   }
   ledTick();
+#if !defined(BOARD_IS_WS43B)
   checkNightMode();
+#endif
+#endif  // !BAMBU_MONITOR_ONLY: no hidden light/plug/alert or GPIO automation
 
-#if BOARD_HAS_CAMERA
+#if BOARD_HAS_CAMERA && !BAMBU_MONITOR_ONLY
   // Camera (#120) lifecycle (cheap, non-blocking): open the 2nd TLS socket only
   // while the camera UI is on screen (fullscreen, or printing screen with a
   // visible camera tile) and the printer can stream; close it otherwise so heap
@@ -1651,21 +1742,25 @@ void loop() {
   }
 #endif
 
-  thumbService();
-  updateDisplay();
+  { ws43b_memory::Scope memory(ws43b_memory::Stage::Thumbnail); thumbService(); }
+  { ws43b_memory::Scope memory(ws43b_memory::Stage::Render); updateDisplay(); }
 
-  // MQTT and rotation after display update - TLS reconnect can block for
-  // several seconds so we handle it last to keep UI responsive.
+  // Legacy boards keep MQTT after drawing because reconnect may block.
+  // Waveshare has already serviced MQTT before drawing; rotation stays here.
   // Skip during auto-OTA: that path already holds a TLS session to GitHub
   // and a concurrent second TLS session to Bambu Cloud is unsupported.
   if (isWiFiConnected() && !isAPMode() && isAnyPrinterConfigured() && !isOtaAutoInProgress()) {
+#if !defined(BOARD_IS_WS43B)
     handleBambuMqtt();
+#endif
+#if !BAMBU_MONITOR_ONLY
     // Freeze auto-rotation while the camera fullscreen or the power-confirm modal
     // is up so the displayed printer (and its stream / target) does not drift.
     if (getScreenState() != SCREEN_CAMERA &&
         getScreenState() != SCREEN_POWER_CONFIRM &&
         getScreenState() != SCREEN_HMS &&
         getScreenState() != SCREEN_DRY_PEEK) handleRotation();
+#endif
   }
 
   // Commit the framebuffer sprite to the panel. On JC3248W535 this is a
@@ -1676,9 +1771,11 @@ void loop() {
   // Plug power-confirm (#136): fire the blocking relay command only after the
   // "Sending..." frame is committed, and time out the result flash. Runs after
   // flushFrame() for the same reason cameraService() does.
+#if !BAMBU_MONITOR_ONLY
   handlePowerConfirmService();
+#endif
 
-#if BOARD_HAS_CAMERA
+#if BOARD_HAS_CAMERA && !BAMBU_MONITOR_ONLY
   // Blocking camera socket work (connect can stall up to the TLS timeout) runs
   // dead last - AFTER flushFrame() - so on the framebuffer board (JC3248W535,
   // where draws are only visible once pushed) a stalled connect never delays the

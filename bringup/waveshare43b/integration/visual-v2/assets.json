@@ -1,0 +1,26 @@
+{
+  "source_reference": "design-previews/2026-10-14-wydruk-native-v2/wydruk-800x480.html",
+  "assets": [
+    {"name":"Nozzle","source":"raw/icons/nozzle.svg","width":42,"height":46},
+    {"name":"Bed","source":"raw/icons/bed.svg","width":42,"height":46},
+    {"name":"Chamber","source":"raw/icons/chamber.svg","width":42,"height":46},
+    {"name":"Print","source":"raw/icons/print.svg","width":33,"height":33,"green_material":true},
+    {"name":"AMS","source":"raw/icons/ams.svg","width":33,"height":33},
+    {"name":"Details","source":"raw/icons/details.svg","width":33,"height":33},
+    {"name":"Settings","source":"raw/icons/settings.svg","width":33,"height":33},
+    {"name":"Spool","source":"raw/scene-atlas.png","width":64,"height":69,"viewbox":[735,60,460,540],"image_width":1280,"image_height":1280,"green_material":true},
+    {"name":"Model","source":"raw/scene-components.png","width":160,"height":132,"viewbox":[138,110,484,400],"image_width":1448,"image_height":1086,"green_material":true},
+    {"name":"Plate","source":"raw/scene-components.png","width":220,"height":108,"viewbox":[743,203,640,312],"image_width":1448,"image_height":1086},
+    {"name":"Head","source":"raw/scene-components.png","width":36,"height":47,"viewbox":[250,655,280,360],"image_width":1448,"image_height":1086},
+    {"name":"Clock","source":"raw/icons/clock.svg","width":33,"height":33},
+    {"name":"Weather","source":"raw/icons/weather.svg","width":33,"height":33},
+    {"name":"Network","source":"raw/icons/network.svg","width":33,"height":33},
+    {"name":"Check","source":"raw/icons/check.svg","width":33,"height":33,"green_material":true},
+    {"name":"Pause","source":"raw/icons/pause.svg","width":33,"height":33,"green_material":true},
+    {"name":"Alert","source":"raw/icons/alert.svg","width":33,"height":33,"green_material":true},
+    {"name":"EmptySlot","source":"raw/icons/empty-slot.svg","width":33,"height":33},
+    {"name":"UnknownData","source":"raw/icons/unknown-data.svg","width":33,"height":33},
+    {"name":"Printer","source":"raw/icons/printer.svg","width":33,"height":33},
+    {"name":"Fan","source":"raw/icons/fan.svg","width":33,"height":33}
+  ]
+}

@@ -1,0 +1,7 @@
+# Waveshare 4.3B: preserve existing NVS, OTA data and app0; add inactive app1.
+# Install this table once over USB before using WebUI OTA. No filesystem.
+# Name, Type, SubType, Offset, Size, Flags
+nvs,data,nvs,0x9000,0x5000,
+otadata,data,ota,0xe000,0x2000,
+app0,app,ota_0,0x10000,0x300000,
+app1,app,ota_1,0x310000,0x300000,

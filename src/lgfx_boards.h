@@ -18,7 +18,17 @@
 
 #include <LovyanGFX.hpp>
 
-#if defined(BOARD_IS_DIY)
+#if defined(BOARD_IS_WS43B)
+// Exact 4.3B BSP, independent of the 4.3/4.3C/2.8C configurations.
+#include "lgfx_panel_ws43b.hpp"
+class LGFX_WS43B : public lgfx::LGFX_Device {
+  lgfx::Panel_WS43B _panel;
+public:
+  LGFX_WS43B() { setPanel(&_panel); }
+};
+static LGFX_WS43B _tft_instance;
+
+#elif defined(BOARD_IS_DIY)
 // --- Generic DIY SPI display (issue #153/#151) -------------------------------
 // Pins/driver/geometry come from -D flags, resolved + validated in
 // diy_display_config.h (pulled in via config.h, re-included here for clarity;

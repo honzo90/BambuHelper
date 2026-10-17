@@ -72,6 +72,15 @@ bool cloudLoginRefreshStored();
 // True when a stored password exists and the last sign-in needed no 2FA.
 bool cloudLoginCanAutoRefresh();
 
+// Background automatic renewal. Call only from the main/MQTT loop. Manual
+// login/reset supersedes its result; service commits a completed valid reply.
+#if BOARD_MQTT_ASYNC_CONNECT
+bool cloudLoginStartStoredRefresh(uint8_t slot);
+bool cloudLoginStoredRefreshPending();
+void cloudLoginServiceStoredRefresh();
+void cloudLoginCancelStoredRefresh(uint8_t slot);
+#endif
+
 void cloudLoginReset();
 
 // Reachability self-test: post throwaway credentials to the account endpoint

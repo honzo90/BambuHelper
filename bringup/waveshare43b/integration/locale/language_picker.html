@@ -1,0 +1,25 @@
+<div style="padding:8px 0">
+<label for="uiLanguage">Language / Język</label>
+<select id="uiLanguage" aria-label="Language / Język"><option value="pl">Polski</option><option value="en">English</option></select>
+<small>Shared with the panel. Reload this page after changing it on the display.</small>
+<span id="uiLanguageStatus" role="status"></span>
+</div>
+<script>
+(function(){
+  var select=document.getElementById('uiLanguage'), status=document.getElementById('uiLanguageStatus');
+  var current=document.documentElement.lang==='pl'?'pl':'en';
+  select.value=current;
+  select.addEventListener('change',async function(){
+    select.disabled=true;status.textContent='';
+    try {
+      var response=await fetch('/ui/language',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'language='+encodeURIComponent(select.value)});
+      if(!response.ok) throw Error('save');
+      location.reload();
+    } catch(e) {
+      select.value=current;
+      status.textContent=current==='pl'?'Nie zapisano języka. Spróbuj ponownie.':'Language not saved. Please retry.';
+      select.disabled=false;
+    }
+  });
+})();
+</script>

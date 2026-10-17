@@ -276,7 +276,10 @@
 // through an off-screen sprite. The 240x320 profile (both orientations) and the
 // 240x240 profile; links two extra VLW blobs (inter_card_num / inter_card_lbl).
 // 240x320 boards without PSRAM (CYD family) render it in 20 px internal-RAM bands.
-#if (defined(DISPLAY_240x320) || defined(DISPLAY_320x480)) && defined(BOARD_HAS_PSRAM)
+#if defined(BOARD_IS_WS43B)
+// The 800x480 port has its own dashboard, AMS and weather renderer.
+#define HAS_CARD_SKIN  0
+#elif (defined(DISPLAY_240x320) || defined(DISPLAY_320x480)) && defined(BOARD_HAS_PSRAM)
 #define HAS_CARD_SKIN  1
 #elif defined(DISPLAY_240x320) && !defined(BOARD_IS_C3)
 #define HAS_CARD_SKIN  1   // band path (CARD_BAND_RENDER); not on a C3 (DIY), too little RAM
@@ -401,7 +404,11 @@
 // and JS freed ~77 KB of app slot, which is far more than the flow costs even
 // on the 1.75 MB C3 boards. Kept as a capability so a future flash-starved
 // board can drop it without touching anything but this block.
+#if BAMBU_MONITOR_ONLY
+#define HAS_CLOUD_LOGIN  0  // this profile accepts a token, never account/password login
+#else
 #define HAS_CLOUD_LOGIN  1
+#endif
 
 // =============================================================================
 //  Display rotation (multi-printer)

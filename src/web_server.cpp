@@ -1,3 +1,4 @@
+#include "ws43b_memory_diag.h"
 #include "web_server.h"
 #include <new>
 #include "web_template.h"
@@ -24,6 +25,18 @@
 #include "clock_pong.h"
 #include "hms_lookup.h"
 #include <WebServer.h>
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_weather.h"
+#include <WiFi.h>  // core 3 no longer provides WiFi through WebServer's headers
+#include <esp_system.h>
+#include <esp_heap_caps.h>
+#include "ws43b_hardware.h"
+#include "ws43b_clock_settings.h"
+#include "ws43b_display_mode.h"
+#include "ws43b_language.h"
+#include <lwip/sockets.h>
+#include <errno.h>
+#endif
 #include <ArduinoJson.h>
 #include <Update.h>
 #include "esp_ota_ops.h"
@@ -32,6 +45,9 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
+#if defined(BOARD_IS_WS43B)
+extern const uint8_t rootca_crt_bundle_end[] asm("_binary_x509_crt_bundle_end");
+#endif
 #endif
 
 // Global WebServer instance. Defined here, referenced from src/web_template.cpp
@@ -84,8 +100,10 @@ static void readDisplayFromForm() {
   if (server.hasArg("nend"))   dpSettings.nightEndHour = server.arg("nend").toInt();
   if (server.hasArg("nbright")) dpSettings.nightBrightness = server.arg("nbright").toInt();
   if (server.hasArg("ssbright")) dpSettings.screensaverBrightness = server.arg("ssbright").toInt();
-  // Apply brightness after all brightness-related values are parsed
+  // Native 4.3B inactivity/night policy owns its binary backlight.
+#if !defined(BOARD_IS_WS43B)
   setBacklight(getEffectiveBrightness());
+#endif
 
   if (server.hasArg("rotation")) {
     uint8_t rot = server.arg("rotation").toInt();
@@ -237,7 +255,236 @@ static void readDisplayFromForm() {
 // ---------------------------------------------------------------------------
 //  Route handlers
 // ---------------------------------------------------------------------------
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+// Separate, small setup page for the validated display profile. It reuses the
+// project's connection handlers, with no command, camera, GPIO or OTA controls.
+static const char MONITOR_PAGE[] PROGMEM = R"MONITOR(<!doctype html>
+<html lang="pl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BambuHelper — monitor 4.3B</title>
+<style>body{max-width:640px;margin:24px auto;padding:0 20px;background:#111820;color:#edf3f8;font:17px system-ui}h1{font-size:25px}section{border:1px solid #465364;padding:18px;margin:20px 0;border-radius:10px}label{display:block;margin:14px 0}input,select,button{box-sizing:border-box;width:100%;padding:10px;font:inherit;border-radius:5px;border:1px solid #74879a}button{background:#66dfb4;color:#10241e;cursor:pointer}small{color:#b8c8d8}#result{white-space:pre-wrap}</style>
+<h1>BambuHelper — monitor 800 × 480</h1>
+<p>Ustawienia panelu 800 × 480. <a href="/">Przejdź do głównego WebUI</a>.</p>
+<section><h2>Połączenie</h2><p id="connection">Odczyt stanu…</p><p id="data">Oczekiwanie na dane…</p><small>Połączenie MQTT nie potwierdza otrzymywania użytecznej telemetrii.</small></section>
+)MONITOR"
+#if defined(BOARD_IS_WS43B)
+R"MONITOR(<section><h2>Wygląd panelu</h2><form id="display" action="/monitor/display" method="post">
+<label>Motyw<select name="theme"><option value="0">Granatowy</option><option value="1">Ciemny / zielony</option><option value="2">Ciemny / bursztynowy</option></select></label>
+<label>Wartości wentylatorów<select name="fan_match_printer"><option value="1">Zaokrąglaj do 10% jak na drukarce</option><option value="0">Dokładność do 1%</option></select></label>
+<small>Zmiany widać od razu i pozostają po ponownym uruchomieniu panelu.</small>
+<p><button disabled>Zapisz ustawienia panelu</button></p></form></section>
+<section><h2>Tryb wyświetlania</h2><form id="displayMode" action="/monitor/display-mode" method="post">
+<label>Wydruk i wygaszacz<select name="mode"><option value="simple">Prosty</option><option value="advanced">Zaawansowany (w budowie)</option></select></label>
+<small>Jeden wybór dla ekranu Wydruk i wygaszacza. Prosty pokazuje procent MQTT i ważne ostrzeżenia. Zaawansowany dodaje szczegóły etapów. Ustawienia zegara pozostają bez zmian.</small>
+<p><button disabled>Zapisz tryb wyświetlania</button></p></form></section>
+<section><h2>Zegar i wygaszanie</h2><form id="clock" action="/monitor/clock" method="post">
+<label>Czas bez dotykania ekranu<select name="idle_minutes"><option value="0">Wyłączone</option><option value="1">1 minuta</option><option value="5">5 minut</option><option value="15">15 minut</option><option value="30">30 minut</option></select></label>
+<label>Po upływie czasu<select name="screen_off"><option value="0">Pokaż zegar</option><option value="1">Wyłącz podświetlenie</option></select></label>
+<label>Format godziny<select name="use24h"><option value="1">24 godziny</option><option value="0">12 godzin (AM/PM)</option></select></label>
+<small>Czas jest liczony od ostatniego dotknięcia, także podczas drukowania i suszenia AMS. Zmiany danych i połączenia nie zerują czasu. Dotyk wybudza panel i rozpoczyna odliczanie od nowa. Zegar korzysta z zapisanej strefy czasowej i synchronizacji czasu BambuHelper.</small>
+<p><button disabled>Zapisz zegar i wygaszanie</button></p></form></section>
+)MONITOR"
+#endif
+R"MONITOR(
+<section><h2>Drukarka</h2><p>Wpisz dane istniejącego połączenia LAN lub token chmury. Ten formularz zapisuje konfigurację panelu.</p>
+<form id="printer" action="/save/printer" method="post" autocomplete="off">
+<input type="hidden" name="slot" value="0">
+<label>Połączenie<select name="connmode" id="mode"><option value="local">LAN</option><option value="cloud_all">Chmura</option></select></label>
+<label>Nazwa na panelu<input name="pname" maxlength="23"></label>
+<label>Numer seryjny drukarki<input name="serial" maxlength="19" required autocapitalize="characters" spellcheck="false"></label>
+<div id="lan"><label>Adres IP drukarki<input name="ip" maxlength="15" inputmode="decimal"></label>
+<label>Kod dostępu LAN<input name="code" type="password" maxlength="8" autocomplete="new-password"></label></div>
+<div id="cloud" hidden><label>Region<select name="region"><option value="us">Globalny / Europa</option><option value="cn">Chiny</option></select></label>
+<label>Token chmury<input name="token" type="password" maxlength="1199" autocomplete="new-password"></label></div>
+<small>Puste pole kodu lub tokenu zachowuje zapisany sekret. Sekrety nie są odsyłane przez panel.</small>
+<p><button>Zapisz połączenie drukarki</button></p></form></section>
+<section><h2>Wi-Fi panelu</h2><form id="wifi" action="/save/wifi" method="post" autocomplete="off">
+<label>SSID sieci 2,4 GHz<input name="ssid" maxlength="32" required autocapitalize="none" spellcheck="false"></label>
+<label>Hasło Wi-Fi<input name="pass" type="password" maxlength="64" autocomplete="new-password"></label>
+<small>Puste pole hasła zachowuje zapisane hasło. Zapis uruchomi ponownie panel.</small>
+<p><button>Zapisz Wi-Fi i uruchom panel ponownie</button></p></form></section>
+<p id="result" role="status"></p>
+<script>
+const mode=document.getElementById('mode');
+function modeChanged(){document.getElementById('lan').hidden=mode.value!=='local';document.getElementById('cloud').hidden=mode.value==='local';}
+mode.onchange=modeChanged;
+for(const form of document.querySelectorAll('form'))form.onsubmit=async e=>{
+ e.preventDefault();const out=document.getElementById('result'),button=form.querySelector('button');button.disabled=true;
+ try{const r=await fetch(form.action,{method:'POST',body:new URLSearchParams(new FormData(form)),cache:'no-store'});const d=await r.json();
+ if(!r.ok||d.status!=='ok')throw Error(d.message||'Zapis nie powiódł się');
+ for(const field of form.querySelectorAll('input[type=password]'))field.value='';
+ out.textContent=d.warning|| (form.id==='display'||form.id==='displayMode'||form.id==='clock'?'Zapisano ustawienia panelu.':form.id==='wifi'?'Zapisano Wi-Fi. Panel uruchamia się ponownie.':'Zapisano. Sprawdź połączenie i nadejście telemetrii.');
+ }catch(e){out.textContent=e.message||'Brak odpowiedzi panelu';}finally{button.disabled=false;}
+};
+fetch('/printer/config',{cache:'no-store'}).then(r=>r.json()).then(d=>{
+ const f=document.getElementById('printer');for(const [field,key]of [['pname','name'],['serial','serial'],['ip','ip'],['connmode','mode'],['region','region']])if(d[key]!==undefined)f.elements[field].value=d[key]==='eu'&&field==='region'?'us':d[key];modeChanged();
+}).catch(()=>{});
+const display=document.getElementById('display');
+if(display)fetch('/monitor/display',{cache:'no-store'}).then(async r=>{
+ if(!r.ok)throw Error();const d=await r.json();
+ if(![0,1,2].includes(d.theme)||typeof d.fan_match_printer!=='boolean')throw Error();
+ display.elements.theme.value=String(d.theme);display.elements.fan_match_printer.value=d.fan_match_printer?'1':'0';display.querySelector('button').disabled=false;
+}).catch(()=>{document.getElementById('result').textContent='Nie odczytano ustawień panelu. Odśwież stronę, aby spróbować ponownie.';});
+const displayMode=document.getElementById('displayMode');
+if(displayMode)fetch('/monitor/display-mode',{cache:'no-store'}).then(async r=>{
+ if(!r.ok)throw Error();const d=await r.json();
+ if(!['simple','advanced'].includes(d.mode))throw Error();
+ displayMode.elements.mode.value=d.mode;displayMode.querySelector('button').disabled=false;
+}).catch(()=>{document.getElementById('result').textContent='Nie odczytano trybu wyświetlania. Odśwież stronę, aby spróbować ponownie.';});
+const clock=document.getElementById('clock');
+if(clock)fetch('/monitor/clock',{cache:'no-store'}).then(async r=>{
+ if(!r.ok)throw Error();const d=await r.json();
+ if(![0,1,5,15,30].includes(d.idle_minutes)||![0,1].includes(d.screen_off)||![0,1].includes(d.use24h))throw Error();
+ for(const key of ['idle_minutes','screen_off','use24h'])clock.elements[key].value=String(d[key]);clock.querySelector('button').disabled=false;
+}).catch(()=>{document.getElementById('result').textContent='Nie odczytano ustawień zegara. Odśwież stronę, aby spróbować ponownie.';});
+async function status(){try{const r=await fetch('/monitor/status',{cache:'no-store'});const d=await r.json();
+ document.getElementById('connection').textContent=!d.configured?'Drukarka nie jest skonfigurowana':d.mqtt_connected?'MQTT: połączono':'MQTT: rozłączono';
+ document.getElementById('data').textContent=d.has_useful_data?'Ostatnia użyteczna telemetria: '+d.useful_age_s+' s temu'+(d.data_fresh?'':' — dane nieaktualne'):'Brak użytecznej telemetrii. Odebrane wiadomości MQTT: '+d.messages;
+ }catch{document.getElementById('connection').textContent='Brak połączenia z panelem';document.getElementById('data').textContent='Stan drukarki nieznany';}}
+status();setInterval(status,3000);
+</script></html>)MONITOR";
+
+static void handleMonitorBlocked() {
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(403, "application/json", "{\"status\":\"error\",\"message\":\"Unavailable in monitor-only profile\"}");
+}
+#if defined(BOARD_IS_WS43B)
+// These two routes touch only the local view preferences, never connection
+// settings, printer commands or the general settings store.
+static void handleMonitorDisplayGet() {
+  server.sendHeader("Cache-Control", "no-store");
+  JsonDocument doc;
+  doc["theme"] = ws43bViewTheme();
+  doc["fan_match_printer"] = dispSettings.fanMatchPrinter;
+  String json;
+  serializeJson(doc, json);
+  server.send(200, "application/json", json);
+}
+
+static void handleMonitorDisplaySave() {
+  server.sendHeader("Cache-Control", "no-store");
+  const String theme = server.arg("theme");
+  const String fan = server.arg("fan_match_printer");
+  if (server.args() != 2 || !server.hasArg("theme") ||
+      !server.hasArg("fan_match_printer") ||
+      (theme != "0" && theme != "1" && theme != "2") ||
+      (fan != "0" && fan != "1")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Wybierz motyw i sposób wyświetlania wentylatorów.\"}");
+    return;
+  }
+  if (!saveWs43bViewSettings(uint8_t(theme[0] - '0'), fan == "1")) {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Nie zapisano ustawień panelu. Spróbuj ponownie.\"}");
+    return;
+  }
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+#endif
+#if defined(BOARD_IS_WS43B)
+static void handleMonitorClockGet() {
+  server.sendHeader("Cache-Control", "no-store");
+  const auto& settings = ws43bClockSettings();
+  JsonDocument doc;
+  doc["idle_minutes"] = settings.idleMinutes;
+  doc["screen_off"] = settings.screenOff ? 1 : 0;
+  doc["use24h"] = settings.use24h ? 1 : 0;
+  String json;
+  serializeJson(doc, json);
+  server.send(200, "application/json", json);
+}
+
+static void handleMonitorClockSave() {
+  server.sendHeader("Cache-Control", "no-store");
+  const String idle = server.arg("idle_minutes");
+  const String off = server.arg("screen_off");
+  const String format = server.arg("use24h");
+  if (server.args() != 3 || !server.hasArg("idle_minutes") ||
+      !server.hasArg("screen_off") || !server.hasArg("use24h") ||
+      (idle != "0" && idle != "1" && idle != "5" && idle != "15" && idle != "30") ||
+      (off != "0" && off != "1") || (format != "0" && format != "1")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Wybierz czas bezczynności, działanie i format godziny.\"}");
+    return;
+  }
+  const uint16_t minutes = idle == "30" ? 30 : idle == "15" ? 15 : idle[0] - '0';
+  if (!saveWs43bClockSettings(minutes, off == "1", format == "1")) {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Nie zapisano ustawień zegara. Spróbuj ponownie.\"}");
+    return;
+  }
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+#endif
+#endif
+
+#if defined(BOARD_IS_WS43B)
+static void handleMonitorDisplayModeGet() {
+  server.sendHeader("Cache-Control", "no-store");
+  JsonDocument doc;
+  doc["mode"] = ws43bAdvancedDisplay() ? "advanced" : "simple";
+  String json;
+  serializeJson(doc, json);
+  server.send(200, "application/json", json);
+}
+
+static void handleMonitorDisplayModeSave() {
+  server.sendHeader("Cache-Control", "no-store");
+  const String mode = server.arg("mode");
+  if (server.args() != 1 || !server.hasArg("mode") ||
+      (mode != "simple" && mode != "advanced")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Choose Simple or Advanced display mode.\"}");
+    return;
+  }
+  if (!saveWs43bDisplayMode(mode == "advanced")) {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Display mode could not be saved. Please retry.\"}");
+    return;
+  }
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+#endif
+
+#if defined(BOARD_IS_WS43B)
+static void handleWeatherSetupGet() {
+ JsonDocument j;j["done"]=ws43bSetupDone();j["dark"]=dpSettings.nightBrightness==0;
+ String out;serializeJson(j,out);server.sendHeader("Cache-Control","no-store");server.send(200,"application/json",out);
+}
+static void handleWeatherSetupSave() {
+ const String action=server.arg("action"),dark=server.arg("dark");
+ if(server.args()!=2 || (action!="skip"&&action!="finish") || (dark!="0"&&dark!="1")){
+  server.send(400,"application/json","{}");return;
+ }
+ server.send(finishWs43bSetup(action=="skip",dark=="1")?200:500,"application/json","{}");
+}
+static void handleWeatherGet() {
+  const auto c=ws43bWeatherConfig();JsonDocument j;
+  j["enabled"]=c.enabled;j["solar"]=c.solar;j["latitude"]=c.latitude;j["longitude"]=c.longitude;j["city"]=c.city;j["night_seconds"]=c.nightSeconds;
+  String out;serializeJson(j,out);server.sendHeader("Cache-Control","no-store");server.send(200,"application/json",out);
+}
+static void handleWeatherSave() {
+  JsonDocument j;ws43b_weather::Config c;const String body=server.arg("plain");
+  if(body.length()>1024||deserializeJson(j,body)||!ws43b_weather::parseConfig(j.as<JsonVariantConst>(),c)){server.send(400,"application/json","{\"error\":\"Invalid weather settings\"}");return;}
+  server.send(saveWs43bWeather(c)?200:500,"application/json","{}");
+}
+static void handleLanguageGet() {
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", ws43bPolish() ? "{\"language\":\"pl\"}" : "{\"language\":\"en\"}");
+}
+static void handleLanguageSave() {
+  const String value = server.arg("language");
+  if (value != "pl" && value != "en") {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid language\"}");
+    return;
+  }
+  if (!saveWs43bLanguage(value == "pl" ? 0 : 1)) {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Language could not be saved\"}");
+    return;
+  }
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+#endif
+
 static void handleRoot() {
+#if BAMBU_MONITOR_ONLY
+  server.sendHeader("Cache-Control", "no-store");
+  server.send_P(200, "text/html; charset=utf-8", MONITOR_PAGE);
+  return;
+#endif
   if (isAPMode()) {
     serveApPage();
   } else {
@@ -247,6 +494,21 @@ static void handleRoot() {
 
 // Save printer settings only (no restart — reinit MQTT)
 static void handleSavePrinter() {
+#if BAMBU_MONITOR_ONLY
+  // A single monitored printer: do not silently configure a hidden slot.
+  if ((server.hasArg("slot") && server.arg("slot") != "0") ||
+      !server.hasArg("serial") || server.arg("serial").length() == 0 ||
+      server.arg("serial").length() >= sizeof(printers[0].config.serial) ||
+      server.arg("pname").length() >= sizeof(printers[0].config.name) ||
+      server.arg("ip").length() >= sizeof(printers[0].config.ip) ||
+      server.arg("code").length() >= sizeof(printers[0].config.accessCode) ||
+      server.arg("token").length() >= 1200 ||
+      (server.arg("connmode") != "local" && server.arg("connmode") != "cloud_all")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Choose a connection mode and check the printer field lengths\"}");
+    return;
+  }
+  server.sendHeader("Cache-Control", "no-store");
+#endif
   // Free any active SSDP scan sockets before we reinit networking below.
   ssdpStopScan();
 
@@ -315,11 +577,15 @@ static void handleSavePrinter() {
     // The write itself failed (full or fragmented NVS) - without this line the
     // portal keeps saying "No token set" however often the user pastes, with
     // nothing to explain why.
+#if BAMBU_MONITOR_ONLY
+    warnings += "The cloud token could not be stored. Configuration is not confirmed. ";
+#else
     uint16_t u, f, t;
     getNvsUsage(u, f, t);
     warnings += "The cloud token could not be stored - settings storage is full (" +
                 String(u) + " of " + String(t) +
                 " entries used). Export settings, factory-reset, re-import, then paste the token again. ";
+#endif
   }
   if (isCloudMode(cfg.mode)) {
     if (strlen(cfg.serial) == 0)
@@ -422,10 +688,65 @@ static void handleSaveGaugeLayout() {
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
+// Asynchronous scan shared by the setup assistant and full WebUI. RAM only.
+static bool setupWifiScanRequested=false;
+static String setupWifiScanResult;
+static void handleSetupWifiScan() {
+  server.sendHeader("Cache-Control","no-store");
+
+  if(server.method()==HTTP_POST) {
+    const int previous=WiFi.scanComplete();
+    setupWifiScanResult="";
+    setupWifiScanRequested=true;
+    if(previous!=WIFI_SCAN_RUNNING) {
+      WiFi.scanDelete();
+      // Short active dwell reduces the interruption to the connected WebUI.
+      const int started=WiFi.scanNetworks(true,false,false,120);
+      if(started==WIFI_SCAN_FAILED) {
+        setupWifiScanRequested=false;
+        server.send(503,"application/json","{\"state\":\"failed\",\"reason\":\"scan_start_failed\"}");return;
+      }
+    }
+    server.send(202,"application/json","{\"state\":\"scanning\"}");return;
+  }
+  if(setupWifiScanResult.length()) {server.send(200,"application/json",setupWifiScanResult);return;}
+  const int count=WiFi.scanComplete();
+  if(count==WIFI_SCAN_RUNNING) {server.send(200,"application/json","{\"state\":\"scanning\"}");return;}
+  if(!setupWifiScanRequested || count<0) {
+    setupWifiScanRequested=false;
+    server.send(200,"application/json","{\"state\":\"failed\"}");return;
+  }
+  JsonDocument doc;doc["state"]="done";JsonArray list=doc["networks"].to<JsonArray>();
+  // Bounded list sorted by signal. Collapse multiple APs with the same SSID.
+  int order[64];const int limit=count<64?count:64;
+  for(int i=0;i<limit;++i)order[i]=i;
+  for(int i=0;i<limit;++i)for(int j=i+1;j<limit;++j)
+    if(WiFi.RSSI(order[j])>WiFi.RSSI(order[i])){const int tmp=order[i];order[i]=order[j];order[j]=tmp;}
+  for(int i=0;i<limit && list.size()<32;++i) {
+    const int index=order[i];const String ssid=WiFi.SSID(index);if(!ssid.length())continue;
+    bool duplicate=false;for(JsonObject item:list)if(item["ssid"].as<String>()==ssid){duplicate=true;break;}
+    if(duplicate)continue;
+    JsonObject item=list.add<JsonObject>();item["ssid"]=ssid;item["rssi"]=WiFi.RSSI(index);
+    item["secure"]=WiFi.encryptionType(index)!=WIFI_AUTH_OPEN;
+  }
+  serializeJson(doc,setupWifiScanResult);WiFi.scanDelete();setupWifiScanRequested=false;
+  server.send(200,"application/json",setupWifiScanResult);
+}
+
 // Save WiFi + network settings (requires restart)
 static void handleSaveWifi() {
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+  // Fail before mutation instead of storing a truncated SSID/password.
+  const size_t ssidLength = server.arg("ssid").length();
+  if (ssidLength == 0 || ssidLength >= sizeof(wifiSSID) ||
+      server.arg("pass").length() >= sizeof(wifiPass)) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid Wi-Fi credential length\"}");
+    return;
+  }
+  server.sendHeader("Cache-Control", "no-store");
+#endif
   if (server.hasArg("ssid")) strlcpy(wifiSSID, server.arg("ssid").c_str(), sizeof(wifiSSID));
-  if (server.hasArg("pass") && server.arg("pass").length() > 0) strlcpy(wifiPass, server.arg("pass").c_str(), sizeof(wifiPass));
+  if (server.hasArg("pass") && (server.arg("pass").length() > 0 || server.arg("clear_pass")=="1")) strlcpy(wifiPass, server.arg("pass").c_str(), sizeof(wifiPass));
 
   netSettings.useDHCP = (!server.hasArg("netmode") || server.arg("netmode") == "dhcp");
   if (server.hasArg("net_ip"))  strlcpy(netSettings.staticIP, server.arg("net_ip").c_str(), sizeof(netSettings.staticIP));
@@ -474,6 +795,13 @@ static void handleApply() {
   char prevTz[sizeof(netSettings.timezoneStr)];
   strlcpy(prevTz, netSettings.timezoneStr, sizeof(prevTz));
   readDisplayFromForm();
+#if defined(BOARD_IS_WS43B)
+  const auto clock = ws43bClockSettings();
+  if (!saveWs43bClockSettings(clock.idleMinutes, clock.screenOff, netSettings.use24h)) {
+    server.send(500, "text/plain", "Clock settings write failed");
+    return;
+  }
+#endif
   saveSettings();
   applyDisplaySettings();
   if (strcmp(netSettings.timezoneStr, prevTz) != 0) {
@@ -482,9 +810,133 @@ static void handleApply() {
   server.send(200, "text/plain", "OK");
 }
 
+#if defined(BOARD_IS_WS43B)
+// Diagnostic response only; neither a printer command nor a persistent screen
+// freeze. The single application loop cannot draw or process MQTT during this
+// bounded transfer. Even a client that stops reading cannot hold it forever.
+static bool sendFrameBytes(int fd, const uint8_t *bytes, size_t count, uint32_t started) {
+  while (count) {
+    if (fd < 0 || uint32_t(millis() - started) >= 8000) return false;
+    const int sent = send(fd, bytes, count, MSG_DONTWAIT);
+    if (sent > 0) { bytes += sent; count -= size_t(sent); }
+    else if (sent == 0 || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)) return false;
+    delay(1); // Feed system tasks; never call the renderer or server recursively.
+  }
+  return true;
+}
+
+static void handleFrameCapture() {
+  auto client = server.client();
+  const uint32_t started = millis();
+  ws43b::FrameCaptureInfo info{};
+  const bool available = !isAPMode() && isPrinterConfigured(0) && ws43b::frameCaptureInfo(info);
+  if (!available) {
+    const char unavailable[] = "HTTP/1.1 409 Conflict\r\nContent-Length: 0\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
+    sendFrameBytes(client.fd(), reinterpret_cast<const uint8_t *>(unavailable), sizeof(unavailable)-1, started);
+    client.stop();
+    return;
+  }
+  // Internal SRAM scratch, not another PSRAM frame. Static storage also keeps
+  // the 3.2 KB row off the small Arduino-loop stack. No HTTP re-entrancy.
+  static DRAM_ATTR uint8_t row[ws43b::CAPTURE_ROW_BYTES * 2];
+  char http[200];
+  const int httpSize = snprintf(http, sizeof(http),
+      "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %u\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+      unsigned(ws43b::CAPTURE_BYTES));
+  uint8_t header[ws43b::CAPTURE_HEADER_BYTES];
+  ws43b::captureHeader(header, info);
+  bool ok = httpSize > 0 && size_t(httpSize) < sizeof(http) &&
+      sendFrameBytes(client.fd(), reinterpret_cast<const uint8_t *>(http), size_t(httpSize), started) &&
+      sendFrameBytes(client.fd(), header, sizeof(header), started);
+  for (size_t y = 0; ok && y < ws43b::CAPTURE_HEIGHT; ++y)
+    ok = ws43b::readFrameCaptureRow(y, row, sizeof(row)) && sendFrameBytes(client.fd(), row, sizeof(row), started);
+  // On timeout/error the receiver rejects the truncated response. Never emit
+  // another status body into the middle of a binary image.
+  client.stop();
+}
+#endif
+
+#if defined(BOARD_IS_WS43B) && !BAMBU_MONITOR_ONLY
+static void handleMonitorStatus() {
+  JsonDocument doc;
+  const uint8_t slot = rotState.displayIndex;
+  BambuState& st = printers[slot].state;
+  // Deliberately no raw payload or credentials, and no numeric zero standing
+  // in for missing temperatures. The TFT renders validated per-field values.
+  const MqttDiag& monitorDiag = getMqttDiag(slot);
+  const bool monitorOnline = isWiFiConnected() && !isAPMode() && st.connected;
+  doc["monitor_only"] = bool(BAMBU_MONITOR_ONLY);
+  doc["configured"] = isPrinterConfigured(slot);
+  doc["wifi_connected"] = isWiFiConnected() && !isAPMode();
+  doc["mqtt_connected"] = monitorOnline;
+  doc["mqtt_attempts"] = monitorDiag.attempts;
+  if (monitorDiag.attempts) doc["mqtt_last_rc"] = monitorDiag.lastRc;
+  else doc["mqtt_last_rc"] = nullptr;
+  doc["messages"] = monitorDiag.messagesRx;
+  doc["valid_reports"] = st.monitor.validReports;
+  doc["malformed_reports"] = st.monitor.malformedReports;
+  doc["mqtt_connect_ms"] = monitorDiag.connectDurMs;
+#if BOARD_MQTT_ASYNC_CONNECT
+  doc["mqtt_connect_pending"] = monitorDiag.connectPending;
+  doc["mqtt_connect_stack_free"] = monitorDiag.connectStackFree;
+#endif
+#if WS43B_CONNECT_DIAG
+  doc["connection_diag_version"] = 1;
+  doc["tcp_probe_ms"] = monitorDiag.tcpProbeMs;
+  doc["transport_setup_ms"] = monitorDiag.transportSetupMs;
+  doc["tls_handshake_ms"] = monitorDiag.tlsHandshakeMs;
+  doc["mqtt_session_ms"] = monitorDiag.mqttSessionMs;
+  doc["mqtt_subscribe_ms"] = monitorDiag.subscribeMs;
+  doc["tls_ready"] = monitorDiag.tlsReady;
+#endif
+  doc["pushall_sent"] = monitorDiag.pushallTotal;
+  if(st.monitor.hasUsefulData && monitorDiag.connectTime)
+    doc["first_data_delay_ms"] = uint32_t(st.monitor.firstUsefulMs-monitorDiag.connectTime);
+  else doc["first_data_delay_ms"] = nullptr;
+  if(st.monitor.coreSeen && monitorDiag.connectTime)
+    doc["first_core_delay_ms"] = uint32_t(st.monitor.firstCoreMs-monitorDiag.connectTime);
+  else doc["first_core_delay_ms"] = nullptr;
+  doc["uptime_ms"] = millis();
+#if defined(BOARD_IS_WS43B)
+  doc["reset_reason"] = int(esp_reset_reason());
+  doc["loop_stack_high_water_mark"] = uxTaskGetStackHighWaterMark(nullptr);
+  doc["free_heap"] = ESP.getFreeHeap();
+  doc["min_free_heap"] = ESP.getMinFreeHeap();
+  doc["free_psram"] = ESP.getFreePsram();
+  const ws43b::RenderDiagnostics displayDiag = ws43b::renderDiagnostics();
+  doc["display_diag_version"] = 6;
+  doc["display_requested_pclk_hz"] = ws43b::requestedPclkHz();
+  doc["display_bounce_pixels"] = ws43b::bounceBufferPixels();
+  doc["display_dcache_line_bytes"] = ws43b::dcacheLineBytes();
+  doc["display_frames"] = displayDiag.frames;
+  doc["display_last_render_us"] = displayDiag.lastRenderUs;
+  doc["display_max_render_us"] = displayDiag.maxRenderUs;
+  doc["display_legacy_fill_probes"] = displayDiag.legacyFillProbes;
+  doc["display_legacy_fill_mismatches"] = displayDiag.legacyFillMismatches;
+  doc["display_fill_readback_errors"] = displayDiag.fillReadbackErrors;
+#endif
+  doc["has_useful_data"] = st.monitor.hasUsefulData;
+  if (st.monitor.hasUsefulData) {
+    const uint32_t ageMs = millis() - st.monitor.lastUsefulMs;
+    doc["useful_age_s"] = ageMs / 1000UL;
+    doc["data_fresh"] = monitorOnline && ageMs <= BAMBU_MONITOR_FRESH_MS;
+  } else {
+    doc["useful_age_s"] = nullptr;
+    doc["data_fresh"] = false;
+  }
+  String monitorJson;
+  serializeJson(doc, monitorJson);
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", monitorJson);
+  return;
+}
+#endif
+
 static void handleStatus() {
   uint8_t slot = 0;
+#if !BAMBU_MONITOR_ONLY
   if (server.hasArg("slot")) slot = server.arg("slot").toInt();
+#endif
   // Bound by the config array, not by MAX_ACTIVE_PRINTERS: the two differ on a
   // low-RAM board, which still keeps MAX_PRINTERS NVS slots but only runs two
   // MQTT connections. Clamping to 0 made /status?slot=2 there answer about slot
@@ -495,6 +947,67 @@ static void handleStatus() {
   BambuState& st = printers[slot].state;
 
   JsonDocument doc;
+#if BAMBU_MONITOR_ONLY
+  // Deliberately no raw payload or credentials, and no numeric zero standing
+  // in for missing temperatures. The TFT renders validated per-field values.
+  const MqttDiag& monitorDiag = getMqttDiag(slot);
+  const bool monitorOnline = isWiFiConnected() && !isAPMode() && st.connected;
+  doc["monitor_only"] = bool(BAMBU_MONITOR_ONLY);
+  doc["configured"] = isPrinterConfigured(slot);
+  doc["wifi_connected"] = isWiFiConnected() && !isAPMode();
+  doc["mqtt_connected"] = monitorOnline;
+  doc["mqtt_attempts"] = monitorDiag.attempts;
+  if (monitorDiag.attempts) doc["mqtt_last_rc"] = monitorDiag.lastRc;
+  else doc["mqtt_last_rc"] = nullptr;
+  doc["messages"] = monitorDiag.messagesRx;
+  doc["valid_reports"] = st.monitor.validReports;
+  doc["malformed_reports"] = st.monitor.malformedReports;
+  doc["mqtt_connect_ms"] = monitorDiag.connectDurMs;
+#if BOARD_MQTT_ASYNC_CONNECT
+  doc["mqtt_connect_pending"] = monitorDiag.connectPending;
+  doc["mqtt_connect_stack_free"] = monitorDiag.connectStackFree;
+#endif
+  doc["pushall_sent"] = monitorDiag.pushallTotal;
+  if(st.monitor.hasUsefulData && monitorDiag.connectTime)
+    doc["first_data_delay_ms"] = uint32_t(st.monitor.firstUsefulMs-monitorDiag.connectTime);
+  else doc["first_data_delay_ms"] = nullptr;
+  if(st.monitor.coreSeen && monitorDiag.connectTime)
+    doc["first_core_delay_ms"] = uint32_t(st.monitor.firstCoreMs-monitorDiag.connectTime);
+  else doc["first_core_delay_ms"] = nullptr;
+  doc["uptime_ms"] = millis();
+#if defined(BOARD_IS_WS43B)
+  doc["reset_reason"] = int(esp_reset_reason());
+  doc["loop_stack_high_water_mark"] = uxTaskGetStackHighWaterMark(nullptr);
+  doc["free_heap"] = ESP.getFreeHeap();
+  doc["min_free_heap"] = ESP.getMinFreeHeap();
+  doc["free_psram"] = ESP.getFreePsram();
+  const ws43b::RenderDiagnostics displayDiag = ws43b::renderDiagnostics();
+  doc["display_diag_version"] = 6;
+  doc["display_requested_pclk_hz"] = ws43b::requestedPclkHz();
+  doc["display_bounce_pixels"] = ws43b::bounceBufferPixels();
+  doc["display_dcache_line_bytes"] = ws43b::dcacheLineBytes();
+  doc["display_frames"] = displayDiag.frames;
+  doc["display_last_render_us"] = displayDiag.lastRenderUs;
+  doc["display_max_render_us"] = displayDiag.maxRenderUs;
+  doc["display_legacy_fill_probes"] = displayDiag.legacyFillProbes;
+  doc["display_legacy_fill_mismatches"] = displayDiag.legacyFillMismatches;
+  doc["display_fill_readback_errors"] = displayDiag.fillReadbackErrors;
+#endif
+  doc["has_useful_data"] = st.monitor.hasUsefulData;
+  if (st.monitor.hasUsefulData) {
+    const uint32_t ageMs = millis() - st.monitor.lastUsefulMs;
+    doc["useful_age_s"] = ageMs / 1000UL;
+    doc["data_fresh"] = monitorOnline && ageMs <= BAMBU_MONITOR_FRESH_MS;
+  } else {
+    doc["useful_age_s"] = nullptr;
+    doc["data_fresh"] = false;
+  }
+  String monitorJson;
+  serializeJson(doc, monitorJson);
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", monitorJson);
+  return;
+#endif
   // Per-printer (driven by ?slot=)
   doc["connected"] = st.connected;
   doc["configured"] = isPrinterConfigured(slot);
@@ -817,6 +1330,11 @@ static void handleCardBmp() {
 
 // Whatever screen is up (gauges, clock, Card...), re-rendered into PSRAM.
 static void handleScreenBmp() {
+#if defined(BOARD_IS_WS43B)
+  // Native canvas uses a separate render target; legacy retargeting is unsafe.
+  server.send(501, "text/plain", "Use the native 4.3B frame capture endpoint");
+  return;
+#endif
   const uint16_t* buf; int16_t w, h;
   if (!screenCaptureBegin(&buf, &w, &h)) {
     server.send(503, "text/plain", "Screenshot needs free PSRAM (not on a power-confirm screen)");
@@ -893,7 +1411,16 @@ static void handleToggleSetting() {
   else if (key == "hmsonl")  dispSettings.hmsLookupOnline = on;
 #endif
   else if (key == "nighten") dpSettings.nightModeEnabled = on;
+#if defined(BOARD_IS_WS43B)
+  else if (key == "use24h") {
+    const auto clock = ws43bClockSettings();
+    if (!saveWs43bClockSettings(clock.idleMinutes, clock.screenOff, on)) {
+      server.send(500, "text/plain", "Clock settings write failed"); return;
+    }
+  }
+#else
   else if (key == "use24h")  netSettings.use24h = on;
+#endif
   else if (key == "rotsplit")  rotState.splitEnabled = on;
   else if (key == "rotsplitf") rotState.splitForce = on;
   else if (key == "clkhd")     dispSettings.hideClockDate = on;
@@ -1228,7 +1755,9 @@ static void handleLanScan() {
 // Get printer config for a specific slot (multi-printer tabs)
 static void handlePrinterConfig() {
   uint8_t slot = 0;
+#if !BAMBU_MONITOR_ONLY
   if (server.hasArg("slot")) slot = server.arg("slot").toInt();
+#endif
   if (slot >= MAX_ACTIVE_PRINTERS) slot = 0;
 
   PrinterConfig& cfg = printers[slot].config;
@@ -1242,6 +1771,13 @@ static void handlePrinterConfig() {
   doc["region"] = cfg.region == REGION_EU ? "eu" : (cfg.region == REGION_CN ? "cn" : "us");
   doc["connected"] = st.connected;
   doc["configured"] = isPrinterConfigured(slot);
+#if BAMBU_MONITOR_ONLY
+  String monitorJson;
+  serializeJson(doc, monitorJson);  // accessCode / cloud token are never included
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", monitorJson);
+  return;
+#endif
   // Per-fan capability flags derived from device.airduct.parts[] (only the
   // funcs actually reported by this printer). H2C reports func 0/1/2/4, X2D
   // reports 0/2/5/6 — so the UI gates each gauge on its specific bit instead
@@ -1326,6 +1862,10 @@ static void handleLightSet() {
 
 // Test buzzer from web UI
 static void handleBuzzerTest() {
+#if defined(BOARD_IS_WS43B)
+  server.send(409, "application/json", "{\"status\":\"error\",\"message\":\"No supported auxiliary GPIO device on 4.3B\"}");
+  return;
+#endif
   uint8_t snd = 0;
   if (server.hasArg("sound")) snd = server.arg("sound").toInt();
   if (snd <= 2) buzzerPlay((BuzzerEvent)snd);
@@ -1348,6 +1888,10 @@ static uint32_t ledColorArg(const char *arg, uint32_t fallback) {
 // uint8_t (avoids 300 -> 44 wraparound). On invalid pin we shut the preview
 // off so the user doesn't see a "ghost" LED still lit on the previous pin.
 static void handleLedPreview() {
+#if defined(BOARD_IS_WS43B)
+  server.send(409, "application/json", "{\"status\":\"error\",\"message\":\"No supported auxiliary GPIO device on 4.3B\"}");
+  return;
+#endif
   bool en = server.hasArg("en") ? (server.arg("en") == "1") : ledSettings.enabled;
 
   uint8_t drv = ledSettings.driver;
@@ -1391,6 +1935,10 @@ static void handleLedPreview() {
 // has the pin attached and should be testable. ledTriggerTestEffect() reports
 // whether it actually started so we can return a meaningful error.
 static void handleLedTest() {
+#if defined(BOARD_IS_WS43B)
+  server.send(409, "application/json", "{\"status\":\"error\",\"message\":\"No supported auxiliary GPIO device on 4.3B\"}");
+  return;
+#endif
   uint8_t md = ledSettings.finishMode;
   if (server.hasArg("md")) {
     int v = server.arg("md").toInt();
@@ -1427,6 +1975,15 @@ static void handleLedTest() {
 
 // Save rotation settings (multi-printer)
 static void handleSaveRotation() {
+#if defined(BOARD_IS_WS43B)
+  if ((server.hasArg("buzzen") && server.arg("buzzen") != "0") ||
+      (server.hasArg("leden") && server.arg("leden") != "0") ||
+      (server.hasArg("btntype") && server.arg("btntype") != "3") ||
+      server.arg("rotsplit") == "1" || server.arg("rotsplitf") == "1") {
+    server.send(400, "text/plain", "4.3B uses fixed GT911 touch and a single 800x480 view; auxiliary GPIO peripherals are unavailable");
+    return;
+  }
+#endif
   if (server.hasArg("rotmode")) {
     uint8_t mode = server.arg("rotmode").toInt();
     if (mode <= 2) rotState.mode = (RotateMode)mode;
@@ -1461,6 +2018,12 @@ static void handleSaveRotation() {
     uint8_t bp = server.arg("btnpin").toInt();
     if (bp > 0 && bp <= 48) buttonPin = bp;
   }
+#if defined(BOARD_IS_WS43B)
+  buttonType = BTN_TOUCHSCREEN;
+  buttonPin = 0;
+  rotState.splitEnabled = false;
+  rotState.splitForce = false;
+#endif
   saveButtonSettings();
   initButton();
 
@@ -1739,6 +2302,20 @@ static void handleSettingsExport() {
     p["lightDelay"] = cfg.lightOffDelayMin; // off delay (minutes)
   }
 
+#if defined(BOARD_IS_WS43B)
+  const auto &clock = ws43bClockSettings();
+  JsonObject native = doc["waveshare43b"].to<JsonObject>();
+  const auto weather=ws43bWeatherConfig();
+  JsonObject weatherObject=native["weather"].to<JsonObject>();
+  weatherObject["enabled"]=weather.enabled;weatherObject["solar"]=weather.solar;
+  weatherObject["latitude"]=weather.latitude;weatherObject["longitude"]=weather.longitude;
+  weatherObject["city"]=weather.city;weatherObject["night_seconds"]=weather.nightSeconds;
+  native["idle_minutes"] = clock.idleMinutes;
+  native["screen_off"] = clock.screenOff;
+  native["use24h"] = clock.use24h;
+  native["display_mode"] = ws43bAdvancedDisplay() ? "advanced" : "simple";
+  native["language"] = ws43bPolish() ? "pl" : "en";
+#endif
   // Display
   char buf[8];
   JsonObject disp = doc["display"].to<JsonObject>();
@@ -2037,6 +2614,44 @@ static void handleSettingsImportFinish() {
     return;
   }
 
+#if defined(BOARD_IS_WS43B)
+  auto importedClock = ws43bClockSettings();
+  bool importedAdvancedDisplay = ws43bAdvancedDisplay();
+  auto importedWeather = ws43bWeatherConfig();
+  uint8_t importedLanguage = ws43bPolish() ? 0 : 1;
+  if (!doc["waveshare43b"].isNull()) {
+    JsonObject native = doc["waveshare43b"];
+    if (!native || !native["idle_minutes"].is<uint16_t>() ||
+        !native["screen_off"].is<bool>() || !native["use24h"].is<bool>()) {
+      server.send(400, "text/plain", "Invalid 4.3B clock settings"); return;
+    }
+    // Optional for older backups: omission preserves the current presentation.
+    if (native.containsKey("display_mode")) {
+      const char* mode = native["display_mode"].is<const char*>() ? native["display_mode"].as<const char*>() : "";
+      if (strcmp(mode, "simple") && strcmp(mode, "advanced")) {
+        server.send(400, "text/plain", "Invalid display mode"); return;
+      }
+      importedAdvancedDisplay = !strcmp(mode, "advanced");
+    }
+    if (!native["language"].isNull()) {
+      const char* lang = native["language"].is<const char*>() ? native["language"].as<const char*>() : "";
+      if (strcmp(lang, "pl") && strcmp(lang, "en")) {
+        server.send(400, "text/plain", "Invalid language"); return;
+      }
+      importedLanguage = strcmp(lang, "pl") ? 1 : 0;
+    }
+    if(!native["weather"].isNull() && !ws43b_weather::parseConfig(native["weather"].as<JsonVariantConst>(),importedWeather)) {
+      server.send(400,"text/plain","Invalid weather settings");return;
+    }
+    const uint16_t minutes = native["idle_minutes"];
+    if (minutes != 0 && minutes != 1 && minutes != 5 && minutes != 15 && minutes != 30) {
+      server.send(400, "text/plain", "Invalid 4.3B idle timeout"); return;
+    }
+    importedClock.idleMinutes = minutes;
+    importedClock.screenOff = native["screen_off"];
+    importedClock.use24h = native["use24h"];
+  }
+#endif
   // Older backups still carry a "wifi" block - ignored, the device keeps its WiFi
   // credentials. The "network" block (DHCP / static IP / hostname) still applies.
 
@@ -2435,6 +3050,22 @@ static void handleSettingsImportFinish() {
   }
 
   // Save everything to NVS
+#if defined(BOARD_IS_WS43B)
+  if (!saveWs43bDisplayMode(importedAdvancedDisplay)) {
+    server.send(500, "text/plain", "Display mode could not be saved. Please retry."); return;
+  }
+  if (!saveWs43bWeather(importedWeather)) {
+    server.send(500,"text/plain","Weather settings write failed");return;
+  }
+  if (!saveWs43bLanguage(importedLanguage)) {
+    server.send(500, "text/plain", "Language could not be saved"); return;
+  }
+  if (doc["waveshare43b"].isNull()) importedClock.use24h = netSettings.use24h;
+  if (!saveWs43bClockSettings(importedClock.idleMinutes, importedClock.screenOff, importedClock.use24h)) {
+    server.send(500, "text/plain", "Clock settings write failed"); return;
+  }
+  sanitizeWs43bHardwareSettings();
+#endif
   saveSettings();
   saveRotationSettings();
   saveButtonSettings();
@@ -2466,7 +3097,11 @@ static void otaAutoTaskFn(void* param) {
   disableCore0WDT();
 
   WiFiClientSecure client;
+#if defined(BOARD_IS_WS43B)
+  client.setCACertBundle(rootca_crt_bundle_start, rootca_crt_bundle_end - rootca_crt_bundle_start);
+#else
   client.setCACertBundle(rootca_crt_bundle_start);
+#endif
 
   httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
   httpUpdate.onProgress([](int cur, int total) {
@@ -2519,7 +3154,14 @@ static void otaAutoTaskFn(void* param) {
 }
 
 static void handleOtaAuto() {
-  if (otaAutoInProgress) {
+#if defined(BOARD_IS_WS43B)
+  const auto *next = esp_ota_get_next_update_partition(NULL);
+  if (!next || next == esp_ota_get_running_partition()) {
+    server.send(409, "application/json", "{\"error\":\"Install the 4.3B dual-slot partition table over USB first\"}");
+    return;
+  }
+#endif
+  if (otaAutoInProgress || otaInProgress) {
     server.send(409, "application/json", "{\"error\":\"Update already in progress\"}");
     return;
   }
@@ -2530,6 +3172,11 @@ static void handleOtaAuto() {
     return;
   }
 
+#if defined(BOARD_IS_WS43B)
+  if(!ws43b::beginOtaDisplay()) {
+    server.send(409,"application/json","{\"error\":\"Display is busy; retry update\"}");return;
+  }
+#endif
   disconnectBambuMqtt();
 
   otaAutoInProgress = true;
@@ -2573,6 +3220,17 @@ static void handleOtaUpload() {
 
   if (upload.status == UPLOAD_FILE_START) {
     otaError = "";
+#if defined(BOARD_IS_WS43B)
+    if (!upload.filename.startsWith("BambuHelper-ws_lcd_43b-") ||
+        !upload.filename.endsWith("-ota.bin")) {
+      otaError = "Use a BambuHelper-ws_lcd_43b-...-ota.bin application for this board";
+      otaInProgress = false;
+      return;
+    }
+#endif
+#if defined(BOARD_IS_WS43B)
+    if(!ws43b::beginOtaDisplay()) {otaError="Display is busy; retry update";return;}
+#endif
     otaInProgress = true;
     otaFirstChunk = true;
     Serial.printf("OTA: start, file=%s\n", upload.filename.c_str());
@@ -2580,7 +3238,11 @@ static void handleOtaUpload() {
     disconnectBambuMqtt();
 
     const esp_partition_t* partition = esp_ota_get_next_update_partition(NULL);
-    if (!partition) {
+    if (!partition
+#if defined(BOARD_IS_WS43B)
+        || partition == esp_ota_get_running_partition()
+#endif
+    ) {
       otaError = "No OTA partition found";
       Serial.println("OTA: no OTA partition found");
       otaInProgress = false;
@@ -2609,7 +3271,11 @@ static void handleOtaUpload() {
     // Validate ESP32 magic byte on first chunk
     if (otaFirstChunk && upload.currentSize > 0) {
       otaFirstChunk = false;
-      if (upload.buf[0] != 0xE9) {
+      if (upload.buf[0] != 0xE9
+#if defined(BOARD_IS_WS43B)
+          || upload.currentSize < 24 || upload.buf[12] != 9 || upload.buf[13] != 0
+#endif
+      ) {
         otaError = "Invalid firmware file";
         Update.abort();
         otaInProgress = false;
@@ -2771,6 +3437,24 @@ static void handleCaptiveDetect() {
   server.send(302, "text/plain", "");
 }
 
+#if defined(BOARD_IS_WS43B) && WS43B_MEMORY_DIAG
+static void handleMemoryDiagnostics() {
+  // The response lives in PSRAM; never reserve an 8 KB internal heap buffer
+  // while measuring internal memory pressure.
+  constexpr size_t capacity = 8192;
+  char *body = static_cast<char *>(heap_caps_malloc(capacity, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  if (!body) { server.send(503, "application/json", "{}"); return; }
+  const size_t length = ws43b_memory::formatJson(body, capacity);
+  if (length) {
+    server.sendHeader("Cache-Control", "no-store");
+    server.setContentLength(length);
+    server.send(200, "application/json", "");
+    server.sendContent(body, length);
+  } else server.send(500, "application/json", "{}");
+  heap_caps_free(body);
+}
+#endif
+
 void initWebServer() {
   // Captive portal detection endpoints (must be before onNotFound)
   server.on("/generate_204", HTTP_GET, handleCaptiveDetect);        // Android/Samsung
@@ -2780,8 +3464,56 @@ void initWebServer() {
   server.on("/canonical.html", HTTP_GET, handleCaptiveDetect);       // Firefox
 
   server.on("/", HTTP_GET, handleRoot);
+#if defined(BOARD_IS_WS43B) && WS43B_MEMORY_DIAG
+  server.on("/diagnostics/memory", HTTP_GET, handleMemoryDiagnostics);
+#endif
+#if defined(BOARD_IS_WS43B)
+  server.on("/ui/language", HTTP_GET, handleLanguageGet);
+  server.on("/ui/language", HTTP_POST, handleLanguageSave);
+#endif
+  server.on("/wifi/scan", HTTP_POST, handleSetupWifiScan);
+  server.on("/wifi/scan", HTTP_GET, handleSetupWifiScan);
   server.on("/save/wifi", HTTP_POST, handleSaveWifi);
   server.on("/save/printer", HTTP_POST, handleSavePrinter);
+#if BAMBU_MONITOR_ONLY
+  // Allowlist is the server-side boundary. Hidden legacy controls cannot be
+  // invoked by direct HTTP, including uploads, settings import and GPIO tests.
+  server.on("/printer/config", HTTP_GET, handlePrinterConfig);
+  server.on("/status", HTTP_GET, handleStatus);
+  server.on("/monitor/status", HTTP_GET, handleStatus);
+#if defined(BOARD_IS_WS43B)
+  server.on("/monitor/display", HTTP_GET, handleMonitorDisplayGet);
+  server.on("/monitor/display", HTTP_POST, handleMonitorDisplaySave);
+  server.on("/monitor/weather/setup", HTTP_GET, handleWeatherSetupGet);
+  server.on("/monitor/weather/setup", HTTP_POST, handleWeatherSetupSave);
+  server.on("/monitor/weather", HTTP_GET, handleWeatherGet);
+  server.on("/monitor/weather", HTTP_POST, handleWeatherSave);
+  server.on("/monitor/clock", HTTP_GET, handleMonitorClockGet);
+  server.on("/monitor/clock", HTTP_POST, handleMonitorClockSave);
+  server.on("/monitor/display-mode", HTTP_GET, handleMonitorDisplayModeGet);
+  server.on("/monitor/display-mode", HTTP_POST, handleMonitorDisplayModeSave);
+  server.on("/diagnostics/frame", HTTP_GET, handleFrameCapture);
+#endif
+  server.onNotFound(handleMonitorBlocked);
+#else
+#if defined(BOARD_IS_WS43B)
+  server.on("/monitor", HTTP_GET, []() {
+    server.sendHeader("Cache-Control", "no-store");
+    server.send_P(200, "text/html; charset=utf-8", MONITOR_PAGE);
+  });
+  server.on("/monitor/status", HTTP_GET, handleMonitorStatus);
+  server.on("/monitor/display", HTTP_GET, handleMonitorDisplayGet);
+  server.on("/monitor/display", HTTP_POST, handleMonitorDisplaySave);
+  server.on("/monitor/weather/setup", HTTP_GET, handleWeatherSetupGet);
+  server.on("/monitor/weather/setup", HTTP_POST, handleWeatherSetupSave);
+  server.on("/monitor/weather", HTTP_GET, handleWeatherGet);
+  server.on("/monitor/weather", HTTP_POST, handleWeatherSave);
+  server.on("/monitor/clock", HTTP_GET, handleMonitorClockGet);
+  server.on("/monitor/clock", HTTP_POST, handleMonitorClockSave);
+  server.on("/monitor/display-mode", HTTP_GET, handleMonitorDisplayModeGet);
+  server.on("/monitor/display-mode", HTTP_POST, handleMonitorDisplayModeSave);
+  server.on("/diagnostics/frame", HTTP_GET, handleFrameCapture);
+#endif
   server.on("/save/gaugelayout", HTTP_POST, handleSaveGaugeLayout);
   server.on("/save/rotation", HTTP_POST, handleSaveRotation);
   server.on("/save/power", HTTP_POST, handleSavePower);
@@ -2831,6 +3563,7 @@ void initWebServer() {
   server.on("/ota/status", HTTP_GET,  handleOtaStatus);
 #endif
   server.onNotFound(handleNotFound);
+#endif
   const char* otaHeaders[] = {"X-MD5"};
   server.collectHeaders(otaHeaders, 1);
   server.begin();
@@ -2840,6 +3573,13 @@ void initWebServer() {
 void handleWebServer() {
   server.handleClient();
 
+#if defined(BOARD_IS_WS43B)
+  bool otaBusyNow=otaInProgress;
+#ifdef ENABLE_OTA_AUTO
+  otaBusyNow=otaBusyNow||otaAutoInProgress;
+#endif
+  if(ws43b::otaDisplayActive()&&!otaBusyNow&&!pendingRestartAt)otaMqttReinitPending=true;
+#endif
   if (otaMqttReinitPending) {
     bool otaBusy = otaInProgress;
 #ifdef ENABLE_OTA_AUTO
@@ -2847,6 +3587,9 @@ void handleWebServer() {
 #endif
     if (!otaBusy) {
       otaMqttReinitPending = false;
+#if defined(BOARD_IS_WS43B)
+      ws43b::endOtaDisplay();
+#endif
       Serial.println("OTA: update failed/aborted, re-initializing MQTT");
       initBambuMqtt();
     }

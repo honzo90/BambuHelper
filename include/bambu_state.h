@@ -3,6 +3,9 @@
 
 #include <Arduino.h>
 #include "config.h"
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+#include "bambu_monitor.h"
+#endif
 
 enum ConnMode : uint8_t { CONN_LOCAL = 0, CONN_CLOUD = 1, CONN_CLOUD_ALL = 2 };
 enum CloudRegion : uint8_t { REGION_US = 0, REGION_EU = 1, REGION_CN = 2 };
@@ -128,6 +131,9 @@ inline uint64_t hmsKeyOf(uint32_t attr, uint32_t code) {
 #define PRINT_MAP_MAX 8
 
 struct BambuState {
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+  BambuMonitorTelemetry monitor;
+#endif
   bool connected;
   bool printing;
   char gcodeState[16];        // RUNNING, PAUSE, FINISH, IDLE, FAILED, PREPARE

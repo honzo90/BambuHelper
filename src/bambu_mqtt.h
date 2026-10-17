@@ -3,9 +3,18 @@
 
 #include <Arduino.h>
 #include "config.h"
+#include "ws43b_connection_diag.h"
 
 // Connection diagnostics exposed for display/web
 struct MqttDiag {
+#if BOARD_MQTT_ASYNC_CONNECT
+  bool connectPending;
+  uint32_t connectStackFree;
+#endif
+#if WS43B_CONNECT_DIAG
+  uint32_t tcpProbeMs, transportSetupMs, tlsHandshakeMs, mqttSessionMs, subscribeMs;
+  bool tlsReady;
+#endif
   int      lastRc;          // PubSubClient state code from last attempt
   uint32_t attempts;        // broker connect attempts since boot
   uint32_t probes;          // LAN: TCP probes that found the printer unreachable
@@ -40,7 +49,8 @@ enum PushallReason : uint8_t {
   PUSHALL_RECOVERY_FINISH_HOT,
   PUSHALL_RECOVERY_FAILED,
   PUSHALL_MANUAL,
-  PUSHALL_PERIODIC_IDLE      // cloud: low-rate poll while not printing (catches dropped print-start delta)
+  PUSHALL_PERIODIC_IDLE,     // cloud: low-rate poll while not printing (catches dropped print-start delta)
+  PUSHALL_RECOVERY_VISIBLE
 };
 
 extern bool mqttDebugLog;   // verbose Serial logging (toggled via web)
@@ -48,6 +58,9 @@ extern bool mqttDebugLog;   // verbose Serial logging (toggled via web)
 void initBambuMqtt();
 void initBambuMqttSlot(uint8_t slot);    // re-init one slot, leave the other connected
 void handleBambuMqtt();
+#if defined(BOARD_IS_WS43B)
+bool bambuMqttReceivePending(uint8_t slot);
+#endif
 void disconnectBambuMqtt();              // disconnect all connections
 void disconnectBambuMqtt(uint8_t slot);  // disconnect specific slot
 

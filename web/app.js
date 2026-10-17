@@ -29,14 +29,14 @@ function loadSection(id){
   for (var j = 0; j < navs.length; j++) {
     navs[j].setAttribute('aria-current', navs[j].dataset.section === id ? 'true' : 'false');
   }
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('scrim').classList.remove('show');
+  setDrawer(false);
   window.scrollTo(0, 0);
   try { localStorage.setItem('bambu_section', id); } catch(e){}
   if (location.hash !== '#' + id) {
     try { history.replaceState(null, '', '#' + id); } catch(e){}
   }
   startPolling(id);
+  if(id==='wifi'&&!wifiScanLoaded)scanWifi();
 }
 var navBtns = document.querySelectorAll('.nav-item');
 for (var b = 0; b < navBtns.length; b++){
@@ -59,15 +59,56 @@ document.getElementById('themeToggle').addEventListener('click', function(){
   try { localStorage.setItem('bh-theme', next); } catch(e){}
 });
 
-/* ============ Mobile drawer ============ */
-document.getElementById('hamburger').addEventListener('click', function(){
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('scrim').classList.toggle('show');
+/* ============ Navigation icons / mobile drawer ============ */
+// Local, decorative SVGs. No icon fonts, CDN or user data enters this markup.
+var navPaths = {
+  printer: 'M7 8V3h10v5M6 17H3V8h18v9h-3M7 14h10v7H7zM17 11h1',
+  display: 'M3 4h18v13H3zM8 21h8M12 17v4',
+  printscreen: 'M4 3h16v18H4zM8 7h8M8 11h5M8 17h8',
+  afterprint: 'M20 11a8 8 0 1 1-5-7M9 10l3 3 9-9',
+  clock: 'M12 8v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',
+  colors: 'M12 3C7 3 3 7 3 12s4 9 9 9h1a2 2 0 0 0 1-4 2 2 0 0 1 1-4h3c4 0 4-10-6-10M7 9h.01M10 6h.01M15 6h.01M18 9h.01',
+  hardware: 'M6 6h12v12H6zM9 9h6v6H9zM9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3',
+  power: 'm13 2-9 12h7l-1 8 10-13h-7z',
+  wifi: 'M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M8 16a6 6 0 0 1 8 0M12 20h.01',
+  errors: 'm12 3 10 18H2zM12 9v5M12 17h.01',
+  diag: 'M3 5h18v14H3zM6 12h3l2-4 3 8 2-4h2'
+};
+document.querySelectorAll('.nav-item').forEach(function(button){
+  var path=navPaths[button.dataset.section];if(!path)return;
+  var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('class','nav-icon');
+  svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
+  svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');
+  svg.setAttribute('stroke-width','1.6');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');
+  var shape=document.createElementNS('http://www.w3.org/2000/svg','path');shape.setAttribute('d',path);
+  svg.appendChild(shape);button.prepend(svg);
 });
-document.getElementById('scrim').addEventListener('click', function(){
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('scrim').classList.remove('show');
+function setDrawer(open){
+  var sidebar=document.getElementById('sidebar'),toggle=document.getElementById('hamburger');
+  var wasOpen=sidebar.classList.contains('open');
+  sidebar.classList.toggle('open',open);
+  document.getElementById('scrim').classList.toggle('show',open);
+  toggle.setAttribute('aria-expanded',String(open));
+  if(open){
+    var first=sidebar.querySelector('.nav-item[aria-current="true"]')||sidebar.querySelector('.nav-item');
+    if(first)first.focus();
+  }else if(wasOpen && window.matchMedia('(max-width: 820px)').matches)toggle.focus();
+}
+document.getElementById('hamburger').addEventListener('click',function(){setDrawer(!document.getElementById('sidebar').classList.contains('open'));});
+document.getElementById('scrim').addEventListener('click',function(){setDrawer(false);});
+document.addEventListener('keydown',function(event){
+  var sidebar=document.getElementById('sidebar');if(!sidebar.classList.contains('open'))return;
+  if(event.key==='Escape'){event.preventDefault();setDrawer(false);}
+  if(event.key==='Tab'){
+    var buttons=Array.from(sidebar.querySelectorAll('button')).filter(function(el){return !el.disabled && el.getClientRects().length;});
+    if(!buttons.length)return;
+    var first=buttons[0],last=buttons[buttons.length-1];
+    if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
+    else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
+  }
 });
+window.addEventListener('resize',function(){if(!window.matchMedia('(max-width: 820px)').matches)setDrawer(false);});
 
 /* ============ Toast ============ */
 var _toastTimer = null;
@@ -705,9 +746,64 @@ function pickLanDevice(mode){
   fillLanDevice(mode, { serial: sel.value, ip: opt.getAttribute('data-ip') });
 }
 
+/* ============ WiFi network selection ============ */
+var wifiScanLoaded=false,wifiScanNetworks=[],wifiSelectedSsid='',wifiSelectedOpen=false;
+function chooseNetwork(){
+  var selected=document.getElementById('networks').value;
+  if(selected)document.getElementById('ssid').value=selected;
+  else document.getElementById('ssid').focus();
+  document.getElementById('pass').value='';
+  wifiSelectedSsid=selected;
+  wifiSelectedOpen=wifiScanNetworks.some(function(n){return n.ssid===selected&&n.secure===false;});
+}
+function wifiClearSavedPassword(ssid){
+  return ssid!==document.getElementById('ssid').defaultValue || (ssid===wifiSelectedSsid&&wifiSelectedOpen);
+}
+async function scanWifi(){
+  var button=document.getElementById('scan'),msg=document.getElementById('scanmsg');
+  if(!button||button.disabled)return;
+  button.disabled=true;wifiScanLoaded=true;msg.textContent='Scanning for networks…';
+  async function request(options){
+    // Scanning briefly moves the radio off the connected channel. Retry a
+    // transient HTTP failure without changing Wi-Fi credentials or settings.
+    for(var retry=0;retry<3;retry++) {
+      var controller=new AbortController(),timer=setTimeout(function(){controller.abort();},6000);
+      try {
+        var response=await fetch('/wifi/scan',Object.assign({cache:'no-store',signal:controller.signal},options||{}));
+        if(!response.ok)throw Error('scan_http');
+        var data=await response.json();
+        return data;
+      } catch(e) {if(retry===2)throw e;}
+      finally{clearTimeout(timer);}
+      await new Promise(function(resolve){setTimeout(resolve,800);});
+    }
+  }
+  try {
+    await request({method:'POST'});
+    var restarts=0;
+    for(var attempt=0;attempt<25;attempt++) {
+      await new Promise(function(resolve){setTimeout(resolve,800);});
+      var data=await request();if(data.state==='scanning')continue;
+      if(data.state==='failed' && restarts<2) {restarts++;await request({method:'POST'});continue;}
+      if(data.state!=='done'||!Array.isArray(data.networks))throw Error();
+      wifiScanNetworks=data.networks;
+      var select=document.getElementById('networks'),previous=select.value;select.length=1;
+      data.networks.forEach(function(network){
+        var option=document.createElement('option');option.value=network.ssid;
+        option.textContent=network.ssid+' · '+network.rssi+' dBm'+(network.secure?' 🔒':'');select.appendChild(option);
+      });
+      if(data.networks.some(function(n){return n.ssid===previous;}))select.value=previous;
+      msg.textContent=data.networks.length?'Select a network or enter its name below.':'No networks found. Try again or enter the name manually.';
+      return;
+    }
+    throw Error();
+  }catch(e){msg.textContent='Scan failed. Try again or enter the network manually.';}
+  finally{button.disabled=false;}
+}
+
 /* ============ Save WiFi ============ */
 function saveWifi(){
-  var ssid = document.getElementById('ssid').value.trim();
+  var ssid = document.getElementById('ssid').value;
   var netmode = document.getElementById('netmode').value;
   var ip = document.getElementById('net_ip').value.trim();
   var gw = document.getElementById('net_gw').value.trim();
@@ -724,6 +820,7 @@ function saveWifi(){
   var p = new URLSearchParams();
   p.append('ssid', ssid);
   p.append('pass', document.getElementById('pass').value);
+  if(wifiClearSavedPassword(ssid))p.append('clear_pass','1');
   p.append('netmode', netmode);
   p.append('net_ip', ip);
   p.append('net_gw', gw);
@@ -758,6 +855,11 @@ function toggleBtnPin(){
 function applyGestureVis(){
   var card = document.getElementById('gestCard');
   if (!card) return;
+  if (DEV.board === 'ws_lcd_43b') {
+    card.hidden = true; document.getElementById('gestOff').hidden = true;
+    ['gtap','gdbl','ghold'].forEach(function(id){var el=document.getElementById(id);if(el)el.disabled=true;});
+    return;
+  }
   var on = DEV.boardBtn === '1' || document.getElementById('btntype').value !== '0';
   card.style.display = on ? '' : 'none';
   document.getElementById('gestOff').style.display = on ? 'none' : '';
@@ -1887,9 +1989,21 @@ function checkForUpdates(){
       var latest = d.tag_name, current = DEV.fw;
       function parseVer(v){ var m = v.replace(/^v/,'').match(/^(\d+)\.(\d+)(?:\.(\d+))?(.*)$/); return m ? {major:parseInt(m[1]),minor:parseInt(m[2]),patch:m[3]?parseInt(m[3]):0,pre:m[4]!==''} : null; }
       function isNewer(a, b){ var av = parseVer(a), bv = parseVer(b); if (!av || !bv) return a !== b; if (av.major !== bv.major) return av.major > bv.major; if (av.minor !== bv.minor) return av.minor > bv.minor; if (av.patch !== bv.patch) return av.patch > bv.patch; return !av.pre && bv.pre; }
-      if (!isNewer(latest, current)){ res.style.color = 'var(--success)'; res.textContent = latest === current ? 'You are up to date (' + current + ')' : 'Running newer version (' + current + ')'; return; }
+      if (DEV.board !== 'ws_lcd_43b' && !isNewer(latest, current)){ res.style.color = 'var(--success)'; res.textContent = latest === current ? 'You are up to date (' + current + ')' : 'Running newer version (' + current + ')'; return; }
       var board = DEV.board, expectedPrefix = 'BambuHelper-' + board + '-', otaBin = null;
-      for (var i = 0; i < d.assets.length; i++){ var n = d.assets[i].name; if (n.startsWith(expectedPrefix) && n.endsWith('-ota.bin')){ otaBin = d.assets[i]; break; } }
+      for (var i = 0; i < (d.assets || []).length; i++){ var n = d.assets[i].name; if (n.startsWith(expectedPrefix) && n.endsWith('-ota.bin')){ otaBin = d.assets[i]; break; } }
+      if (!otaBin){
+        res.style.color = 'var(--info)';
+        res.textContent = 'Upstream release: ' + latest + '. No compatible OTA file for this board. Use a Waveshare 4.3B build.';
+        document.getElementById('installBtn').style.display = 'none';
+        document.getElementById('updateLink').style.display = 'none';
+        return;
+      }
+      if (!isNewer(latest, current)){
+        res.style.color = 'var(--success)';
+        res.textContent = 'No newer compatible update (' + current + ')';
+        return;
+      }
       var slotB = parseInt(DEV.otaSlot, 10) || 0, flashMb = parseInt(DEV.flashMb, 10) || 0;
       if (otaBin && slotB > 0 && otaBin.size > slotB){
         res.style.color = 'var(--danger)';
@@ -1962,7 +2076,7 @@ function toggleAfterPrint(){
   document.getElementById('afterPrintWrap').style.display = keepon ? 'none' : 'block';
   var pong = document.getElementById('pong');
   var row = document.getElementById('pong-row');
-  var showClock = !keepon && document.getElementById('afterfin').value !== 'off';
+  var showClock = (typeof DEV !== 'undefined' && DEV.board === 'ws_lcd_43b') || (!keepon && document.getElementById('afterfin').value !== 'off');
   pong.disabled = !showClock;
   if (row) row.style.opacity = showClock ? '1' : '0.4';
 }
@@ -2034,3 +2148,199 @@ applyThemeMode(document.documentElement.getAttribute('data-theme') || 'dark');
   refreshTopStatusDots();
   setInterval(refreshTopStatusDots, 5000);
 })();
+
+
+/* Native settings use the same validated endpoints as the LCD menu. */
+function ws43bDisplaySettingsMarkup(){
+  return '<div class="card-head"><div><h3>Panel theme and idle screen</h3><p>Shared with the display menu. Changes are saved on the panel.</p></div></div>' +
+    '<form id="wsDisplayModeForm"><div class="field"><label for="wsDisplayMode">Print and screensaver mode</label><select id="wsDisplayMode"><option value="simple">Simple</option><option value="advanced">Advanced (in development)</option></select></div>' +
+    '<p class="hint">One choice for Print and the screensaver. Simple shows MQTT progress and important warnings. Advanced adds stage details. Clock settings stay unchanged.</p><button type="submit" class="btn btn-primary" disabled>Save display mode</button></form>' +
+    '<form id="wsThemeForm"><div class="field"><label for="wsTheme">Panel color preset</label><select id="wsTheme"><option value="0">Navy</option><option value="1">Dark / green</option><option value="2">Dark / amber</option></select></div>' +
+    '<p class="hint">Applying a preset replaces panel colors and reloads this page. Save other changes first.</p><button type="submit" class="btn btn-secondary" disabled>Apply preset and reload</button></form>' +
+    '<form id="wsIdleForm" style="margin-top:var(--sp-4)"><div class="row"><div class="field"><label for="wsIdle">Time without touch</label><select id="wsIdle"><option value="0">Disabled</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>' +
+    '<div class="field"><label for="wsIdleAction">On timeout</label><select id="wsIdleAction"><option value="0">Show clock</option><option value="1">Turn off backlight</option></select></div></div>' +
+    '<p class="hint">Daytime printing stays on Print after timeout. Other views return to Print first. Night behavior follows the night schedule. Touch resets the timer.</p><button type="submit" class="btn btn-primary" disabled>Save idle settings</button></form>' +
+    '<button type="button" class="btn btn-ghost btn-sm" id="wsNativeReload">Reload panel settings</button><p id="wsNativeStatus" class="hint" role="status" aria-live="polite"></p>';
+}
+function setupWs43bDisplaySettings(){
+  var intro=document.querySelector('#sec-display .section-intro');
+  if(!intro || document.getElementById('wsNativeSettings')) return;
+  var card=document.createElement('div');card.id='wsNativeSettings';card.className='card';
+  card.innerHTML=ws43bDisplaySettingsMarkup();intro.after(card);
+  var summary=intro.querySelector('p');if(summary)summary.textContent='Set the panel theme, idle screen, clock and gauges.';
+  var theme=document.getElementById('wsThemeForm'),idle=document.getElementById('wsIdleForm'),mode=document.getElementById('wsDisplayModeForm');
+  var themeButton=theme.querySelector('button'),idleButton=idle.querySelector('button'),modeButton=mode.querySelector('button');
+  var status=document.getElementById('wsNativeStatus'),reload=document.getElementById('wsNativeReload');
+  var ready=false;
+  async function request(path,body){
+    var options={cache:'no-store'};
+    if(body){options.method='POST';options.headers={'Content-Type':'application/x-www-form-urlencoded'};options.body=body.toString();}
+    var response=await fetch(path,options),data=await response.json();
+    if(!response.ok || (body && data.status!=='ok'))throw Error(data.message || 'Panel settings request failed');
+    return data;
+  }
+  function busy(value){themeButton.disabled=value;idleButton.disabled=value;modeButton.disabled=value;reload.disabled=value;}
+  async function load(){
+    ready=false;busy(true);status.textContent='Reading panel settings…';
+    try {
+      var values=await Promise.all([request('/monitor/display'),request('/monitor/clock'),request('/monitor/display-mode')]);
+      var display=values[0],clock=values[1],presentation=values[2];
+      if(![0,1,2].includes(display.theme) || typeof display.fan_match_printer!=='boolean' ||
+         ![0,1,5,15,30].includes(clock.idle_minutes) || ![0,1].includes(clock.screen_off) || ![0,1].includes(clock.use24h) ||
+         !['simple','advanced'].includes(presentation.mode))throw Error('Invalid panel settings response');
+      document.getElementById('wsDisplayMode').value=presentation.mode;
+      document.getElementById('wsTheme').value=String(display.theme);
+      document.getElementById('wsIdle').value=String(clock.idle_minutes);
+      document.getElementById('wsIdleAction').value=String(clock.screen_off);
+      document.getElementById('fanmp').checked=display.fan_match_printer;
+      document.getElementById('use24h').checked=!!clock.use24h;
+      ready=true;busy(false);status.textContent='';
+    } catch(e){status.textContent=e.message || 'Could not load panel settings. Retry.';reload.disabled=false;}
+  }
+  theme.onsubmit=async function(event){
+    event.preventDefault();if(!ready || themeButton.disabled)return;busy(true);
+    var body=new URLSearchParams({theme:document.getElementById('wsTheme').value,fan_match_printer:document.getElementById('fanmp').checked?'1':'0'});
+    try {await request('/monitor/display',body);location.reload();}
+    catch(e){status.textContent=e.message;busy(false);}
+  };
+  idle.onsubmit=async function(event){
+    event.preventDefault();if(!ready || idleButton.disabled)return;busy(true);
+    var body=new URLSearchParams({idle_minutes:document.getElementById('wsIdle').value,screen_off:document.getElementById('wsIdleAction').value,use24h:document.getElementById('use24h').checked?'1':'0'});
+    try {await request('/monitor/clock',body);status.textContent='Idle settings saved.';}
+    catch(e){status.textContent=e.message;}
+    finally{busy(false);}
+  };
+  mode.onsubmit=async function(event){
+    event.preventDefault();if(!ready || modeButton.disabled)return;busy(true);
+    var body=new URLSearchParams({mode:document.getElementById('wsDisplayMode').value});
+    try {await request('/monitor/display-mode',body);status.textContent='Display mode saved.';}
+    catch(e){status.textContent=e.message;}
+    finally{busy(false);}
+  };
+  reload.onclick=load;load();
+  // Preserve working border effects and Pong, but remove obsolete finish/idle
+  // explanations belonging to the other boards' screensaver policy.
+  var legacy=document.getElementById('keepon').closest('.card');
+  if(legacy){
+    legacy.querySelector('h3').textContent='Screen effects';
+    var description=legacy.querySelector('.card-head p');if(description)description.textContent='Border effects and clock animation.';
+    legacy.querySelectorAll('.help-text').forEach(function(el){el.hidden=true;});
+  }
+  // Backlight is binary on 4.3B. Retain the original ID for saveDisplay().
+  var range=document.getElementById('nbright');
+  if(range){
+    var nightCard=range.closest('.card');
+    if(nightCard){
+      nightCard.style.display='';
+      nightCard.querySelector('h3').textContent='Scheduled backlight';
+      var nightLabel=nightCard.querySelector('label[for="nighten"]');if(nightLabel)nightLabel.textContent='Enable night schedule';
+    }
+    var select=document.createElement('select');select.id=range.id;
+    select.innerHTML='<option value="0">Off</option><option value="255">On</option>';
+    select.value=Number(range.value)===0?'0':'255';range.replaceWith(select);
+    var field=select.closest('.field'),caption=field.querySelector('label span');if(caption)caption.textContent='Backlight at night';
+    var hint=field.querySelector('.hint');if(hint)hint.textContent='Scheduled backlight: off or on. Requires time synchronization.';
+    var value=document.getElementById('nbrightVal');if(value)value.hidden=true;
+  }
+}
+
+/* Waveshare 4.3B: original portal with explicit physical-board capabilities. */
+function setupWs43bPortal(){
+  if (typeof DEV === 'undefined' || DEV.board !== 'ws_lcd_43b') return;
+  setupWs43bDisplaySettings();
+  setupWs43bWeather();
+  // Keep fields in the DOM because upstream form serializers address them
+  // explicitly. Disable unsupported choices and explain them at the field.
+  var unsupported = ['rotation','bright','ssbright',
+    'keepon','afterprint','afterfin','fmins','dack','fintm','kps','btntype','btnpin',
+    'buzzen','buzpin','buzqs','buzqe','buzclick','buzbeden','buzbedtemp',
+    'leden','leddrv','ledpin','ledping','ledpinb','ledanode','ledbr','ledfxmd',
+    'ledfxsec','ledfxbr','ledauto','ledpause','lederr','lednight','lederrsec',
+    'ledcidl','ledcprn','ledcpau','ledcfin','ledcerr','batshow','rotsplit','rotsplitf'];
+  unsupported.forEach(function(id){
+    var el = document.getElementById(id); if (!el) return;
+    el.disabled = true;
+    var row = el.closest('.field, .check-row');
+    if (row) { row.hidden = true; row.style.display = 'none'; }
+  });
+  [['btntype','3'],['buzzen','0'],['leden','0'],['rotation','0']].forEach(function(pair){
+    var el = document.getElementById(pair[0]); if (el) el.value = pair[1];
+  });
+  ['rotsplit','rotsplitf'].forEach(function(id){var el=document.getElementById(id);if(el)el.checked=false;});
+  // Upstream moved orientation into a separate card; its only control is
+  // unsupported by the fixed landscape panel, so hide the empty card as well.
+  var orientation = document.getElementById('rotation');
+  if (orientation) { var orientationCard = orientation.closest('.card'); if (orientationCard) orientationCard.hidden = true; }
+  // GPIO test controls must not appear operable when the hardware is absent.
+  document.querySelectorAll('[onclick]').forEach(function(el){
+    if (/buzzerTest|testBuzzer|testLed|previewLed|ledTest|ledPreview/.test(el.getAttribute('onclick') || '')) {
+      el.disabled = true; el.hidden = true; el.title = 'No supported auxiliary GPIO device on 4.3B';
+    }
+  });
+}
+setupWs43bPortal();
+
+function setupWs43bWeather(){
+  if(document.getElementById('wsWeatherCard'))return;
+  var host=document.querySelector('#sec-display');if(!host)return;
+  var pl=document.documentElement.lang==='pl';function W(a,b){return pl?a:b;}
+  var card=document.createElement('div');card.id='wsWeatherCard';card.className='card ws-weather-controls';
+  card.innerHTML='<h3>'+W('Pogoda i słoneczny tryb nocny','Weather and solar night schedule')+'</h3>'+
+    '<p>'+W('Źródło: Open-Meteo. Godzina i data używają strefy czasowej panelu.','Source: Open-Meteo. Time and date use the panel timezone.')+'</p>'+
+    '<form id="wsWeatherForm"><div class="field"><label for="wsWeatherQuery">'+W('Miejscowość lub kod pocztowy','City or postal code')+'</label><input type="text" id="wsWeatherQuery" maxlength="80" autocomplete="off" enterkeyhint="search"><button class="btn btn-ghost" type="button" id="wsWeatherSearch">'+W('Szukaj','Search')+'</button><select id="wsWeatherResults" aria-label="Location" hidden disabled></select><p id="wsWeatherLocation"></p></div>'+
+    '<label><input type="checkbox" id="wsWeatherEnabled"> '+W('Pogoda na wydruku i zegarze','Weather on print and clock screens')+'</label><br>'+
+    '<label><input type="checkbox" id="wsWeatherSolar"> '+W('Noc od zachodu do wschodu słońca','Night from sunset to sunrise')+'</label>'+
+    '<p>'+W('Zakończenie kreatora włącza harmonogram nocny. Ręczne godziny są zapasowe przy braku danych słonecznych. Wyłącz tę opcję, aby zawsze używać ręcznych godzin.','Finishing setup enables the night schedule. Manual hours are the fallback when solar data is unavailable. Disable this option to always use manual hours.')+'</p>'+
+    '<div class="field"><label>'+W('Nocny czas bez dotyku','Night inactivity timeout')+'</label><select id="wsWeatherNight"><option value="30">30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>'+
+    '<p>'+W('Nocne podświetlenie wyłączone: ekran gaśnie, a dotyk wybudza go na wybrany czas. Włączone: po tym czasie pojawia się zegar z kolorami przyciemnionymi do 30%. Dotyk przywraca normalne kolory.','Night backlight off: the screen is dark and touch wakes it for the selected time. On: this timeout opens the clock with colors dimmed to 30%. Touch restores normal colors.')+'</p>'+
+    '<button class="btn btn-primary" type="submit" id="wsWeatherSave" disabled>'+W('Zapisz pogodę i tryb nocny','Save weather and night settings')+'</button><p id="wsWeatherStatus" role="status"></p></form>';
+  host.appendChild(card);
+  var cfg=null,results=[],form=document.getElementById('wsWeatherForm'),status=document.getElementById('wsWeatherStatus'),save=document.getElementById('wsWeatherSave');
+  var wizard=null;
+  var launch=document.createElement('button');launch.type='button';launch.className='btn btn-ghost';launch.textContent=W('Konfiguruj pogodę i noc','Set up weather and night');host.insertBefore(launch,card);
+  function openWizard(state){
+    if(wizard)return;
+    wizard=document.createElement('dialog');wizard.className='ws-setup-dialog';wizard.setAttribute('aria-labelledby','wsSetupTitle');
+    var title=document.createElement('h2');title.id='wsSetupTitle';title.tabIndex=-1;title.textContent=W('Dokończ ustawienia ekranu','Finish display setup');wizard.appendChild(title);
+    var hint=document.createElement('p');hint.textContent=W('Ustaw lokalizację i nocny ekran. Wi-Fi i drukarka pozostają bez zmian. Możesz pominąć i wrócić tutaj później.','Set your location and night display. Wi-Fi and printer settings are preserved. You can skip and return later.');wizard.appendChild(hint);
+    wizard.appendChild(card);
+    var label=document.createElement('label');label.textContent=W('Nocą: ','At night: ');
+    var action=document.createElement('select');action.id='wsSetupAction';
+    [[true,W('Wyłącz ekran; dotyk wybudza','Screen off; touch wakes')],[false,W('Zegar, data i pogoda','Clock, date and weather')]].forEach(function(v){var o=document.createElement('option');o.value=v[0]?'1':'0';o.textContent=v[1];action.appendChild(o);});
+    action.value=state.dark?'1':'0';label.appendChild(action);wizard.insertBefore(label,card);
+    var skip=document.createElement('button');skip.type='button';skip.className='btn btn-ghost';skip.textContent=W('Pomiń na razie','Skip for now');wizard.appendChild(skip);
+    skip.onclick=async function(){skip.disabled=true;try{await completeSetup(true);closeWizard();}catch(e){status.textContent=W('Nie zapisano pominięcia. Spróbuj ponownie.','Could not save skip. Retry.');}finally{skip.disabled=false;}};
+    wizard.addEventListener('cancel',function(e){e.preventDefault();skip.click();});
+    save.textContent=W('Zapisz i zakończ','Save and finish');document.body.appendChild(wizard);wizard.showModal();title.focus({preventScroll:true});wizard.scrollTop=0;
+  }
+  function closeWizard(){if(!wizard)return;host.appendChild(card);wizard.close();wizard.remove();wizard=null;save.textContent=W('Zapisz pogodę i tryb nocny','Save weather and night settings');}
+  async function completeSetup(skip){
+    var body=new URLSearchParams({action:skip?'skip':'finish',dark:document.getElementById('wsSetupAction').value});
+    var response=await fetch('/monitor/weather/setup',{method:'POST',body:body});if(!response.ok)throw Error();
+    if(!skip){var enabled=document.getElementById('nighten'),brightness=document.getElementById('nbright');if(enabled)enabled.checked=true;if(brightness)brightness.value=body.get('dark')==='1'?'0':'255';}
+  }
+  async function readSetup(auto){try{var response=await fetch('/monitor/weather/setup',{cache:'no-store'});if(!response.ok)throw Error();var state=await response.json();if(!auto||!state.done)openWizard(state);}catch(e){status.textContent=W('Nie odczytano kreatora. Spróbuj ponownie.','Setup could not load. Retry.');}}
+  launch.onclick=function(){if(cfg)readSetup(false);};
+  function locationText(){document.getElementById('wsWeatherLocation').textContent=cfg.city||W('Nie wybrano miejscowości','No location selected');}
+  fetch('/monitor/weather',{cache:'no-store'}).then(function(r){if(!r.ok)throw Error();return r.json();}).then(function(c){
+    cfg=c;locationText();document.getElementById('wsWeatherEnabled').checked=c.enabled;document.getElementById('wsWeatherSolar').checked=c.solar;document.getElementById('wsWeatherNight').value=String(c.night_seconds);save.disabled=false;readSetup(true);
+  }).catch(function(){status.textContent=W('Nie odczytano ustawień. Odśwież stronę.','Could not load settings. Reload the page.');});
+  document.getElementById('wsWeatherQuery').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();document.getElementById('wsWeatherSearch').click();}});
+  document.getElementById('wsWeatherResults').onchange=function(){if(this.value==='')return;var r=results[Number(this.value)];if(!cfg||!r)return;cfg.latitude=r.latitude;cfg.longitude=r.longitude;cfg.city=r.name;locationText();};
+  document.getElementById('wsWeatherSearch').onclick=async function(){
+    if(!cfg)return;var name=document.getElementById('wsWeatherQuery').value.trim();if(name.length<2)return;
+    this.disabled=true;status.textContent=W('Szukam…','Searching…');var select=document.getElementById('wsWeatherResults');select.hidden=true;select.disabled=true;var controller=new AbortController(),timer=setTimeout(function(){controller.abort();},8000);
+    try{var response=await fetch('https://geocoding-api.open-meteo.com/v1/search?count=5&language='+ (pl?'pl':'en')+'&name='+encodeURIComponent(name),{signal:controller.signal});if(!response.ok)throw Error();
+      var json=await response.json();results=(json.results||[]).filter(function(r){return typeof r.name==='string'&&new TextEncoder().encode(r.name).length<64&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);});
+      select.replaceChildren();var placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=W('Wybierz miejscowość z listy','Choose a location');placeholder.disabled=true;select.appendChild(placeholder);
+      results.forEach(function(r,i){var o=document.createElement('option');o.value=String(i);o.textContent=[r.name,r.admin4&&r.admin4!==r.name?r.admin4:'',r.admin1,r.country].filter(Boolean).join(' — ');select.appendChild(o);});
+      if(results.length){select.value='';select.hidden=false;select.disabled=false;status.textContent=W('Wybierz właściwą miejscowość z listy.','Choose the correct location from the list.');}else status.textContent=W('Brak tej nazwy w bazie. Spróbuj nazwy dzielnicy, części miejscowości lub pobliskiego miasta. Samo wpisanie nazwy nie wybiera lokalizacji.','Name not found. Try a district, village or nearby city. Typing a name alone does not select a location.');
+    }catch(e){status.textContent=W('Wyszukiwanie niedostępne. Spróbuj ponownie.','Search unavailable. Please retry.');}
+    finally{clearTimeout(timer);this.disabled=false;}
+  };
+  form.onsubmit=async function(e){e.preventDefault();if(!cfg)return;save.disabled=true;
+    cfg.enabled=document.getElementById('wsWeatherEnabled').checked;cfg.solar=document.getElementById('wsWeatherSolar').checked;cfg.night_seconds=Number(document.getElementById('wsWeatherNight').value);
+    try{var r=await fetch('/monitor/weather',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(!r.ok)throw Error();if(wizard){await completeSetup(false);closeWizard();}status.textContent=W('Zapisano. Pobranie pogody może potrwać chwilę.','Saved. Weather may take a moment to load.');}
+    catch(e){status.textContent=W('Nie zapisano. Wybierz miejscowość i spróbuj ponownie.','Not saved. Select a location and retry.');}finally{save.disabled=false;}
+  };
+}

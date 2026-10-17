@@ -10,6 +10,9 @@
 
 // CA certificate bundle (shared with MQTT — linked from platformio build)
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
+#if defined(BOARD_IS_WS43B)
+extern const uint8_t rootca_crt_bundle_end[] asm("_binary_x509_crt_bundle_end");
+#endif
 
 // ---------------------------------------------------------------------------
 //  Region-aware URL helpers
@@ -104,15 +107,22 @@ static int httpsRequest(const char* method, const char* url,
                                   // single-threaded web server down with it
 
   // First attempt: proper CA verification
+#if defined(BOARD_IS_WS43B)
+  // Arduino 3.3.11 requires the exact bundle size; retain verified TLS.
+  tls->setCACertBundle(rootca_crt_bundle_start, rootca_crt_bundle_end - rootca_crt_bundle_start);
+#else
   tls->setCACertBundle(rootca_crt_bundle_start);
+#endif
   int httpCode = httpsRequestWith(*tls, method, url, body, authToken, response, cookie);
 
+#if !BAMBU_MONITOR_ONLY
   if (httpCode == -1) {
     // TLS handshake likely failed — retry without verification
     Serial.println("CLOUD: TLS verified request failed, retrying without CA check");
     tls->setInsecure();
     httpCode = httpsRequestWith(*tls, method, url, body, authToken, response, cookie);
   }
+#endif
 
   delete tls;
   return httpCode;
@@ -204,12 +214,20 @@ bool cloudFetchUserId(const char* token, char* userId, size_t len, CloudRegion r
   else if (!doc["uid"].isNull()) uidStr = String((long)doc["uid"].as<long long>());
 
   if (uidStr.length() == 0) {
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+    Serial.println("CLOUD: No uid in profile (response withheld)");
+#else
     Serial.printf("CLOUD: No uid in profile: %s\n", response.substring(0, 300).c_str());
+#endif
     return false;
   }
 
   snprintf(userId, len, "u_%s", uidStr.c_str());
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+  Serial.println("CLOUD: Profile userId available");
+#else
   Serial.printf("CLOUD: Got userId from profile: %s\n", userId);
+#endif
   return true;
 }
 
@@ -251,7 +269,11 @@ bool cloudFetchPlateThumbUrl(const char* token, CloudRegion region, const char* 
   WiFiClientSecure tls;
   tls.setTimeout(10);
   tls.setHandshakeTimeout(10);
-  tls.setCACertBundle(rootca_crt_bundle_start);     // fail closed: no insecure retry with a Bearer
+#if defined(BOARD_IS_WS43B)
+  tls.setCACertBundle(rootca_crt_bundle_start, rootca_crt_bundle_end - rootca_crt_bundle_start);
+#else
+  tls.setCACertBundle(rootca_crt_bundle_start);
+#endif     // fail closed: no insecure retry with a Bearer
   HTTPClient http;
   if (!http.begin(tls, api)) return false;
   http.setTimeout(10000);
@@ -294,7 +316,11 @@ bool cloudDownload(const char* url, uint8_t* buf, size_t cap, size_t* len) {
   WiFiClientSecure tls;
   tls.setTimeout(10);
   tls.setHandshakeTimeout(10);
+#if defined(BOARD_IS_WS43B)
+  tls.setCACertBundle(rootca_crt_bundle_start, rootca_crt_bundle_end - rootca_crt_bundle_start);
+#else
   tls.setCACertBundle(rootca_crt_bundle_start);
+#endif
   HTTPClient http;
   if (!http.begin(tls, url)) return false;
   http.setTimeout(10000);
@@ -305,7 +331,7 @@ bool cloudDownload(const char* url, uint8_t* buf, size_t cap, size_t* len) {
     http.end();
     return false;
   }
-  WiFiClient* s = http.getStreamPtr();
+  auto* s = http.getStreamPtr();
   size_t got = 0;
   unsigned long last = millis();
   while (got < (size_t)size && http.connected() && millis() - last < 10000) {
@@ -335,4 +361,3 @@ bool cloudFetchDeviceList(const char* token, CloudRegion region, String& respons
   Serial.printf("CLOUD: device list HTTP %d, len=%d\n", httpCode, response.length());
   return httpCode == 200;
 }
-

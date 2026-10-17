@@ -5,6 +5,11 @@
 #include <time.h>
 
 void sanitizeBuzzerPin() {
+#if defined(BOARD_IS_WS43B)
+  buzzerSettings.pin = 0;
+  buzzerSettings.enabled = false;
+  return;
+#endif
 #if BUZZER_BACKEND_TCA9554
   // The buzzer is an expander bit here, so there is no pin to validate - and a
   // stale NVS value from another board must never be driven as a GPIO.

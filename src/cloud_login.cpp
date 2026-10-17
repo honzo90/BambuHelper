@@ -4,12 +4,21 @@
 
 #include "bambu_cloud.h"
 #include "settings.h"
+#include "cloud_http_reader.h"
 
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <esp_task_wdt.h>
+#if BOARD_MQTT_ASYNC_CONNECT
+#include <atomic>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#endif
 
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
+#if defined(BOARD_IS_WS43B)
+extern const uint8_t rootca_crt_bundle_end[] asm("_binary_x509_crt_bundle_end");
+#endif
 
 // ---------------------------------------------------------------------------
 //  Session state
@@ -24,6 +33,10 @@ static bool   g_neededTwoFactor = false;
 // A refused code leaves the flow waiting on the same step, so the state alone
 // cannot tell the portal whether to show the message as a prompt or a problem.
 static bool   g_lastFailed = false;
+#if BOARD_MQTT_ASYNC_CONNECT
+// Main-loop generation: a manual sign-in/reset supersedes any detached reply.
+static uint32_t storedRefreshGeneration = 0;
+#endif
 
 CloudLoginState cloudLoginState()   { return g_state; }
 const char*     cloudLoginMessage() { return g_message.c_str(); }
@@ -45,6 +58,9 @@ static bool fail(const char* message, CloudLoginState state = CLOUD_LOGIN_FAILED
 }
 
 void cloudLoginReset() {
+#if BOARD_MQTT_ASYNC_CONNECT
+  ++storedRefreshGeneration;
+#endif
   g_state = CLOUD_LOGIN_IDLE;
   g_message = "";
   g_lastFailed = false;
@@ -146,22 +162,33 @@ static const char* siteHost(CloudRegion region) {
 // none of it, and mixing the two has already cost one debugging round.
 static bool cloudRequest(const char* host, const char* path, const char* method,
                          const char* body, bool useSession, CloudResponse& out,
-                         size_t maxBody = 8192) {   // a login reply carries two JWTs
+                         size_t maxBody = 8192, bool feedWatchdog = true) {   // a login reply carries two JWTs
 
   WiFiClientSecure* tls = new (std::nothrow) WiFiClientSecure();
   if (!tls) { out.status = -2; return false; }
 
-  // All three bounds matter: the web server is single-threaded, so a handshake
-  // that never returns takes the device offline, OTA endpoint included. They
-  // stack, and a sign-in step can run two requests back to back, so keep them
-  // tight - a healthy call here finishes in a second or two.
-  tls->setTimeout(5);
+  // Stream timeout is milliseconds on current Arduino cores. HTTP framing is
+  // handled below with an absolute deadline and yielding reads instead of the
+  // version-dependent readStringUntil()/readBytes() helpers.
+#if defined(BOARD_IS_WS43B)
+  tls->setTimeout(5000); // Arduino 3.x: Stream milliseconds
+#else
+  tls->setTimeout(5);    // retain existing legacy-core socket configuration
+#endif
   tls->setHandshakeTimeout(6);
+#if defined(BOARD_IS_WS43B)
+  tls->setCACertBundle(rootca_crt_bundle_start, rootca_crt_bundle_end - rootca_crt_bundle_start);
+#else
   tls->setCACertBundle(rootca_crt_bundle_start);
+#endif
 
-  esp_task_wdt_reset();
+  if (feedWatchdog) esp_task_wdt_reset();
+#if defined(BOARD_IS_WS43B)
+  bool connected = tls->connect(host, 443, 5000); // separate TCP/socket timeout
+#else
   bool connected = tls->connect(host, 443);
-  esp_task_wdt_reset();          // the handshake itself can eat several seconds
+#endif
+  if (feedWatchdog) esp_task_wdt_reset();          // the handshake itself can eat several seconds
   if (!connected) {
     delete tls;
     out.status = -1;
@@ -179,113 +206,22 @@ static bool cloudRequest(const char* host, const char* path, const char* method,
   if (body) { req += "Content-Length: "; req += strlen(body); req += "\r\n"; }
   req += "\r\n";
   if (body) req += body;
-  tls->print(req);
-
-  // --- status line + headers ---
-  long  contentLength = -1;
-  bool  chunked = false;
-  uint32_t start = millis();
-  while (millis() - start < 12000) {
-    esp_task_wdt_reset();
-    if (!tls->connected() && !tls->available()) break;
-    if (!tls->available()) { delay(5); continue; }
-
-    String line = tls->readStringUntil('\n');
-    line.trim();
-    String lower = line;
-    lower.toLowerCase();          // header names are case-insensitive
-
-    if (out.status < 0 && lower.startsWith("http/")) {
-      int sp = line.indexOf(' ');
-      if (sp > 0) out.status = line.substring(sp + 1, sp + 4).toInt();
-    } else if (lower.startsWith("set-cookie:")) {
-      out.setCookies += line.substring(11);
-      out.setCookies += '\n';
-    } else if (lower.startsWith("content-length:")) {
-      contentLength = line.substring(15).toInt();
-    } else if (lower.startsWith("transfer-encoding:") && lower.indexOf("chunked") > 0) {
-      chunked = true;
-    } else if (line.length() == 0) {
-      break;   // end of headers
-    }
-  }
-
-  // --- body ---
-  // Stop at the cap instead of overshooting by a read: a body that gets cut
-  // mid-JSON must be reported as truncated, not parsed as a reply with fields
-  // missing. A login answer carries two JWTs and is the closest thing here to
-  // the cap.
-  auto append = [&](const char* chunk, size_t len) {
-    if (out.body.length() + len > maxBody) {
-      size_t room = maxBody - out.body.length();
-      if (room > 0) out.body += String(chunk).substring(0, room);
-      out.truncated = true;
-      return;
-    }
-    out.body += chunk;
-  };
-
-  if (chunked) {
-    bool desynced = false;
-    while (!desynced && millis() - start < 12000) {
-      esp_task_wdt_reset();
-      String sizeLine = tls->readStringUntil('\n');
-      sizeLine.trim();
-      long chunkSize = strtol(sizeLine.c_str(), nullptr, 16);
-      if (chunkSize <= 0) break;
-      while (chunkSize > 0 && millis() - start < 12000) {
-        char buf[129];
-        size_t want = chunkSize < 128 ? chunkSize : 128;
-        size_t got = tls->readBytes(buf, want);
-        if (got == 0) {
-          // A short read leaves the stream mid-chunk; carrying on would parse
-          // payload bytes as the next chunk header and append garbage.
-          desynced = true;
-          break;
-        }
-        buf[got] = '\0';
-        append(buf, got);
-        chunkSize -= got;
-      }
-      if (!desynced) tls->readStringUntil('\n');   // trailing CRLF
-    }
-  } else if (contentLength > 0) {
-    long remaining = contentLength;
-    while (remaining > 0 && millis() - start < 12000) {
-      esp_task_wdt_reset();
-      char buf[129];
-      size_t want = remaining < 128 ? remaining : 128;
-      size_t got = tls->readBytes(buf, want);
-      if (got == 0) break;
-      buf[got] = '\0';
-      append(buf, got);
-      remaining -= got;
-    }
-  } else if (contentLength < 0) {
-    // Neither header: the body runs until the peer closes. Without this an
-    // identity-encoded reply reads as empty and a perfectly good token is
-    // reported as "no token came back".
-    while (millis() - start < 12000) {
-      esp_task_wdt_reset();
-      if (!tls->available()) {
-        if (!tls->connected()) break;
-        delay(5);
-        continue;
-      }
-      char buf[129];
-      size_t got = tls->readBytes(buf, 128);
-      if (got == 0) continue;
-      buf[got] = '\0';
-      append(buf, got);
-    }
-  }
+  const bool sent = tls->print(req) == req.length();
+  const auto result = sent ? cloud_http::readResponse(*tls, out.status,
+    out.setCookies, out.body, maxBody,
+    [] { return uint32_t(millis()); },
+    [feedWatchdog] { if (feedWatchdog) esp_task_wdt_reset(); delay(1); })
+    : cloud_http::Result::Disconnected;
+  out.truncated = result != cloud_http::Result::Complete;
 
   tls->stop();
   delete tls;
-  esp_task_wdt_reset();
+  if (feedWatchdog) esp_task_wdt_reset();
 
-  if (useSession) jarAbsorb(out.setCookies);
-  return out.status > 0;
+  // Never commit cookies or parse an incomplete/malformed token response.
+  const bool complete = result == cloud_http::Result::Complete;
+  if (complete && useSession) jarAbsorb(out.setCookies);
+  return complete;
 }
 
 // ---------------------------------------------------------------------------
@@ -493,6 +429,9 @@ bool cloudLoginRequestEmailCode(const char* email) {
 }
 
 bool cloudLoginSubmitCode(const char* code) {
+#if BOARD_MQTT_ASYNC_CONNECT
+  ++storedRefreshGeneration;
+#endif
   const CloudLoginState keep = g_state;   // so a mistyped code can be retried
   if (keep != CLOUD_LOGIN_NEED_TFA && keep != CLOUD_LOGIN_NEED_EMAIL_CODE) {
     return fail("Nothing is waiting for a code - start again.", keep);
@@ -553,8 +492,30 @@ bool cloudLoginSubmitCode(const char* code) {
 }
 
 bool cloudLoginCanAutoRefresh() {
-  char pw[CLOUD_PASSWORD_MAX + 1];
-  return loadCloudPassword(pw, sizeof(pw));
+  char pw[CLOUD_PASSWORD_MAX + 1]{};
+  const bool stored = loadCloudPassword(pw, sizeof(pw));
+  memset(pw, 0, sizeof(pw));
+  return stored;
+}
+
+static bool finishStoredRefresh(bool ok) {
+  // Key this on "a second factor was demanded", not on the call's return value:
+  // a malformed 2FA challenge fails the call outright, and testing `ok` there
+  // would keep the password and re-run the same doomed login every 15 minutes.
+  // A transport failure sets no such flag, so a Wi-Fi blip still keeps it.
+  if (g_neededTwoFactor && g_state != CLOUD_LOGIN_OK) {
+    // A code prompt cannot be answered without a human, so a 2FA account can
+    // never refresh silently. Drop the password rather than keep asking - and
+    // clear the pending step, or the portal would poll this background attempt
+    // and pop a code prompt at somebody who never asked to sign in.
+    Serial.println("CLOUD: account asks for 2FA - stored password cannot refresh it");
+    clearCloudPassword();
+    cloudLoginReset();
+    g_state = CLOUD_LOGIN_FAILED;
+    g_message = "The saved password needs a 2FA code, so the token could not be renewed. Sign in again.";
+    return false;
+  }
+  return ok && g_state == CLOUD_LOGIN_OK;
 }
 
 bool cloudLoginRefreshStored() {
@@ -576,24 +537,118 @@ bool cloudLoginRefreshStored() {
   bool ok = cloudLoginWithPassword(email, pw);
   memset(pw, 0, sizeof(pw));
 
-  // Key this on "a second factor was demanded", not on the call's return value:
-  // a malformed 2FA challenge fails the call outright, and testing `ok` there
-  // would keep the password and re-run the same doomed login every 15 minutes.
-  // A transport failure sets no such flag, so a Wi-Fi blip still keeps it.
-  if (g_neededTwoFactor && g_state != CLOUD_LOGIN_OK) {
-    // A code prompt cannot be answered without a human, so a 2FA account can
-    // never refresh silently. Drop the password rather than keep asking - and
-    // clear the pending step, or the portal would poll this background attempt
-    // and pop a code prompt at somebody who never asked to sign in.
-    Serial.println("CLOUD: account asks for 2FA - stored password cannot refresh it");
-    clearCloudPassword();
-    cloudLoginReset();
-    g_state = CLOUD_LOGIN_FAILED;
-    g_message = "The saved password needs a 2FA code, so the token could not be renewed. Sign in again.";
+  return finishStoredRefresh(ok);
+}
+
+#if BOARD_MQTT_ASYNC_CONNECT
+// One detached HTTPS request. Only this task touches its response; no session,
+// settings, NVS, printer state or UI operations occur in the worker. Completion
+// is published once, then all parsing/persistence is done on the MQTT/UI loop.
+struct StoredRefreshJob {
+  PrinterConfig config{};
+  uint8_t slot = 0;
+  uint32_t generation = 0;
+  char email[CLOUD_EMAIL_MAX + 1]{};
+  char password[CLOUD_PASSWORD_MAX + 1]{};
+  char token[CLOUD_TOKEN_MAX]{};
+  CloudResponse response;
+  bool reachedService = false;
+  std::atomic<bool> done{false};
+};
+static StoredRefreshJob storedRefreshJob;
+static bool storedRefreshBusy = false; // main loop only
+
+static void storedRefreshWorker(void*) {
+  auto& j = storedRefreshJob;
+  // Destroy local JSON/payload before publishing completion or deleting task.
+  {
+    JsonDocument body;
+    body["account"] = j.email;
+    body["password"] = j.password;
+    String payload;
+    serializeJson(body, payload);
+    // No cookies/global session access; this task is not registered with WDT.
+    j.reachedService = cloudRequest(apiHost(j.config.region),
+      "/v1/user-service/user/login", "POST", payload.c_str(), false,
+      j.response, 8192, false);
+  }
+  j.done.store(true, std::memory_order_release);
+  vTaskDelete(nullptr);
+}
+
+static void clearStoredRefreshJob() {
+  auto& j = storedRefreshJob;
+  memset(j.password, 0, sizeof j.password);
+  memset(j.token, 0, sizeof j.token);
+  memset(j.email, 0, sizeof j.email);
+  j.config = {};
+  j.response = {};
+  storedRefreshBusy = false;
+}
+
+bool cloudLoginStoredRefreshPending() { return storedRefreshBusy; }
+
+void cloudLoginCancelStoredRefresh(uint8_t slot) {
+  if (storedRefreshBusy && storedRefreshJob.slot == slot)
+    ++storedRefreshGeneration; // never destroy a worker-owned object/client
+}
+
+bool cloudLoginStartStoredRefresh(uint8_t slot) {
+  if (storedRefreshBusy || slot >= MAX_ACTIVE_PRINTERS ||
+      !isCloudMode(printers[slot].config.mode) ||
+      g_state == CLOUD_LOGIN_NEED_TFA || g_state == CLOUD_LOGIN_NEED_EMAIL_CODE)
+    return false;
+  auto& j = storedRefreshJob;
+  j.config = printers[slot].config;
+  j.slot = slot;
+  j.generation = storedRefreshGeneration;
+  if (!loadCloudEmail(j.email, sizeof j.email) ||
+      !loadCloudPassword(j.password, sizeof j.password) ||
+      !loadCloudToken(j.token, sizeof j.token)) {
+    clearStoredRefreshJob();
     return false;
   }
-  return ok && g_state == CLOUD_LOGIN_OK;
+  j.reachedService = false;
+  j.response = {};
+  j.done.store(false, std::memory_order_relaxed);
+  storedRefreshBusy = true;
+  if (xTaskCreatePinnedToCore(storedRefreshWorker, "cloud_refresh", 8192,
+                            nullptr, 1, nullptr, 0) != pdPASS) {
+    clearStoredRefreshJob();
+    return false;
+  }
+  return true;
 }
+
+void cloudLoginServiceStoredRefresh() {
+  if (!storedRefreshBusy || !storedRefreshJob.done.load(std::memory_order_acquire)) return;
+  auto& j = storedRefreshJob;
+  const auto& config = printers[j.slot].config;
+  // A changed/logout/pasted token must never be overwritten by an old reply.
+  // Reset and slot lifecycle also invalidate ABA changes made through the UI.
+  char email[CLOUD_EMAIL_MAX + 1]{};
+  char password[CLOUD_PASSWORD_MAX + 1]{};
+  char token[CLOUD_TOKEN_MAX]{};
+  const bool current = j.generation == storedRefreshGeneration &&
+    config.mode == j.config.mode && config.region == j.config.region &&
+    strcmp(config.serial, j.config.serial) == 0 &&
+    strcmp(config.cloudUserId, j.config.cloudUserId) == 0 &&
+    loadCloudEmail(email, sizeof email) && strcmp(email, j.email) == 0 &&
+    loadCloudPassword(password, sizeof password) && strcmp(password, j.password) == 0 &&
+    loadCloudToken(token, sizeof token) && strcmp(token, j.token) == 0;
+  memset(password, 0, sizeof password);
+  memset(token, 0, sizeof token);
+  if (current) {
+    cloudLoginReset();
+    g_email = j.email;
+    const bool ok = j.reachedService ? handleLoginReply(j.response)
+      : fail("Could not reach the Bambu sign-in service.");
+    const bool renewed = finishStoredRefresh(ok);
+    Serial.printf("CLOUD: background token renewal %s\n", renewed ? "complete" : "failed");
+  }
+  clearStoredRefreshJob();
+}
+#endif // BOARD_MQTT_ASYNC_CONNECT
 
 // ---------------------------------------------------------------------------
 //  Self-test - proves the path without touching a real account

@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "settings.h"
+#include "ws43b_usb_log.h"
 
 static ImprovWiFi improvSerial(&Serial);
 static bool improvInited = false;
@@ -38,7 +39,11 @@ static void onImprovError(ImprovTypes::Error err) {
 static void onImprovConnected(const char *ssid, const char *password) {
   // Library has already established STA via our custom connect callback.
   // Persist credentials so the next boot skips Improv entirely.
+#if BAMBU_MONITOR_ONLY
+  Serial.println("Improv: connected, saving credentials");
+#else
   Serial.printf("Improv: connected as %s, saving credentials\n", ssid);
+#endif
   strlcpy(wifiSSID, ssid, sizeof(wifiSSID));
   strlcpy(wifiPass, password, sizeof(wifiPass));
   saveSettings();
@@ -48,7 +53,11 @@ static void onImprovConnected(const char *ssid, const char *password) {
 // Custom connect keeps WIFI_AP_STA mode intact so the captive portal AP
 // (already running) stays reachable while we attempt the STA connection.
 static bool improvCustomConnect(const char *ssid, const char *password) {
+#if BAMBU_MONITOR_ONLY
+  Serial.println("Improv: attempting STA connect");
+#else
   Serial.printf("Improv: attempting STA connect to %s\n", ssid);
+#endif
   WiFi.begin(ssid, password);
 #if BOARD_NEEDS_WIFI_TX_LIMIT
   // C3 antenna workaround (issue #146): some C3 SuperMini batches only work at
@@ -71,7 +80,11 @@ void improvSetupBegin(uint32_t windowMs) {
   String deviceName = buildDeviceName();
   improvSerial.setDeviceInfo(
       detectChipFamily(),
+#if BAMBU_MONITOR_ONLY
+      "BambuHelper-WS43B-Monitor",
+#else
       "BambuHelper",
+#endif
       FW_VERSION,
       deviceName.c_str(),
       "http://{LOCAL_IPV4}/");
@@ -90,7 +103,12 @@ void improvSetupBegin(uint32_t windowMs) {
 
 bool improvSetupTick() {
   if (!improvInited) return false;
-  improvSerial.handleSerial();
+  {
+#if defined(BOARD_IS_WS43B) && ARDUINO_USB_CDC_ON_BOOT
+    ws43b_usb::ImprovReplyWindow<decltype(Serial)> replyWindow(Serial);
+#endif
+    improvSerial.handleSerial();
+  }
   if (improvSucceeded) {
     improvSucceeded = false;  // one-shot
     return true;

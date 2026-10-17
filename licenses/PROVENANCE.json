@@ -1,0 +1,38 @@
+{
+  "ESP32_Display_Panel.txt": {
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "LovyanGFX-1.2.26.txt": {
+    "sha256": "ec7c22d763503f016c1e743e6089042e780fbb1c118ebcc0b1eb72232e8903b3"
+  },
+  "ArduinoJson-7.4.3.txt": {
+    "sha256": "4a7ee9c96b28cbf30c5bf7c2d211a0ef57179f0328e68ad7b7fa7d754b7da1a2"
+  },
+  "Arduino-ESP32-3.3.11-LICENSE.txt": {
+    "sha256": "62e54861b30e953735dc187f036917c588665dbe3c5dd88449e34317608bbf5e"
+  },
+  "LovyanGFX-GFXFF.txt": {
+    "sha256": "3e7bede50526352926c2283e640f2823d9f9f2165d1852044c4fb1bbac283106"
+  },
+  "ImprovWiFi.txt": {
+    "sha256": "9dd5dfc24d6ba76e90c0d52f714b99e789bc4d5ceef0796f6a322edb8a597f4c"
+  },
+  "Inter-OFL-1.1.txt": {
+    "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+  },
+  "ESP32_IO_Expander.txt": {
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "Inter-OFL-1.1-matching-font.txt": {
+    "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+  },
+  "PubSubClient-2.8.txt": {
+    "sha256": "b416abfc7294f9279480389e4825463ac71b2b064b892aa7d95abd5d4b6edc63"
+  },
+  "ESP-IDF-5.5.5-LICENSE.txt": {
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "esp-lib-utils.txt": {
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  }
+}

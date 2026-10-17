@@ -1,21 +1,37 @@
+#include "ws43b_memory_diag.h"
 #include "bambu_mqtt.h"
 #include "bambu_state.h"
 #include "settings.h"
 #include "display_ui.h"
 #include "config.h"
+#if defined(BOARD_IS_WS43B)
+#include "display_ws43b.h"
+#include "ws43b_live_view.h"
+#endif
 #include "bambu_cloud.h"
 #include "cloud_login.h"
 #include "hms_lookup.h"    // hmsIsDescribed: undescribed HMS codes never enter state
 
 #include <ArduinoJson.h>
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+#include "bambu_monitor_parser.h"
+#endif
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <algorithm>
 #include <esp_task_wdt.h>
+#if BOARD_MQTT_ASYNC_CONNECT
+#include <atomic>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#endif
 
 // Built-in CA certificate bundle for cloud TLS verification
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
+#if defined(BOARD_IS_WS43B)
+extern const uint8_t rootca_crt_bundle_end[] asm("_binary_x509_crt_bundle_end");
+#endif
 
 class MqttRxClient;
 
@@ -29,6 +45,9 @@ struct MqttConn {
   unsigned long lastReconnectAttempt;
   unsigned long lastPushallRequest;
   uint32_t pushallSeqId;
+#if defined(BOARD_IS_WS43B)
+  ws43b_live::RefreshGate visibleRefresh;
+#endif
   unsigned long connectTime;
   bool initialPushallSent;
   bool gotDataSinceConnect;  // true after first message on current connection
@@ -76,8 +95,17 @@ static bool usesStatDoorSensor(bool dualNozzle, const char* serial) {
 }
 
 
+// Passive profile never emits report strings, identities or credentials.
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+#define MQTT_PRINT(...) do {} while (0)
+#define MQTT_PRINTLN(...) do {} while (0)
+#else
+#define MQTT_PRINT(...) Serial.printf(__VA_ARGS__)
+#define MQTT_PRINTLN(...) Serial.println(__VA_ARGS__)
+#endif
+
 // Conditional debug print
-#define MQTT_LOG(fmt, ...) do { if (mqttDebugLog) Serial.printf("MQTT: " fmt "\n", ##__VA_ARGS__); } while(0)
+#define MQTT_LOG(fmt, ...) do { if (mqttDebugLog) MQTT_PRINT("MQTT: " fmt "\n", ##__VA_ARGS__); } while(0)
 
 // Non-blocking MQTT receive. PubSubClient reads a whole packet in one blocking
 // call, and an H2 pushes ~38 KB of full status every ~2 s that trickles in over
@@ -101,11 +129,36 @@ class MqttRxClient : public Client {
     return _pkt != nullptr;
   }
 
+#if WS43B_CONNECT_DIAG
+  ws43b_connection::Timing connectTiming;
+  int connect(IPAddress ip, uint16_t port) override {
+    reset(); return ws43b_connection::connect(_t, ip, port, connectTiming, [](){return millis();});
+  }
+  int connect(const char* host, uint16_t port) override {
+    reset(); return ws43b_connection::connect(_t, host, port, connectTiming, [](){return millis();});
+  }
+#elif BOARD_MQTT_ASYNC_CONNECT
+  int connect(IPAddress ip, uint16_t port) override { reset(); return _t.connect(ip, port, 3000); }
+  int connect(const char* host, uint16_t port) override { reset(); return _t.connect(host, port, 3000); }
+#else
   int connect(IPAddress ip, uint16_t port) override { reset(); return _t.connect(ip, port); }
   int connect(const char* host, uint16_t port) override { reset(); return _t.connect(host, port); }
+#endif
   size_t write(uint8_t b) override { return _t.write(b); }
   size_t write(const uint8_t* b, size_t n) override { return _t.write(b, n); }
-  int available() override { pump(); return (int)(_passLen - _passPos); }
+  void setHandler(Handler h) { _h = h; }
+#if BOARD_MQTT_ASYNC_CONNECT
+  // Only the connection worker enables this. PubSubClient busy-polls CONNACK;
+  // yielding here keeps the idle/watchdog task runnable during a silent broker.
+  bool connecting = false;
+#endif
+  int available() override {
+    pump();
+#if BOARD_MQTT_ASYNC_CONNECT
+    if (connecting && _passPos == _passLen) vTaskDelay(1);
+#endif
+    return (int)(_passLen - _passPos);
+  }
   int read() override {
     if (_passPos >= _passLen) pump();
     return _passPos < _passLen ? _pass[_passPos++] : -1;
@@ -254,6 +307,7 @@ const char* pushallReasonToString(uint8_t reason) {
     case PUSHALL_RECOVERY_FAILED:    return "Recovery (Failed)";
     case PUSHALL_MANUAL:             return "Manual";
     case PUSHALL_PERIODIC_IDLE:      return "Periodic (Idle)";
+    case PUSHALL_RECOVERY_VISIBLE:   return "Recovery (Visible screen)";
     case PUSHALL_NONE:
     default:                         return "Never";
   }
@@ -271,7 +325,8 @@ static void releaseClients(MqttConn& c) {
 // ---------------------------------------------------------------------------
 //  Lazy allocation of TLS + MQTT clients for one connection
 // ---------------------------------------------------------------------------
-static bool ensureClients(MqttConn& c) {
+static bool ensureClients(MqttConn& c, const PrinterConfig& cfg, MqttRxClient::Handler handler = mqttCallback) {
+  ws43b_memory::Scope memory(ws43b_memory::Stage::MqttAllocate);
   if (c.tls && c.mqtt) return true;
 
   uint32_t freeHeap = ESP.getFreeHeap();
@@ -289,9 +344,13 @@ static bool ensureClients(MqttConn& c) {
     }
     MQTT_LOG("[%d] WiFiClientSecure allocated OK", c.slotIndex);
   }
-  if (isCloudMode(printers[c.slotIndex].config.mode)) {
+  if (isCloudMode(cfg.mode)) {
     // Cloud: use built-in CA certificate bundle for proper TLS verification
+#if defined(BOARD_IS_WS43B)
+    c.tls->setCACertBundle(rootca_crt_bundle_start, rootca_crt_bundle_end - rootca_crt_bundle_start);
+#else
     c.tls->setCACertBundle(rootca_crt_bundle_start);
+#endif
     c.tls->setTimeout(15);
   } else {
     // LAN: printers use self-signed certs, skip verification
@@ -321,7 +380,6 @@ static bool ensureClients(MqttConn& c) {
     MQTT_LOG("[%d] PubSubClient allocated OK", c.slotIndex);
   }
 
-  PrinterConfig& cfg = printers[c.slotIndex].config;
   if (isCloudMode(cfg.mode)) {
     const char* broker = getBambuBroker(cfg.region);
     MQTT_LOG("[%d] setServer(%s, %d) [CLOUD]", c.slotIndex, broker, BAMBU_PORT);
@@ -342,14 +400,14 @@ static bool ensureClients(MqttConn& c) {
   // builds outgoing packets. The largest is CONNECT: ~1.3 KB with the cloud token
   // (< 1200 B), under 100 B on LAN; commands stay under 256 B.
   const size_t txSize = isCloudMode(cfg.mode) ? 1536 : 512;
-  if (!c.io->begin(bufSize, mqttCallback) || !c.mqtt->setBufferSize(txSize)) {
+  if (!c.io->begin(bufSize, handler) || !c.mqtt->setBufferSize(txSize)) {
     MQTT_LOG("[%d] MQTT buffers (%u) FAILED — not enough heap!", c.slotIndex, (unsigned)bufSize);
     delete c.mqtt; c.mqtt = nullptr;
     delete c.io;   c.io   = nullptr;
     delete c.tls;  c.tls  = nullptr;
     return false;
   }
-  c.mqtt->setCallback(mqttCallback);
+  c.mqtt->setCallback(handler);
   c.mqtt->setKeepAlive(isCloudMode(cfg.mode) ? BAMBU_CLOUD_KEEPALIVE : BAMBU_KEEPALIVE);
 
   return true;
@@ -359,6 +417,10 @@ static bool ensureClients(MqttConn& c) {
 //  Request pushall for one connection
 // ---------------------------------------------------------------------------
 static bool requestPushall(MqttConn& c, PushallReason reason) {
+#if BAMBU_MONITOR_ONLY
+  (void)c; (void)reason;
+  return false;
+#else
   if (!c.mqtt) return false;
 
   PrinterConfig& cfg = printers[c.slotIndex].config;
@@ -391,11 +453,13 @@ static bool requestPushall(MqttConn& c, PushallReason reason) {
   c.diag.lastPushallMs = c.lastPushallRequest;
   c.diag.lastPushallReason = (uint8_t)reason;
   return true;
+#endif
 }
 
 // ---------------------------------------------------------------------------
 //  Chamber light control: publish a ledctrl command (LAN + Cloud, same topic)
 // ---------------------------------------------------------------------------
+#if !BAMBU_MONITOR_ONLY
 static bool sendLightCtrlNode(MqttConn& c, const char* topic, const char* node, bool on) {
   char payload[192];
   snprintf(payload, sizeof(payload),
@@ -429,6 +493,8 @@ static bool sendLightCtrl(MqttConn& c, bool on) {
   printers[c.slotIndex].state.ctrlCmdSentMs = now ? now : 1;
   return ok;
 }
+
+#endif
 
 static void clearLiveMetrics(BambuState& s) {
   s.nozzleTemp = 0;    s.nozzleTarget = 0;
@@ -576,7 +642,7 @@ static void hmsAddBaseline(BambuState& s, uint32_t attr, uint32_t code) {
 
   // Nothing cheap left to drop. See BambuState.hmsBaselineSaturated.
   s.hmsBaselineSaturated = true;
-  Serial.printf("MQTT: HMS baseline saturated (>%d standing codes) — "
+  MQTT_PRINT("MQTT: HMS baseline saturated (>%d standing codes) — "
                 "treating all codes on this connection as baseline\n",
                 HMS_BASELINE_MAX);
 }
@@ -613,6 +679,17 @@ static void hmsInsertSorted(BambuState& s, uint32_t attr, uint32_t code) {
 // connected" — see the MqttConn.hmsBaseline* flags.
 static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
                              const char* serial, bool baselineWindow) {
+#if BAMBU_MONITOR_ONLY
+  (void)serial; (void)baselineWindow;
+  s.lastUpdate = millis();  // transport arrival, separate from useful fields
+  if (bambu_monitor::parse(payload, length, s.monitor, millis()))
+    s.lastPrintDataMs = millis();
+#else
+#if defined(BOARD_IS_WS43B)
+  // Keep the validated presence/freshness-aware native view alongside the
+  // upstream state needed by the complete web portal, HMS and automations.
+  bambu_monitor::parse(payload, length, s.monitor, millis());
+#endif
   const char* payloadEnd = (const char*)payload + length;
 #if !HAS_HMS_UI
   (void)baselineWindow;
@@ -700,7 +777,7 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
           JsonArray info = extDoc["info"];
 
           if (info.size() >= 2) {
-            if (!s.dualNozzle) Serial.println("MQTT: dual nozzle DETECTED (H2D/H2C)");
+            if (!s.dualNozzle) MQTT_PRINTLN("MQTT: dual nozzle DETECTED (H2D/H2C)");
             s.dualNozzle = true;
 
             if (extDoc["state"].is<unsigned int>()) {
@@ -1028,7 +1105,7 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
   }
 
   if (mqttDebugLog && print["gcode_state"].is<const char*>()) {
-    Serial.printf("MQTT: state=%s progress=%d nozzle=%.0f bed=%.0f\n",
+    MQTT_PRINT("MQTT: state=%s progress=%d nozzle=%.0f bed=%.0f\n",
                   print["gcode_state"].as<const char*>(),
                   print["mc_percent"] | -1,
                   print["nozzle_temper"] | -1.0f,
@@ -1459,7 +1536,7 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
   if (print["print_error"].is<unsigned int>()) {
     uint32_t pe = print["print_error"].as<unsigned int>();
     if (mqttDebugLog && (!s.printErrorSeen || pe != s.printError))
-      Serial.printf("MQTT: print_error %08X -> %08X%s\n",
+      MQTT_PRINT("MQTT: print_error %08X -> %08X%s\n",
                     s.printErrorSeen ? s.printError : 0u, pe,
                     s.printErrorSeen ? "" : " (first sight)");
     s.printError = pe;
@@ -1514,7 +1591,7 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
           s.hmsSuppressedCodes[s.hmsSuppressed - 1].code = code;
         }
         if (mqttDebugLog)
-          Serial.printf("MQTT:   %04X-%04X-%04X-%04X suppressed (%s)\n",
+          MQTT_PRINT("MQTT:   %04X-%04X-%04X-%04X suppressed (%s)\n",
                         (unsigned)(attr >> 16), (unsigned)(attr & 0xFFFF),
                         (unsigned)(code >> 16), (unsigned)(code & 0xFFFF),
                         undescribed ? "not described by Bambu" : "muted: shown elsewhere");
@@ -1550,12 +1627,12 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
       // hmsTotal counts described entries only, so print what the printer sent
       // alongside it - otherwise a report that was entirely suppressed reads as
       // an empty one and the individual "suppressed" lines above look unrelated.
-      Serial.printf("MQTT: hms %u reported, %u described (kept %u%s)%s\n",
+      MQTT_PRINT("MQTT: hms %u reported, %u described (kept %u%s)%s\n",
                     (unsigned)(s.hmsTotal + s.hmsSuppressed), s.hmsTotal, s.hmsCount,
                     s.hmsOverflow ? ", overflow" : "",
                     baselineWindow ? " [baseline window]" : "");
       for (uint8_t i = 0; i < s.hmsCount; i++)
-        Serial.printf("MQTT:   %04X-%04X-%04X-%04X sev=%u%s\n",
+        MQTT_PRINT("MQTT:   %04X-%04X-%04X-%04X sev=%u%s\n",
                       (unsigned)(s.hms[i].attr >> 16), (unsigned)(s.hms[i].attr & 0xFFFF),
                       (unsigned)(s.hms[i].code >> 16), (unsigned)(s.hms[i].code & 0xFFFF),
                       hmsSeverityOf(s.hms[i].code),
@@ -1566,18 +1643,26 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
 
   s.lastUpdate = millis();
   if (corePrintData) s.lastPrintDataMs = millis();
+#endif
 }
 
 // ---------------------------------------------------------------------------
 //  MQTT callback — routes to correct printer slot by serial in topic
 // ---------------------------------------------------------------------------
 static void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  ws43b_memory::Scope memory(ws43b_memory::Stage::MqttParse);
   esp_task_wdt_reset();
 
   // Extract serial from topic: "device/{serial}/report"
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+  if (!topic || strncmp(topic, "device/", 7) != 0 || strlen(topic) < 15) return;
+#endif
   const char* start = topic + 7;  // skip "device/"
   const char* end = strchr(start, '/');
   if (!end) return;
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+  if (strcmp(end, "/report") != 0) return;
+#endif
   size_t serialLen = end - start;
 
   MqttConn* c = findConnBySerial(start, serialLen);
@@ -1589,7 +1674,9 @@ static void mqttCallback(char* topic, byte* payload, unsigned int length) {
   c->diag.messagesRx++;
   MQTT_LOG("[%d] callback #%u topic=%s len=%u", c->slotIndex, c->diag.messagesRx, topic, length);
 
+#if !BAMBU_MONITOR_ONLY
   c->gotDataSinceConnect = true;
+#endif
   BambuState& s = printers[c->slotIndex].state;
   const char* cfgSerial = printers[c->slotIndex].config.serial;
 
@@ -1599,6 +1686,9 @@ static void mqttCallback(char* topic, byte* payload, unsigned int length) {
 #endif
 
   parseMqttPayload(payload, length, s, cfgSerial, baselineWindow);
+#if BAMBU_MONITOR_ONLY
+  c->gotDataSinceConnect = s.monitor.hasUsefulData;
+#endif
 
 #if HAS_HMS_UI
   // Close the window on the first report after the baseline pushall went out —
@@ -1619,29 +1709,249 @@ static void mqttCallback(char* topic, byte* payload, unsigned int length) {
 //
 // Rate-limited hard: a wrong stored password would otherwise re-post
 // credentials on every reconnect, and Bambu bans on connection churn.
+#if !BAMBU_MONITOR_ONLY
 static bool tryStoredPasswordRelogin(uint8_t slot) {
   static uint32_t lastAttempt = 0;
+  static bool attempted = false;
   const uint32_t RETRY_INTERVAL_MS = 15UL * 60UL * 1000UL;
 
   if (!cloudLoginCanAutoRefresh()) return false;
 
   uint32_t now = millis();
-  if (lastAttempt != 0 && now - lastAttempt < RETRY_INTERVAL_MS) return false;
+  if (attempted && now - lastAttempt < RETRY_INTERVAL_MS) return false;
   lastAttempt = now;
+  attempted = true;
 
   MQTT_LOG("[%d] cloud token rejected — signing in again with the stored password", slot);
+#if BOARD_MQTT_ASYNC_CONNECT && HAS_CLOUD_LOGIN
+  // Schedule only; HTTPS and TLS cannot hold up touch, drawing or live MQTT.
+  return cloudLoginStartStoredRefresh(slot);
+#else
   if (!cloudLoginRefreshStored()) {
     MQTT_LOG("[%d] stored-password sign-in failed: %s", slot, cloudLoginMessage());
     return false;
   }
   MQTT_LOG("[%d] token renewed", slot);
   return true;
+#endif
 }
+
+#endif
 
 // ---------------------------------------------------------------------------
 //  Reconnect one connection
 // ---------------------------------------------------------------------------
+// Called only by the UI/main loop, after the worker has relinquished ownership.
+static void acceptMqttSession(MqttConn& c) {
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+    // No field from the previous MQTT session may appear as current after
+    // reconnect. subscribe() does not run the callback; loop() does that later.
+    printers[c.slotIndex].state.monitor.newSession();
+#endif
+#if BAMBU_MONITOR_ONLY
+    printers[c.slotIndex].state.lastPrintDataMs = 0;
+    printers[c.slotIndex].state.printing = false;
+    setPrinterGcodeStateCanonical(printers[c.slotIndex].state, GCODE_UNKNOWN);
+#endif
+    printers[c.slotIndex].state.connected = true;
+    // Detect "quick disconnect" pattern: if last connection lasted < 30s,
+    // don't reset backoff — the broker may be rejecting us
+    bool quickDisconnect = c.connectTime > 0 &&
+                           (millis() - c.connectTime < 30000);
+    c.connectTime = millis();
+    c.diag.connectTime = c.connectTime;
+#if defined(BOARD_IS_WS43B)
+    c.visibleRefresh = {};
+#endif
+    c.initialPushallSent = false;
+    c.gotDataSinceConnect = false;
+#if HAS_HMS_UI
+    // BambuState is NOT wiped on reconnect (only initConnSlot and settings load
+    // memset it), so the baseline has to be rebuilt explicitly here.
+    {
+      BambuState& bs = printers[c.slotIndex].state;
+      bs.hmsBaselineCount = 0;
+      bs.hmsBaselineSaturated = false;
+      bs.printErrorSeen = false;
+    }
+    c.hmsBaselineOpen = true;
+    c.hmsBaselineSeal = false;
+#endif
+    if (!quickDisconnect) {
+      c.consecutiveFails = 0;  // only reset backoff on stable connections
+    } else {
+      MQTT_LOG("[%d] previous connection was short-lived, keeping backoff=%u",
+               c.slotIndex, c.consecutiveFails);
+    }
+}
+
+#if BOARD_MQTT_ASYNC_CONNECT
+// One connection attempt at a time bounds RAM use. The worker owns a detached
+// client bundle and immutable settings snapshot, never conns[] or BambuState.
+// Disconnect/reconfigure invalidates the generation without waiting for TLS.
+struct ConnectJob {
+  MqttConn candidate{};
+  PrinterConfig config{};
+  char token[1200]{};
+  uint32_t generation = 0;
+  bool subscribed = false;
+  uint32_t stackFree = 0;
+  std::atomic<bool> done{false};
+};
+static ConnectJob connectJob;
+static bool connectJobBusy = false;  // main loop only
+static uint32_t connectGeneration[MAX_ACTIVE_PRINTERS]{};
+
+static void connectWorker(void*) {
+  auto& j = connectJob;
+  auto& c = j.candidate;
+  const auto& cfg = j.config;
+  const uint32_t started = millis();
+  c.diag.lastRc = -2;
+  // No report callback may run in this task, even if the peer sends PUBLISH
+  // before CONNACK. Subscribe only after connect; reports then wait in TLS.
+  if (ensureClients(c, cfg, nullptr)) {
+    c.tls->setHandshakeTimeout(10);
+    c.io->connecting = true;
+    if (cfg.mode == CONN_LOCAL) {
+      WiFiClient probe;
+      const uint32_t probeStarted = millis();
+      c.diag.tcpOk = probe.connect(cfg.ip, BAMBU_PORT, 1500);
+#if WS43B_CONNECT_DIAG
+      c.diag.tcpProbeMs = millis() - probeStarted;
+#endif
+      (void)probeStarted;
+      probe.stop();
+      c.printerUnreachable = !c.diag.tcpOk;
+    } else c.diag.tcpOk = true;
+    if (!c.diag.tcpOk) ++c.diag.probes;
+    else {
+      ++c.diag.attempts;
+      char clientId[32];
+      if (isCloudMode(cfg.mode))
+        snprintf(clientId, sizeof clientId, "bblp_%08x%04x",
+                 (uint32_t)esp_random(), (uint16_t)esp_random());
+      else snprintf(clientId, sizeof clientId, "bambu_%08x_%d",
+                    (uint32_t)ESP.getEfuseMac(), c.slotIndex);
+      ws43b_memory::Scope memory(ws43b_memory::Stage::MqttConnect);
+      const uint32_t sessionStarted = millis();
+      const bool ok = c.mqtt->connect(clientId,
+        isCloudMode(cfg.mode) ? cfg.cloudUserId : BAMBU_USERNAME,
+        isCloudMode(cfg.mode) ? j.token : cfg.accessCode);
+#if WS43B_CONNECT_DIAG
+      c.diag.transportSetupMs = c.io->connectTiming.transportMs;
+      c.diag.tlsHandshakeMs = c.io->connectTiming.tlsMs;
+      c.diag.tlsReady = c.io->connectTiming.tlsReady;
+      c.diag.mqttSessionMs = millis() - sessionStarted - c.diag.transportSetupMs - c.diag.tlsHandshakeMs;
+#endif
+      (void)sessionStarted;
+      c.diag.lastRc = c.mqtt->state();
+      if (ok) {
+        char topic[64];
+        snprintf(topic, sizeof topic, "device/%s/report", cfg.serial);
+        const uint32_t subscribeStarted = millis();
+        j.subscribed = c.mqtt->subscribe(topic);
+#if WS43B_CONNECT_DIAG
+        c.diag.subscribeMs = millis() - subscribeStarted;
+#endif
+        (void)subscribeStarted;
+        if (!j.subscribed) c.diag.lastRc = -2;
+      }
+    }
+    c.io->connecting = false;
+  } else ++c.diag.attempts;
+  memset(j.token, 0, sizeof j.token);
+  memset(j.config.accessCode, 0, sizeof j.config.accessCode);
+  c.diag.connectDurMs = millis() - started;
+  j.stackFree = uxTaskGetStackHighWaterMark(nullptr);
+  // Release publishes the entire candidate. No access to j after this store.
+  j.done.store(true, std::memory_order_release);
+  vTaskDelete(nullptr);
+}
+
+static void finishConnectJob() {
+  if (!connectJobBusy || !connectJob.done.load(std::memory_order_acquire)) return;
+  auto& j = connectJob;
+  auto& from = j.candidate;
+  auto& to = conns[from.slotIndex];
+  if (to.active && connectGeneration[from.slotIndex] == j.generation) {
+    to.diag.attempts += from.diag.attempts;
+    to.diag.probes += from.diag.probes;
+    to.diag.tcpOk = from.diag.tcpOk;
+    to.diag.lastRc = from.diag.lastRc;
+    to.diag.connectDurMs = from.diag.connectDurMs;
+    to.diag.connectStackFree = j.stackFree;
+    to.printerUnreachable = from.printerUnreachable;
+#if WS43B_CONNECT_DIAG
+    to.diag.tcpProbeMs = from.diag.tcpProbeMs;
+    to.diag.transportSetupMs = from.diag.transportSetupMs;
+    to.diag.tlsHandshakeMs = from.diag.tlsHandshakeMs;
+    to.diag.mqttSessionMs = from.diag.mqttSessionMs;
+    to.diag.subscribeMs = from.diag.subscribeMs;
+    to.diag.tlsReady = from.diag.tlsReady;
+#endif
+    to.diag.connectPending = false;
+    if (j.subscribed) {
+      to.tls = from.tls; from.tls = nullptr;
+      to.io = from.io; from.io = nullptr;
+      to.mqtt = from.mqtt; from.mqtt = nullptr;
+      // PubSubClient stores the hostname pointer, so replace the job snapshot
+      // pointer before allowing another job to reuse that storage.
+      const auto& cfg = printers[to.slotIndex].config;
+      to.mqtt->setServer(isCloudMode(cfg.mode) ? getBambuBroker(cfg.region) : cfg.ip, BAMBU_PORT);
+      acceptMqttSession(to);
+      to.io->setHandler(mqttCallback);
+      to.mqtt->setCallback(mqttCallback);
+    } else {
+      printers[to.slotIndex].state.connected = false;
+      if (!to.printerUnreachable) ++to.consecutiveFails;
+      to.lastReconnectAttempt = millis();
+#if !BAMBU_MONITOR_ONLY
+      // Preserve the existing explicit authentication recovery. This separate
+      // HTTP login flow is not run for network/time-out failures.
+      if (isCloudMode(j.config.mode) && (to.diag.lastRc == 4 || to.diag.lastRc == 5))
+        tryStoredPasswordRelogin(to.slotIndex);
+#endif
+    }
+  }
+  releaseClients(from);
+  j.config = {};
+  connectJobBusy = false;
+}
+
+static void startConnectJob(MqttConn& c, const PrinterConfig& cfg) {
+  auto& j = connectJob;
+  j.candidate = {};
+  j.candidate.slotIndex = c.slotIndex;
+  j.config = cfg;
+  j.generation = connectGeneration[c.slotIndex];
+  j.subscribed = false;
+  j.done.store(false, std::memory_order_relaxed);
+  if (isCloudMode(cfg.mode) && !loadCloudToken(j.token, sizeof j.token)) {
+    c.diag.lastRc = -2; ++c.consecutiveFails;
+    j.config = {};
+    return;
+  }
+  releaseClients(c);
+  connectJobBusy = true;
+  c.diag.connectPending = true;
+  if (xTaskCreatePinnedToCore(connectWorker, "mqtt_connect", 8192, nullptr, 1, nullptr, 0) != pdPASS) {
+    connectJobBusy = false;
+    c.diag.connectPending = false;
+    c.diag.lastRc = -2; ++c.consecutiveFails;
+    memset(j.token, 0, sizeof j.token);
+    j.config = {};
+  }
+}
+#endif
+
 static void reconnectConn(MqttConn& c) {
+#if BOARD_MQTT_ASYNC_CONNECT
+  if (connectJobBusy) return;
+#if HAS_CLOUD_LOGIN
+  if (cloudLoginStoredRefreshPending()) return;
+#endif
+#endif
   PrinterConfig& cfg = printers[c.slotIndex].config;
 
   if (cfg.mode == CONN_LOCAL && strlen(cfg.ip) == 0) {
@@ -1685,6 +1995,9 @@ static void reconnectConn(MqttConn& c) {
            isCloudMode(cfg.mode) ? "CLOUD" : "LOCAL");
   MQTT_LOG("[%d] serial=%s heap=%u WiFi=%d", c.slotIndex, cfg.serial, ESP.getFreeHeap(), WiFi.status());
 
+#if BOARD_MQTT_ASYNC_CONNECT
+  startConnectJob(c, cfg);
+#else
   // For cloud: force-release old TLS/MQTT objects before reconnecting.
   // This ensures a clean TLS handshake with no stale session state.
   if (isCloudMode(cfg.mode) && c.tls) {
@@ -1692,7 +2005,7 @@ static void reconnectConn(MqttConn& c) {
     releaseClients(c);
   }
 
-  if (!ensureClients(c)) {
+  if (!ensureClients(c, cfg)) {
     MQTT_LOG("[%d] ensureClients() FAILED", c.slotIndex);
     c.diag.attempts++;
     c.diag.lastRc = -2;
@@ -1702,6 +2015,12 @@ static void reconnectConn(MqttConn& c) {
   }
   if (c.mqtt->connected()) return;
 
+#if WS43B_CONNECT_DIAG
+  c.diag.tcpProbeMs = c.diag.transportSetupMs = c.diag.tlsHandshakeMs = 0;
+  c.diag.mqttSessionMs = c.diag.subscribeMs = 0;
+  c.diag.tlsReady = false;
+  c.io->connectTiming = {};
+#endif
   // TCP reachability test (local mode only)
   if (cfg.mode == CONN_LOCAL) {
     WiFiClient tcp;
@@ -1709,6 +2028,9 @@ static void reconnectConn(MqttConn& c) {
     MQTT_LOG("[%d] TCP test to %s:%d...", c.slotIndex, cfg.ip, BAMBU_PORT);
     unsigned long tcpT0 = millis();
     c.diag.tcpOk = tcp.connect(cfg.ip, BAMBU_PORT);
+#if WS43B_CONNECT_DIAG
+    c.diag.tcpProbeMs = millis() - tcpT0;
+#endif
     MQTT_LOG("[%d] TCP test %s in %lums", c.slotIndex, c.diag.tcpOk ? "OK" : "FAILED", millis() - tcpT0);
     tcp.stop();
     c.printerUnreachable = !c.diag.tcpOk;
@@ -1740,6 +2062,8 @@ static void reconnectConn(MqttConn& c) {
   esp_task_wdt_reset();
 
   bool connected = false;
+  {
+  ws43b_memory::Scope memory(ws43b_memory::Stage::MqttConnect);
   if (isCloudMode(cfg.mode)) {
     char tokenBuf[1200];
     if (!loadCloudToken(tokenBuf, sizeof(tokenBuf))) {
@@ -1756,11 +2080,27 @@ static void reconnectConn(MqttConn& c) {
     if (c.io) c.io->reset();
     connected = c.mqtt->connect(clientId, BAMBU_USERNAME, cfg.accessCode);
   }
+  }
 
+#if WS43B_CONNECT_DIAG
+  c.diag.transportSetupMs = c.io->connectTiming.transportMs;
+  c.diag.tlsHandshakeMs = c.io->connectTiming.tlsMs;
+  c.diag.tlsReady = c.io->connectTiming.tlsReady;
+  c.diag.mqttSessionMs = uint32_t(millis() - t0) - c.diag.transportSetupMs - c.diag.tlsHandshakeMs;
+  // Timings are exposed by /monitor/status. Serial backpressure must not
+  // become part of the connection duration we are trying to measure.
+#endif
   if (connected) {
     char topic[64];
     snprintf(topic, sizeof(topic), "device/%s/report", cfg.serial);
+#if WS43B_CONNECT_DIAG
+    const uint32_t subscribeStart = millis();
+    const bool subscribed = c.mqtt->subscribe(topic);
+    c.diag.subscribeMs = millis() - subscribeStart;
+    if (!subscribed) {
+#else
     if (!c.mqtt->subscribe(topic)) {
+#endif
       MQTT_LOG("[%d] subscribe FAILED for %s — disconnecting", c.slotIndex, topic);
       c.mqtt->disconnect();
       c.consecutiveFails++;
@@ -1768,33 +2108,7 @@ static void reconnectConn(MqttConn& c) {
       return;
     }
 
-    printers[c.slotIndex].state.connected = true;
-    // Detect "quick disconnect" pattern: if last connection lasted < 30s,
-    // don't reset backoff — the broker may be rejecting us
-    bool quickDisconnect = c.connectTime > 0 &&
-                           (millis() - c.connectTime < 30000);
-    c.connectTime = millis();
-    c.diag.connectTime = c.connectTime;
-    c.initialPushallSent = false;
-    c.gotDataSinceConnect = false;
-#if HAS_HMS_UI
-    // BambuState is NOT wiped on reconnect (only initConnSlot and settings load
-    // memset it), so the baseline has to be rebuilt explicitly here.
-    {
-      BambuState& bs = printers[c.slotIndex].state;
-      bs.hmsBaselineCount = 0;
-      bs.hmsBaselineSaturated = false;
-      bs.printErrorSeen = false;
-    }
-    c.hmsBaselineOpen = true;
-    c.hmsBaselineSeal = false;
-#endif
-    if (!quickDisconnect) {
-      c.consecutiveFails = 0;  // only reset backoff on stable connections
-    } else {
-      MQTT_LOG("[%d] previous connection was short-lived, keeping backoff=%u",
-               c.slotIndex, c.consecutiveFails);
-    }
+    acceptMqttSession(c);
     c.diag.lastRc = 0;
     c.diag.connectDurMs = millis() - t0;
     MQTT_LOG("[%d] CONNECTED in %lums, subscribed to %s", c.slotIndex, c.diag.connectDurMs, topic);
@@ -1808,16 +2122,19 @@ static void reconnectConn(MqttConn& c) {
     if (isCloudMode(cfg.mode)) {
       MQTT_LOG("[%d] config: serial=%s userId=%s region=%d",
                c.slotIndex, cfg.serial, cfg.cloudUserId, cfg.region);
+#if !BAMBU_MONITOR_ONLY
       if (c.diag.lastRc == 4 || c.diag.lastRc == 5) {
         if (!tryStoredPasswordRelogin(c.slotIndex)) {
           MQTT_LOG("[%d] Cloud token may be expired — re-login via web UI", c.slotIndex);
         }
       }
+#endif
     } else {
       MQTT_LOG("[%d] config: ip=%s serial=%s code_len=%d",
                c.slotIndex, cfg.ip, cfg.serial, (int)strlen(cfg.accessCode));
     }
   }
+#endif  // BOARD_MQTT_ASYNC_CONNECT
 }
 
 // ---------------------------------------------------------------------------
@@ -1846,10 +2163,33 @@ static void handleConn(MqttConn& c) {
   c.wasConnected = isConnected;
 
   if (isConnected) {
+#if defined(BOARD_IS_WS43B)
+    // Drain a small burst before drawing. The RX layer never waits for a full
+    // PUBLISH; stop on a fragment/control packet, disconnect or work budget.
+    const uint32_t rxStart=millis();
+    for(unsigned batch=0;batch<4;++batch) {
+      const uint32_t before=c.diag.messagesRx;
+      c.mqtt->loop();
+      isConnected=c.mqtt->connected();
+      if(!isConnected || c.diag.messagesRx==before || uint32_t(millis()-rxStart)>=12u ||
+         !c.tls || c.tls->available()<=0)break;
+    }
+#else
     c.mqtt->loop();
     isConnected = c.mqtt->connected();  // re-evaluate: loop() can disconnect
+#endif
   }
 
+#if BAMBU_MONITOR_ONLY
+  // Connection loss is visible immediately. Passive monitoring never issues a
+  // recovery pushall and never turns an old RUNNING status into a guessed IDLE.
+  s.connected = isConnected;
+  if (!isConnected) {
+    c.diag.connectTime = 0;
+    reconnectConn(c);
+  }
+  return;
+#else
   if (!isConnected) {
     // Grace period: don't flag as disconnected until gone for 3s.
     // This prevents screen flicker on momentary cloud drops.
@@ -2105,6 +2445,19 @@ static void handleConn(MqttConn& c) {
   } else if (s.gcodeStateId != GCODE_UNKNOWN) {
     c.stalePushallSentMs = 0;
   }
+#if defined(BOARD_IS_WS43B)
+  // Recover known stale fields in the currently visible view. Share the
+  // existing request cooldown, including requests issued above this block.
+  const uint32_t now=millis();
+  const uint32_t interval=cloud?120000u:BAMBU_PUSHALL_INTERVAL;
+  if(isConnected && c.initialPushallSent && c.gotDataSinceConnect &&
+     c.visibleRefresh.due(now,c.connectTime,c.lastPushallRequest,interval,
+                         ws43bVisibleDataNeedsRefresh(c.slotIndex,now))) {
+    c.visibleRefresh.mark(now); // Failed publishes also back off.
+    requestPushall(c,PUSHALL_RECOVERY_VISIBLE);
+  }
+#endif
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -2116,6 +2469,9 @@ static void handleConn(MqttConn& c) {
 // precisely while the slot is not yet fully configured) can use it without the
 // chicken-and-egg cloudUserId requirement baked into isPrinterConfigured().
 static bool isPrinterSlotEnabled(uint8_t slot) {
+#if BAMBU_MONITOR_ONLY
+  if (slot != 0) return false;  // passive panel has one explicitly configured printer
+#endif
   if (slot >= MAX_PRINTERS) return false;
 #ifdef BOARD_LOW_RAM
   // Slot 1 only available when user opts into experimental 2-printer mode.
@@ -2167,15 +2523,15 @@ static void extractCloudUserIdIfNeeded(uint8_t i) {
   PrinterConfig& cfg = printers[i].config;
   if (!isCloudMode(cfg.mode) || strlen(cfg.serial) == 0 || strlen(cfg.cloudUserId) > 0)
     return;
-  Serial.printf("MQTT: [%d] cloud printer needs userId extraction\n", i);
+  MQTT_PRINT("MQTT: [%d] cloud printer needs userId extraction\n", i);
   char tokenBuf[1200];
   if (loadCloudToken(tokenBuf, sizeof(tokenBuf))) {
     if (!cloudExtractUserId(tokenBuf, cfg.cloudUserId, sizeof(cfg.cloudUserId))) {
-      Serial.printf("MQTT: [%d] JWT extract failed, trying API\n", i);
+      MQTT_PRINT("MQTT: [%d] JWT extract failed, trying API\n", i);
       cloudFetchUserId(tokenBuf, cfg.cloudUserId, sizeof(cfg.cloudUserId), cfg.region);
     }
     if (strlen(cfg.cloudUserId) > 0) {
-      Serial.printf("MQTT: [%d] userId=%s\n", i, cfg.cloudUserId);
+      MQTT_PRINT("MQTT: [%d] userId=%s\n", i, cfg.cloudUserId);
       savePrinterConfig(i);
     }
   }
@@ -2185,10 +2541,19 @@ static void extractCloudUserIdIfNeeded(uint8_t i) {
 static void initConnSlot(uint8_t i) {
   MqttConn& c = conns[i];
   c.slotIndex = i;
+#if BOARD_MQTT_ASYNC_CONNECT
+  ++connectGeneration[i];
+#if HAS_CLOUD_LOGIN
+  cloudLoginCancelStoredRefresh(i);
+#endif
+#endif
   memset(&c.diag, 0, sizeof(MqttDiag));
   c.lastReconnectAttempt = 0;
   c.lastPushallRequest = 0;
   c.pushallSeqId = 0;
+#if defined(BOARD_IS_WS43B)
+  c.visibleRefresh = {};
+#endif
   c.connectTime = 0;
   c.initialPushallSent = false;
   c.gotDataSinceConnect = false;
@@ -2212,13 +2577,13 @@ static void initConnSlot(uint8_t i) {
   if (isPrinterConfigured(i)) {
     c.active = true;
     PrinterConfig& cfg = printers[i].config;
-    Serial.printf("MQTT: [%d] '%s' serial=%s mode=%s — ready\n",
+    MQTT_PRINT("MQTT: [%d] '%s' serial=%s mode=%s — ready\n",
                   i, cfg.name, cfg.serial,
                   isCloudMode(cfg.mode) ? "CLOUD" : "LOCAL");
   } else {
     c.active = false;
     releaseClients(c);
-    Serial.printf("MQTT: [%d] not configured, skipping\n", i);
+    MQTT_PRINT("MQTT: [%d] not configured, skipping\n", i);
   }
 }
 
@@ -2229,7 +2594,7 @@ static void initConnSlot(uint8_t i) {
 static volatile int8_t g_lightCmdReq[MAX_ACTIVE_PRINTERS];
 
 void initBambuMqtt() {
-  Serial.println("MQTT: initBambuMqtt() — multi-printer");
+  MQTT_PRINTLN("MQTT: initBambuMqtt() — multi-printer");
 
   // Clean up any existing connections before reinitializing
   for (uint8_t i = 0; i < MAX_ACTIVE_PRINTERS; i++) {
@@ -2254,7 +2619,7 @@ void initBambuMqtt() {
 
 void initBambuMqttSlot(uint8_t slot) {
   if (slot >= MAX_ACTIVE_PRINTERS) return;
-  Serial.printf("MQTT: initBambuMqttSlot(%d)\n", slot);
+  MQTT_PRINT("MQTT: initBambuMqttSlot(%d)\n", slot);
   // Re-init only this slot: the other printer's connection and live
   // display state stay untouched.
   disconnectBambuMqtt(slot);
@@ -2272,6 +2637,12 @@ static volatile bool g_extRefreshReq[MAX_ACTIVE_PRINTERS] = { false };
 void deferMqttReconnect() { skipReconnectOnce = true; }
 
 void handleBambuMqtt() {
+#if BOARD_MQTT_ASYNC_CONNECT
+#if HAS_CLOUD_LOGIN
+  cloudLoginServiceStoredRefresh();
+#endif
+  finishConnectJob();
+#endif
   bool skip = skipReconnectOnce;
   skipReconnectOnce = false;
   for (uint8_t i = 0; i < MAX_ACTIVE_PRINTERS; i++) {
@@ -2281,6 +2652,7 @@ void handleBambuMqtt() {
     // Already-connected sessions still get mqtt->loop().
     if (skip && !(conns[i].mqtt && conns[i].mqtt->connected())) continue;
     handleConn(conns[i]);
+    #if !BAMBU_MONITOR_ONLY
     // Drain a watt-triggered refresh raised by the Tasmota poll task. Must run
     // on this (MQTT) task because PubSubClient publish is not thread-safe.
     if (g_extRefreshReq[i]) {
@@ -2294,15 +2666,24 @@ void handleBambuMqtt() {
       g_lightCmdReq[i] = -1;
       sendLightCtrl(conns[i], on);
     }
+    #endif
   }
 }
+
+#if defined(BOARD_IS_WS43B)
+bool bambuMqttReceivePending(uint8_t slot) {
+  if(slot>=MAX_ACTIVE_PRINTERS)return false;
+  auto &c=conns[slot];
+  return c.active&&c.mqtt&&c.mqtt->connected()&&c.tls&&c.tls->available()>0;
+}
+#endif
 
 void resetMqttBackoff() {
   for (uint8_t i = 0; i < MAX_ACTIVE_PRINTERS; i++) {
     conns[i].consecutiveFails = 0;
     conns[i].lastReconnectAttempt = 0;  // force immediate retry
   }
-  Serial.println("MQTT: backoff reset, reconnecting immediately");
+  MQTT_PRINTLN("MQTT: backoff reset, reconnecting immediately");
 }
 
 void requestCloudRefresh(uint8_t slot) {
@@ -2329,17 +2710,25 @@ void requestCloudRefresh(uint8_t slot) {
 }
 
 void requestCloudRefreshFromTask(uint8_t slot) {
+#if BAMBU_MONITOR_ONLY
+  (void)slot;
+#else
   // Thread-safe: only raises a flag. The MQTT task does the actual publish in
   // handleBambuMqtt(). A single-byte volatile write is atomic on ESP32; a race
   // with the drain just costs at most one extra refresh next loop.
   if (slot < MAX_ACTIVE_PRINTERS) g_extRefreshReq[slot] = true;
+#endif
 }
 
 void requestLightCommand(uint8_t slot, bool on) {
+#if BAMBU_MONITOR_ONLY
+  (void)slot; (void)on;
+#else
   if (slot >= MAX_ACTIVE_PRINTERS) return;
   g_lightCmdReq[slot] = on ? 1 : 0;
   // Turning the light on (manual or print-start) cancels any pending auto-off.
   if (on) printers[slot].state.lightOffDueMs = 0;
+#endif
 }
 
 void disconnectBambuMqtt() {
@@ -2350,6 +2739,13 @@ void disconnectBambuMqtt() {
 
 void disconnectBambuMqtt(uint8_t slot) {
   if (slot >= MAX_ACTIVE_PRINTERS) return;
+#if BOARD_MQTT_ASYNC_CONNECT
+  ++connectGeneration[slot];
+#if HAS_CLOUD_LOGIN
+  cloudLoginCancelStoredRefresh(slot);
+#endif
+  conns[slot].diag.connectPending = false;
+#endif
   MqttConn& c = conns[slot];
   if (c.mqtt && c.mqtt->connected()) {
     c.mqtt->disconnect();

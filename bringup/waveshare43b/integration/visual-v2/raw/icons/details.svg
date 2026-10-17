@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+<defs><linearGradient id="shell" x2=".8" y2="1"><stop stop-color="#e3edf5"/><stop offset=".45" stop-color="#9eb7ca"/><stop offset="1" stop-color="#58778e"/></linearGradient><linearGradient id="screen" x2=".5" y2="1"><stop stop-color="#344e65"/><stop offset="1" stop-color="#172e43"/></linearGradient></defs>
+<ellipse cx="24" cy="44" rx="16" ry="2.5" fill="#020c16" opacity=".4"/>
+<path d="m12 4 26 2 2 34-26 4-5-4V7Z" fill="#425f77"/>
+<path d="M9 5h26v36H9Z" fill="url(#shell)" stroke="#cfdfeb" stroke-width=".8"/>
+<path d="M12 9h20v27H12Z" fill="url(#screen)"/>
+<path d="M12 9h20" stroke="#5d7a90"/>
+<rect x="15" y="13" width="3" height="3" rx=".6" fill="#a9d3c9"/>
+<rect x="15" y="21" width="3" height="3" rx=".6" fill="#b3c9da"/>
+<rect x="15" y="29" width="3" height="3" rx=".6" fill="#b3c9da"/>
+<path d="M21 14.5h8m-8 8h8m-8 8h6" stroke="#e1ebf2" stroke-width="1.8" stroke-linecap="round"/>
+<path d="M9 5v36h26" fill="none" stroke="#eff7fb" stroke-width="1" opacity=".7"/>
+<path d="m35 7 3 1 1 31-4 2" fill="#526f88"/>
+</svg>

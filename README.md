@@ -1,3 +1,20 @@
+# BambuHelper — Waveshare 4.3B development branch
+
+This fork adds the Waveshare **ESP32-S3-Touch-LCD-4.3B** (800×480, GT911) port to
+[BambuHelper by Keralots and contributors](https://github.com/Keralots/BambuHelper).
+The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`); `main`
+tracks the original project. The original project README is preserved below.
+
+**Development baseline:** the source snapshot corresponds to the panel version
+recorded on 16–17 October 2026. A dark-screen / touch-wake failure has been
+observed and remains unresolved; full print-cycle acceptance is pending.
+This is not a stable release. See [Waveshare build and test notes](WAVESHARE.md).
+
+This upload includes source and tests, without a new Waveshare firmware binary.
+Existing upstream firmware files and the Companion Tool are retained unchanged.
+
+---
+
 # BambuHelper
 
 Dedicated Bambu Lab printer monitor built with ESP32-S3 Super Mini and a 1.54" 240x240 color TFT display (ST7789).

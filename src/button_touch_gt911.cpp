@@ -12,7 +12,7 @@
 // address. Do not "clean that up" into this file.
 #include "button_touch_backend.h"
 
-#if defined(USE_GT911)
+#if defined(USE_GT911) && !defined(BOARD_IS_WS43B)
 
 #include <Wire.h>
 
@@ -133,4 +133,4 @@ TouchPoll touchPoll() {
   return {TouchEvent::None, lastDown};
 }
 
-#endif  // USE_GT911
+#endif  // USE_GT911 && !BOARD_IS_WS43B

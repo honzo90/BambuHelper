@@ -616,6 +616,12 @@ static void pollOne(uint8_t i) {
 //  Auto power-off
 // ---------------------------------------------------------------------------
 static bool sendPowerCommand(uint8_t i, bool on) {
+#if BAMBU_MONITOR_ONLY
+  // Final outbound boundary: no relay command, even if another caller is added.
+  (void)i;
+  (void)on;
+  return false;
+#else
   TasmotaSettings& s = tasmotaSettings[i];
   if (s.ip[0] == '\0') return false;
 
@@ -663,6 +669,7 @@ static bool sendPowerCommand(uint8_t i, bool on) {
   }
   Serial.printf("[%s %u] Power %s HTTP %d\n", tag, i, on ? "On" : "Off", code);
   return false;
+#endif
 }
 
 static bool sendPowerOff(uint8_t i) { return sendPowerCommand(i, false); }
@@ -829,6 +836,10 @@ static void pollTask(void*) {
 //  Lifecycle
 // ---------------------------------------------------------------------------
 void tasmotaInit() {
+#if BAMBU_MONITOR_ONLY
+  // No HTTP/TCP polling task or automatic power-off in the monitor profile.
+  return;
+#endif
   if (g_taskHandle != NULL) {
     vTaskSuspend(g_taskHandle);
     vTaskDelete(g_taskHandle);
@@ -908,6 +919,9 @@ bool tasmotaIsActiveForSlot(uint8_t slot) {
 }
 
 bool tasmotaConfiguredForSlot(uint8_t slot) {
+#if BAMBU_MONITOR_ONLY
+  return false;
+#endif
   return visiblePlugForSlot(slot) != 0xFF;
 }
 

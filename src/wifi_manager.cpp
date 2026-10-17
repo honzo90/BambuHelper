@@ -190,7 +190,11 @@ static void beginStaConnectAttempt() {
 void startWiFiDuringSplash() {
   if (strlen(wifiSSID) == 0) return;
 
+#if BAMBU_MONITOR_ONLY
+  Serial.println("WiFi: starting background connect during splash");
+#else
   Serial.printf("WiFi: starting background connect during splash: %s\n", wifiSSID);
+#endif
   beginStaConnectAttempt();
   splashStaStarted = true;
   splashStaStartMs = millis();
@@ -211,10 +215,18 @@ void initWiFi() {
       unsigned long start = millis();
 
       if (attempt == 1 && splashStaStarted) {
+#if BAMBU_MONITOR_ONLY
+        Serial.println("Connecting to WiFi (attempt 1/3, continued after splash)");
+#else
         Serial.printf("Connecting to WiFi: %s (attempt 1/3, continued after splash)\n", wifiSSID);
+#endif
         start = splashStaStartMs;
       } else {
+#if BAMBU_MONITOR_ONLY
+        Serial.printf("Connecting to WiFi (attempt %d/3)\n", attempt);
+#else
         Serial.printf("Connecting to WiFi: %s (attempt %d/3)\n", wifiSSID, attempt);
+#endif
         beginStaConnectAttempt();
       }
 
@@ -312,7 +324,7 @@ void handleWiFi() {
 
     // Periodically probe STA to recover without user interaction
     unsigned long now = millis();
-    if (!staProbing && now - lastStaProbe >= WIFI_STA_PROBE_INTERVAL) {
+    if (!staProbing && WiFi.scanComplete()!=WIFI_SCAN_RUNNING && now - lastStaProbe >= WIFI_STA_PROBE_INTERVAL) {
       // Start a non-blocking STA probe; result checked after WIFI_STA_PROBE_CHECK_MS
       Serial.println("AP mode: probing STA connection...");
       WiFi.begin(wifiSSID, wifiPass);

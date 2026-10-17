@@ -39,16 +39,18 @@ static const char PAGE_AP_HTML[] PROGMEM = R"rawliteral(
 <title>BambuHelper Setup</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0D1117;color:#E6EDF3;padding:16px;max-width:420px;margin:0 auto}
-h1{color:#58A6FF;font-size:22px;margin-bottom:6px}
-.sub{color:#8B949E;font-size:13px;margin-bottom:20px}
-.card{background:#161B22;border:1px solid #30363D;border-radius:8px;padding:16px;margin-bottom:16px}
-.card h2{color:#58A6FF;font-size:16px;margin-bottom:12px}
-label{display:block;color:#8B949E;font-size:13px;margin-bottom:4px;margin-top:10px}
-input[type=text],input[type=password]{width:100%;padding:8px 10px;border:1px solid #30363D;border-radius:6px;background:#0D1117;color:#E6EDF3;font-size:14px;outline:none}
-input:focus{border-color:#58A6FF}
-.btn{display:block;width:100%;padding:12px;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;text-align:center;background:#238636;color:#fff}
-.btn:hover{background:#2EA043}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#08131F;color:#E6EDF3;padding:16px;max-width:480px;margin:0 auto}
+h1{color:#6DE2B8;font-size:22px;margin-bottom:6px}
+.sub{color:#90A9B8;font-size:13px;margin-bottom:20px}
+.card{background:#101F2D;border:1px solid #2B4252;border-radius:20px;padding:24px;margin-bottom:20px}
+.card h2{color:#6DE2B8;font-size:16px;margin-bottom:12px}
+label{display:block;color:#90A9B8;font-size:13px;margin-bottom:4px;margin-top:10px}
+select,input[type=text],input[type=password]{width:100%;padding:8px 10px;border:1px solid #2B4252;border-radius:10px;background:#08131F;color:#E6EDF3;font-size:16px;min-height:46px;outline:none}
+input:focus{border-color:#6DE2B8}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;text-align:center;background:#6DE2B8;color:#08251E}
+.btn:hover{background:#91EDCC}
+
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #6DE2B8;outline-offset:3px}
 </style>
 </head><body>
 <h1>BambuHelper</h1>
@@ -56,8 +58,12 @@ input:focus{border-color:#58A6FF}
 <div class="card">
   <h2>Connect to WiFi Network</h2>
   <p style="font-size:12px;color:#8B949E;margin-bottom:10px">Enter your WiFi credentials. After saving, the device will restart and connect to your network. You can then access the full settings at the device's IP address.</p>
+  <label for="networks">Available WiFi networks</label>
+  <select id="networks" onchange="chooseNetwork()"><option value="">Manual entry / hidden network</option></select>
+  <button type="button" class="btn" id="scan" onclick="scanWifi()">Refresh networks</button>
+  <p id="scanmsg" role="status" style="font-size:13px;margin-top:10px"></p>
   <label for="ssid">WiFi SSID</label>
-  <input type="text" id="ssid" placeholder="Your WiFi network name">
+  <input type="text" id="ssid" maxlength="32" autocapitalize="none" spellcheck="false" placeholder="Your WiFi network name">
   <label for="pass">WiFi Password</label>
   <input type="password" id="pass" placeholder="WiFi password">
   <div style="margin-top:6px"><input type="checkbox" id="showpass" onchange="document.getElementById('pass').type=this.checked?'text':'password'" style="vertical-align:middle"><label for="showpass" style="color:#8B949E;font-size:12px;margin:0 0 0 4px;display:inline">Show password</label></div>
@@ -65,13 +71,44 @@ input:focus{border-color:#58A6FF}
   <div id="msg" role="status" aria-live="polite" aria-atomic="true" style="margin-top:10px;font-size:13px;text-align:center"></div>
 </div>
 <script>
+function chooseNetwork(){
+  var selected=document.getElementById('networks').value;
+  if(selected)document.getElementById('ssid').value=selected;
+  else document.getElementById('ssid').focus();
+  document.getElementById('pass').value='';
+}
+async function scanWifi(){
+  var button=document.getElementById('scan'),msg=document.getElementById('scanmsg');
+  button.disabled=true;msg.textContent='Scanning for networks…';
+  try {
+    var response=await fetch('/wifi/scan',{method:'POST',cache:'no-store'});
+    if(!response.ok)throw Error();
+    for(var attempt=0;attempt<15;attempt++) {
+      await new Promise(function(resolve){setTimeout(resolve,800);});
+      response=await fetch('/wifi/scan',{cache:'no-store'});if(!response.ok)throw Error();
+      var data=await response.json();if(data.state==='scanning')continue;
+      if(data.state!=='done'||!Array.isArray(data.networks))throw Error();
+      var select=document.getElementById('networks');select.length=1;
+      data.networks.forEach(function(network){
+        var option=document.createElement('option');option.value=network.ssid;
+        option.textContent=network.ssid+' · '+network.rssi+' dBm'+(network.secure?' 🔒':'');
+        select.appendChild(option);
+      });
+      msg.textContent=data.networks.length?'Select a network or enter its name below.':'No networks found. Try again or enter the name manually.';
+      return;
+    }
+    throw Error();
+  }catch(e){msg.textContent='Scan failed. Try again or enter the network manually.';}
+  finally{button.disabled=false;}
+}
+scanWifi();
 function saveWifi(){
   var s=document.getElementById('ssid').value,p=document.getElementById('pass').value;
   if(!s){document.getElementById('msg').innerHTML='<span style="color:#F85149">Enter SSID</span>';return;}
   document.getElementById('msg').innerHTML='<span style="color:#58A6FF">Saving...</span>';
-  var d=new URLSearchParams();d.append('ssid',s);d.append('pass',p);
+  var d=new URLSearchParams();d.append('ssid',s);d.append('pass',p);d.append('clear_pass','1');
   fetch('/save/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:d.toString()})
-    .then(function(){document.body.innerHTML='<div style="text-align:center;padding-top:80px"><h2 style="color:#3FB950">WiFi Saved!</h2><p style="color:#8B949E;margin-top:10px">Restarting... Connect to your WiFi and open the device IP address in a browser.</p></div>';})
+    .then(function(r){if(!r.ok)throw Error('Save failed');return r.json();}).then(function(d){if(d.status!=='ok')throw Error('Save failed');document.body.innerHTML='<div style="text-align:center;padding-top:80px"><h2 style="color:#3FB950">WiFi Saved!</h2><p style="color:#8B949E;margin-top:10px">Restarting... Connect to your WiFi and open the device IP address in a browser.</p></div>';})
     .catch(function(e){document.getElementById('msg').style.color='#F85149';document.getElementById('msg').textContent='Connection error';console.warn('saveWifi:',e);});
 }
 </script>
@@ -126,7 +163,7 @@ static const char PAGE_HTML_1[] PROGMEM = R"rawliteral(
 
 <!-- ============ Top bar ============ -->
 <div class="topbar">
-  <button class="hamburger" id="hamburger" aria-label="Toggle menu" type="button">
+  <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false" type="button">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
   </button>
   <div class="brand">
@@ -1150,8 +1187,14 @@ static const char PAGE_HTML_2[] PROGMEM = R"rawliteral(
       <span class="status-dot" id="wifiTopStat"><span id="wifiTopText">-</span></span>
     </div>
     <div class="field">
+      <label for="networks">Available WiFi networks</label>
+      <select id="networks" onchange="chooseNetwork()"><option value="">Manual entry / hidden network</option></select>
+      <button type="button" class="btn btn-ghost" id="scan" onclick="scanWifi()" style="margin-top:var(--sp-2)">Refresh networks</button>
+      <p id="scanmsg" class="hint" role="status" aria-live="polite"></p>
+    </div>
+    <div class="field">
       <label for="ssid">SSID</label>
-      <input type="text" id="ssid" value="%SSID%" placeholder="Your WiFi name">
+      <input type="text" id="ssid" value="%SSID%" maxlength="32" autocapitalize="none" spellcheck="false" placeholder="Your WiFi name">
     </div>
     <div class="field">
       <label for="pass">Password</label>

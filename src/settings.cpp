@@ -5,6 +5,12 @@
 #include "led.h"
 #include "timezones.h"
 #include "cloud_login.h"   // CLOUD_TOKEN_MAX - the one size every token path shares
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_weather.h"
+#include "ws43b_clock_settings.h"
+#include "ws43b_display_mode.h"
+#include "ws43b_language.h"
+#endif
 #include <Preferences.h>
 #include <nvs.h>           // nvs_get_stats for the storage-usage diagnostics
 #include "esp_ota_ops.h"   // running-slot label for recordBootSlotVersion()
@@ -67,6 +73,48 @@ bool quadPrinterBeta = false;
 bool wifiTxCapped = false;
 
 static Preferences prefs;
+
+#if defined(BOARD_IS_WS43B)
+void sanitizeWs43bHardwareSettings() {
+  buttonType = BTN_TOUCHSCREEN;
+  buttonPin = 0;
+  buzzerSettings.enabled = false;
+  buzzerSettings.pin = 0;
+  ledSettings.enabled = false;
+  dispSettings.buttonPowerControl = false;
+  dispSettings.showBatteryIndicator = false;
+  dispSettings.rotation = 0;
+  rotState.splitEnabled = false;
+  rotState.splitForce = false;
+}
+static uint8_t ws43bTheme = 0;
+uint8_t ws43bViewTheme() { return ws43bTheme; }
+static void applyWs43bViewSettings(uint8_t theme, bool fanMatch) {
+  // Reuse BambuHelper's display fields; keep the native 800x480 orientation.
+  ws43bTheme = theme;
+  dispSettings.bgColor = 0x0084;
+  dispSettings.trackColor = 0x21EA;
+  dispSettings.progressBarColor = theme == 0 ? 0x67B6 : theme == 1 ? 0x77B2 : 0xF5CB;
+  dispSettings.fanMatchPrinter = fanMatch;
+}
+bool saveWs43bViewSettings(uint8_t theme, bool fanMatch) {
+  if (theme > 2) return false;
+  if (theme == ws43bTheme && fanMatch == dispSettings.fanMatchPrinter) return true;
+  Preferences local;
+  if (!local.begin(NVS_NAMESPACE, false)) return false;
+  // One versioned NVS value makes the pair atomic; no unrelated settings write.
+  const uint16_t value = 0x0100 | theme | (fanMatch ? 4 : 0);
+  const bool saved = local.putUShort("w43_view", value) == sizeof(value);
+  local.end();
+  if (saved) {
+    applyWs43bViewSettings(theme, fanMatch);
+#if WS43B_FULL_WEBUI
+    saveSettings();
+#endif
+  }
+  return saved;
+}
+#endif
 
 // ---------------------------------------------------------------------------
 //  RGB565 <-> HTML hex conversion
@@ -564,6 +612,9 @@ void loadSettings() {
   defaultDisplaySettings(def);
 
   dispSettings.rotation = prefs.getUChar("dsp_rot", def.rotation);
+#if defined(BOARD_IS_WS43B)
+  dispSettings.rotation = 0;  // Validated native landscape 800 x 480 only.
+#endif
   dispSettings.bgColor = prefs.getUShort("dsp_bg", def.bgColor);
   dispSettings.trackColor = prefs.getUShort("dsp_trk", def.trackColor);
   dispSettings.animatedBar = prefs.getBool("dsp_abar", def.animatedBar);
@@ -933,15 +984,38 @@ void loadSettings() {
   // C3 antenna workaround flag (local-only, not exported)
   wifiTxCapped = prefs.getBool("wifi_txcap", false);
 
+#if defined(BOARD_IS_WS43B)
+  uint16_t view = prefs.getUShort("w43_view", 0x0104);
+  if ((view & 0xFFF8) != 0x0100 || (view & 3) > 2) view = 0x0104;
+#if WS43B_FULL_WEBUI
+  ws43bTheme = view & 3;
+  // Migrate old presets once; after a full-portal save retain custom colours.
+  if (!prefs.getBool("w43_custom", false))
+#endif
+  applyWs43bViewSettings(view & 3, (view & 4) != 0);
+  sanitizeWs43bHardwareSettings();
+#endif
   prefs.end();
+#if defined(BOARD_IS_WS43B)
+  loadWs43bClockSettings();
+  loadWs43bDisplayMode();
+  loadWs43bWeather();
+  loadWs43bLanguage();
+#endif
 }
 
 // ---------------------------------------------------------------------------
 //  Save settings
 // ---------------------------------------------------------------------------
 void saveSettings() {
+#if defined(BOARD_IS_WS43B)
+  sanitizeWs43bHardwareSettings();
+#endif
   prefs.begin(NVS_NAMESPACE, false);
 
+#if WS43B_FULL_WEBUI
+  prefs.putBool("w43_custom", true);
+#endif
   prefs.putString("wifiSSID", wifiSSID);
   prefs.putString("wifiPass", wifiPass);
   prefs.putUChar("bright", brightness);

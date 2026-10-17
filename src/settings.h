@@ -417,6 +417,11 @@ extern bool wifiTxCapped;
 
 void loadSettings();
 void saveSettings();
+#if defined(BOARD_IS_WS43B)
+// Local display preferences only; never saves Wi-Fi or printer credentials.
+uint8_t ws43bViewTheme();
+bool saveWs43bViewSettings(uint8_t theme, bool fanMatchPrinter);
+#endif
 
 // Normalize a string into a valid mDNS/DNS label: lowercase, keep only
 // [a-z0-9-], strip leading/trailing hyphens. Falls back to "bambuhelper" if
@@ -467,5 +472,9 @@ uint16_t bambuColorToRgb565(const char* rrggbbaa);
 
 // Load default display settings
 void defaultDisplaySettings(DisplaySettings& ds);
+
+#if defined(BOARD_IS_WS43B)
+void sanitizeWs43bHardwareSettings();
+#endif
 
 #endif // SETTINGS_H

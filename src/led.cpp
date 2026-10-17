@@ -1,4 +1,32 @@
 #include "led.h"
+
+#if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
+// The passive monitor never claims LED GPIOs or uses PWM/RMT, including when
+// legacy settings or an unexpected caller request a preview/effect. Keep this
+// at compile time: the other profiles still use Arduino 2.x LED driver APIs.
+void initLed() {}
+void ledTick() {}
+void applyLedDuty(uint8_t) {}
+void sanitizeLedPin() {}
+bool isLedPinAllowed(uint8_t) { return false; }
+bool isRgbLedPinAllowed(uint8_t) { return false; }
+bool onboardRgbPins(uint8_t &, uint8_t &, uint8_t &, bool &) { return false; }
+void previewLed(bool, uint8_t, uint8_t, uint8_t, uint8_t, bool, uint8_t, uint32_t) {}
+void ledSetActivity(LedActivity) {}
+void ledStartFinishEffect() {}
+void ledStopFinishEffect() {}
+#if HAS_HMS_UI
+void ledStartErrorEpisode() {}
+void ledStopErrorEpisode() {}
+#endif
+bool ledTriggerTestEffect(uint8_t, uint16_t, uint8_t, uint32_t) { return false; }
+void ledOnUserInteraction() {}
+void ledSetSuspended(bool) {}
+void ledSetNightSuspended(bool) {}
+bool ledHoldDimUpdate(bool, uint32_t, bool) { return false; }
+
+#else
+
 #include "settings.h"
 #include "config.h"
 #include <Arduino.h>
@@ -1034,3 +1062,5 @@ bool ledHoldDimUpdate(bool heldNow, uint32_t holdMs, bool suppressDim) {
 
   return false;
 }
+
+#endif // BAMBU_MONITOR_ONLY
