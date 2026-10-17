@@ -3486,6 +3486,22 @@ static void handleOtaRollback() {
   scheduleRestart(1500);
 }
 
+// Why the last STA connect failed - read by the AP setup page. Never the password.
+static void handleWifiDiag() {
+  const WifiFailInfo& fi = getWifiFailInfo();
+  JsonDocument doc;
+  doc["kind"] = wifiFailKindName(fi.kind);
+  doc["ssid"] = wifiSSID;
+  doc["rssi"] = fi.rssi;
+  doc["ch"] = fi.channel;
+  doc["reason"] = fi.reason;
+  doc["near"] = fi.nearName;
+  String json;
+  serializeJson(doc, json);
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  server.send(200, "application/json", json);
+}
+
 // Captive portal: redirect any unknown request to root
 // Android/Samsung check /generate_204 expecting 204 — returning 302 triggers popup.
 // Apple checks /hotspot-detect.html — non-"Success" body triggers popup.
@@ -3546,6 +3562,7 @@ void initWebServer() {
   server.on("/wifi/scan", HTTP_POST, handleSetupWifiScan);
   server.on("/wifi/scan", HTTP_GET, handleSetupWifiScan);
   server.on("/save/wifi", HTTP_POST, handleSaveWifi);
+  server.on("/wifi/diag", HTTP_GET, handleWifiDiag);
   server.on("/save/printer", HTTP_POST, handleSavePrinter);
 #if BAMBU_MONITOR_ONLY
   // Allowlist is the server-side boundary. Hidden legacy controls cannot be
