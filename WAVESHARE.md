@@ -68,8 +68,22 @@ python3 -B -m unittest discover -s bringup/waveshare43b/integration/tests -p 'te
 
 Export validation on 17 October 2026: **174 host tests passed, 1 optional test
 skipped**. The sandbox initially blocked 10 MQTT loopback cases; all 10 passed
-when rerun with local socket access. A full firmware rebuild of this exported
-snapshot has not been performed.
+when rerun with local socket access.
+
+**Fresh-clone build verification, 18 October 2026:** the published source commit
+`5b9d48e04b5b2ffee45e6f5b44ed6d4b61d9e07a` was rebuilt successfully on macOS
+without tracked source changes. The build used Arduino CLI 1.5.1, Arduino ESP32
+3.3.11, esp-x32/2601, requested RGB PCLK 16 MHz and the cache64 SDK; memory and connection
+diagnostics were disabled. The application was 2,865,120 bytes within the
+3,145,728-byte app partition, with SHA256
+`f5e0d7dfc7a1e9473c71f1b9814458e0a8c599e919ab7110f62484238ff40277`.
+SDK and legacy-I2C link checks passed.
+
+Dependencies were prepared from pinned public sources. The core and S3 SDK used
+an isolated data directory; existing compiler/helper tools were reused, so this
+was not a clean-machine toolchain installation test. This build was neither
+flashed nor published as a binary. It is separate from the earlier hardware
+candidate identified above and provides no new physical LCD/touch acceptance.
 
 The long MQTT loopback timing test is opt-in. The private historical flash-uploader
 test is excluded along with its device-specific uploader. These tests do not

@@ -1,17 +1,66 @@
 # BambuHelper — Waveshare 4.3B development branch
 
-This fork adds the Waveshare **ESP32-S3-Touch-LCD-4.3B** (800×480, GT911) port to
-[BambuHelper by Keralots and contributors](https://github.com/Keralots/BambuHelper).
-The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`); `main`
-tracks the original project. The original project README is preserved below.
+A desktop Bambu Lab printer monitor for the **Waveshare ESP32-S3-Touch-LCD-4.3B**:
+an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish or
+English interface, and clock/weather views.
 
-**Development baseline:** the source snapshot corresponds to the panel version
-recorded on 16–17 October 2026. A dark-screen / touch-wake failure has been
-observed and remains unresolved; full print-cycle acceptance is pending.
-This is not a stable release. See [Waveshare build and test notes](WAVESHARE.md).
+This fork builds on [BambuHelper by Keralots and contributors](https://github.com/Keralots/BambuHelper).
+The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
+`main` retains the upstream project history.
 
-This upload includes source and tests, without a new Waveshare firmware binary.
-Existing upstream firmware files and the Companion Tool are retained unchanged.
+> **Development status:** a dark-screen / touch-wake failure has been observed
+> and remains unresolved. Its cause is unverified; full print-cycle acceptance
+> is pending. The features below describe the published implementation, not a
+> claim of stable hardware operation.
+
+## What the Waveshare 4.3B branch contains
+
+| Area | Included in this fork |
+|---|---|
+| **Board port** | ST7262 RGB display at 800×480, GT911 capacitive touch over I2C, and the board-specific display/backlight integration. |
+| **Touch interface** | Dedicated Dashboard, AMS, Details, Gauges, Clock and Settings views with navigation designed for the 4.3-inch panel. |
+| **Printer telemetry** | MQTT/TLS integration using the inherited LAN Direct or Bambu Cloud connections; print progress, layer count, remaining time, temperatures and fan readings when reported by the printer. |
+| **AMS telemetry** | Tray/material/color information, remaining filament, temperature, humidity and drying state where the printer/AMS reports those fields. |
+| **Data freshness** | Per-field validity and freshness tracking, retention of fields omitted from MQTT delta reports, and a distinction between a real zero and a missing reading. |
+| **Display modes and scenes** | Simple mode plus an Advanced mode marked as in development; print, drying and cooling scenes, clock and screensaver views including Pong and a water clock. |
+| **Polish / English** | A saved language choice shared by the on-device interface and web configuration portal. |
+| **Optional weather** | Open-Meteo weather data, sunrise/sunset information and night scheduling. Weather and location lookup require Internet access. |
+| **Web configuration and diagnostics** | WiFi/printer/display settings, inherited control and OTA code, plus `/monitor/status` and framebuffer-capture tools for development. |
+| **Build and test tooling** | A separate Arduino CLI build, a pinned cache64 SDK workflow, host regression tests, synthetic MQTT fixtures, visual assets and font generators. |
+
+The MQTT, cloud integration, web portal and other board implementations come
+from upstream; this fork extends them for the Waveshare 4.3B. The profile uses
+`BAMBU_MONITOR_ONLY=0`: chamber-light and smart-plug control paths are included,
+so this is not a passive-only firmware profile.
+
+## Building and validation
+
+Start with **[Waveshare build and test notes](WAVESHARE.md)**. The 4.3B profile is
+[`boards/ws_lcd_43b.ini`](boards/ws_lcd_43b.ini), built with **Arduino ESP32 3.3.11**
+and the **cache64** SDK through
+[`bringup/waveshare43b/integration/build.py`](bringup/waveshare43b/integration/build.py).
+It is a separate Arduino CLI profile, not a PlatformIO environment.
+
+The published source baseline passed a fresh-clone firmware build on macOS on
+**18 October 2026**. The recorded host-test results and exact build scope are in
+[WAVESHARE.md](WAVESHARE.md#host-tests). Build success and host tests do not
+resolve the LCD/touch issue or establish complete hardware acceptance.
+
+**No Waveshare 4.3B firmware binary is distributed by this fork.** The upstream
+web flasher, firmware tables and general instructions preserved below cover
+their listed upstream boards; they do not install this 4.3B port. Other boards,
+printer models and multi-printer configurations have not all been validated
+as part of this fork.
+
+## Source map
+
+- [Display and touch integration](src/lgfx_panel_ws43b.cpp), [touch input](src/button_touch_ws43b.cpp), and [native interface](src/display_ws43b.cpp).
+- [Telemetry state](include/bambu_monitor.h), [MQTT parsing](include/bambu_monitor_parser.h), and [MQTT connection handling](src/bambu_mqtt.cpp).
+- [Clock settings](src/ws43b_clock_settings.cpp), [weather](src/ws43b_weather.cpp), and [language selection](src/ws43b_language.cpp).
+- [Host regression tests](bringup/waveshare43b/integration/tests), [build preparation](prepare_build.py), and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+The original project README follows. Existing upstream firmware files and the
+Companion Tool are retained unchanged.
 
 ---
 
