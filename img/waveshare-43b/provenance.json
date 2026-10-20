@@ -1,0 +1,134 @@
+{
+  "scope": "Host-rendered examples of production UI functions with synthetic telemetry and settings. Host raster primitives can differ from LCD; this is not physical hardware or touch acceptance evidence.",
+  "source_repository": "https://github.com/honzo90/BambuHelper",
+  "source_snapshot_commit": "5b9d48e04b5b2ffee45e6f5b44ed6d4b61d9e07a",
+  "source_sha256": {
+    "src/display_ws43b.cpp": "cadd2fabfcedd2cdae7061fb9d455706e2b8fb6aa4316d635a408ef2479b64a4",
+    "bringup/waveshare43b/integration/previews/boot_preview.cpp": "18308479ca5c77419e9647ab110b9965c73c7dd66a7d614d9310f87e34421332",
+    "include/bambu_monitor.h": "000bd7c32d325ecfa777fcf13bc9a16288b081200915c0565f7da393073e0c7d",
+    "include/ws43b_style.h": "96c62293cc98958997869f0606dfd3f601977ac8e4c09b51efd9219bb6903d94",
+    "include/ws43b_native_scene.h": "fd6b6a4f7504eac513a5d2113ca6c5ecef0c96e3e620495ea88f34c9786dc02d",
+    "include/ws43b_visual_assets.h": "92de79e0cc54f52300d98c355a013071c164e59f05720fa595b90547bc0b7ae8",
+    "include/ws43b_visual_assets_data.h": "7e762031e48a90df10679535d36e78d9b407836bbd0256fe1b59d3eef2b3f49c",
+    "include/ws43b_ui_icons.h": "ef5b7fef4a01013ba0c1c4379648eb2d959a75dc8fc022ea1dec652f34dc72e9",
+    "include/ws43b_repaint_plan.h": "5a31a41b7ce408a2749ba72f12c192f7d5db6419768c74ce80382e10a3d1afb9",
+    "include/ws43b_live_view.h": "59f0f0d498a3c1a04ed6eb47c9a189a2bbaab678d3e3af9562924b5b749d6be5",
+    "include/ws43b_dashboard_policy.h": "0272679ff03fe2e48a0f535fd119274f815732e5cba9531dc5c704011956209d",
+    "include/ws43b_drying_scene.h": "f83f338070c4f8f2a701264ce7a102c5f3787962d40f9a8db7f8bf5165595237",
+    "include/ws43b_print_scene.h": "61ec2271701405da6bfdde8147c10c29c7da21fe983c6e3058f2cd3f7ef8ae33",
+    "include/fonts/ws43b_modern.h": "a541266591ea14d3fd150b6e6cc25cae8105e573fd0c745103feac53f49ee60b",
+    "include/fonts/ws43b_dashboard_v2.h": "ab75cf22a14831e97419388731f188fc097e76c4d0a0b71d58daa8c757d9de3e"
+  },
+  "production_functions": [
+    "small",
+    "button",
+    "dashText",
+    "v2Ink",
+    "v2Dim",
+    "v2Accent",
+    "panelIcon",
+    "v2Clear",
+    "v2Text",
+    "footer",
+    "detailCard",
+    "amsView",
+    "detailsScreen",
+    "settingsScreen",
+    "appearanceSettingsScreen",
+    "dashboardTemperature",
+    "dashboardActivityIcon",
+    "dashboardAms",
+    "dashboardMaterialLine",
+    "dashboardScreen",
+    "saverFilamentColor"
+  ],
+  "host_adaptations": [
+    "CPU Canvas supplies drawing primitives and decodes actual firmware VLW masks.",
+    "Synthetic DEMO header replaces live printer identity, connection status and wall clock.",
+    "MQTT samples, settings, fan percentages and filament colors are fixed demonstration inputs.",
+    "Production ws43b_native::Scene receives host buffers in place of ESP32 PSRAM allocation.",
+    "Fixed 20:04 time and UTC arithmetic produce 21:36 ETA for a 92-minute remaining time; weather header omitted."
+  ],
+  "generator_sha256": "98d8ab2512a14ce031139049dc13db5bea73c7c8fdb2c318faf12d5a3dfa1018",
+  "images": [
+    {
+      "file": "print.png",
+      "width": 800,
+      "height": 480,
+      "bytes": 72259,
+      "sha256": "aa99fa298720134c03fb19be4db7315bf9fa9d31c9cb5e8737739ea40e4dcdc8",
+      "git_blob_sha": "db405c582ce6b055a73362f8bbb1626aab071c8e"
+    },
+    {
+      "file": "ams.png",
+      "width": 800,
+      "height": 480,
+      "bytes": 41603,
+      "sha256": "9ebd51204f5833c0182f7ea75aae847ce39f29bfb06f17a628cdefc70dc17164",
+      "git_blob_sha": "081a57f6d806009a8a10c4106c65f556cfe42518"
+    },
+    {
+      "file": "details.png",
+      "width": 800,
+      "height": 480,
+      "bytes": 26403,
+      "sha256": "c854589930c874bb3b95d1ace298a571be2a2555110e3a87ed39a0ce83181c5a",
+      "git_blob_sha": "7e8ac28f6812267281819e83ab1efa84670282e4"
+    },
+    {
+      "file": "settings.png",
+      "width": 800,
+      "height": 480,
+      "bytes": 29785,
+      "sha256": "c3a18e4827f54bb2d9da31a18dc6222bed62ae62d92d6146f52f714e7da9a932",
+      "git_blob_sha": "52e05dd80d82269f228f396a56a0e0c8cea716d9"
+    },
+    {
+      "file": "appearance.png",
+      "width": 800,
+      "height": 480,
+      "bytes": 23599,
+      "sha256": "c55a92d85dad108dc3ad39e6b7648a6b7372fb65b31cbfeec4ba8a9e84abb310",
+      "git_blob_sha": "2bc72e91e4d71bb0474327888912408f275444a3"
+    },
+    {
+      "file": "boot.png",
+      "width": 800,
+      "height": 480,
+      "bytes": 26012,
+      "sha256": "ad518e02a7cf1394bbbc4f9349823445fe16b6c4cc7d69d8824b08b7c7a11ee0",
+      "git_blob_sha": "a457abeee2a40798e6022533ddf616f320f0577c"
+    }
+  ],
+  "generated_date": "2026-10-20",
+  "publication_base_commit": "12a6424de3288b33e361c53e141d4b3150496e56",
+  "boot_preview": {
+    "renderer": "bringup/waveshare43b/integration/previews/render_boot.py",
+    "fixture": "phase=data, language=pl, theme=0084, time_ms=880",
+    "source_sha256": {
+      "src/display_ws43b.cpp": "cadd2fabfcedd2cdae7061fb9d455706e2b8fb6aa4316d635a408ef2479b64a4",
+      "include/ws43b_boot_scene.h": "73cee5a5e6f944f18552e385e95336d5d5f67177655d354aac3b109a99514e92",
+      "include/ws43b_native_scene.h": "fd6b6a4f7504eac513a5d2113ca6c5ecef0c96e3e620495ea88f34c9786dc02d",
+      "include/ws43b_ui_icons.h": "ef5b7fef4a01013ba0c1c4379648eb2d959a75dc8fc022ea1dec652f34dc72e9",
+      "include/ws43b_visual_assets.h": "92de79e0cc54f52300d98c355a013071c164e59f05720fa595b90547bc0b7ae8",
+      "include/ws43b_visual_assets_data.h": "7e762031e48a90df10679535d36e78d9b407836bbd0256fe1b59d3eef2b3f49c",
+      "include/fonts/ws43b_dashboard_v2.h": "ab75cf22a14831e97419388731f188fc097e76c4d0a0b71d58daa8c757d9de3e",
+      "bringup/waveshare43b/integration/previews/render_boot.py": "a43c1e4df9922cef17c642908742f4f2ceaeb287bb594042920e86e289470bb3",
+      "bringup/waveshare43b/integration/previews/boot_preview.cpp": "18308479ca5c77419e9647ab110b9965c73c7dd66a7d614d9310f87e34421332"
+    },
+    "verification": {
+      "result": "PASS",
+      "full_cases": 40,
+      "partial_comparisons": 520,
+      "partial_allocations": 0,
+      "partial_bounds": [
+        246,
+        291,
+        72,
+        16
+      ],
+      "unsupported_glyphs": 0,
+      "clipped_text_pixels": 0
+    }
+  }
+}

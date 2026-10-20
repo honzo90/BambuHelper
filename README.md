@@ -13,6 +13,32 @@ The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
 > is pending. The features below describe the published implementation, not a
 > claim of stable hardware operation.
 
+## Layout examples
+
+These **800×480 host-rendered previews** use the published Waveshare display
+functions, fonts and assets with synthetic demo data. They illustrate the
+layouts; the demo header and host rasterization can differ from the device.
+They are not photographs or framebuffer captures, and do not establish LCD,
+touch or wake stability. The examples show the Polish interface; English is
+also available.
+
+<table>
+<tr>
+<td width="50%" align="center"><a href="img/waveshare-43b/print.png"><img src="img/waveshare-43b/print.png" width="400" alt="Waveshare 4.3B print dashboard with progress, temperatures and AMS trays"></a><br><strong>Print dashboard</strong><br><sub>Progress, remaining time, temperatures and active filament.</sub></td>
+<td width="50%" align="center"><a href="img/waveshare-43b/ams.png"><img src="img/waveshare-43b/ams.png" width="400" alt="Waveshare 4.3B AMS view with four filament trays, humidity and drying status"></a><br><strong>AMS</strong><br><sub>Tray details, remaining filament, humidity and drying state.</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="img/waveshare-43b/details.png"><img src="img/waveshare-43b/details.png" width="400" alt="Waveshare 4.3B details view with layer count, chamber temperature and fan readings"></a><br><strong>Print details</strong><br><sub>Layers, chamber temperature, speed mode and fans.</sub></td>
+<td width="50%" align="center"><a href="img/waveshare-43b/settings.png"><img src="img/waveshare-43b/settings.png" width="400" alt="Waveshare 4.3B touch settings menu"></a><br><strong>Settings</strong><br><sub>Appearance, clock, weather and language controls.</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><a href="img/waveshare-43b/appearance.png"><img src="img/waveshare-43b/appearance.png" width="400" alt="Waveshare 4.3B appearance settings with three color themes and display modes"></a><br><strong>Appearance</strong><br><sub>Color themes and Simple / Advanced display modes.</sub></td>
+<td width="50%" align="center"><a href="img/waveshare-43b/boot.png"><img src="img/waveshare-43b/boot.png" width="400" alt="Waveshare 4.3B startup screen waiting for printer data"></a><br><strong>Startup</strong><br><sub>Panel, WiFi, printer connection and first-data stages.</sub></td>
+</tr>
+</table>
+
+Click an image for its native resolution. [Preview provenance and source hashes](img/waveshare-43b/provenance.json).
+
 ## What the Waveshare 4.3B branch contains
 
 | Area | Included in this fork |
