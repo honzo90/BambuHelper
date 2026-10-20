@@ -4,7 +4,9 @@
 // =============================================================================
 //  Firmware version
 // =============================================================================
+#ifndef FW_VERSION
 #define FW_VERSION          "v3.9.0"
+#endif
 
 // Board variant — injected into the web UI for OTA asset filtering.
 // Normally set via build_flags in platformio.ini; this is a fallback.

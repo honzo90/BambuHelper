@@ -10,28 +10,38 @@ https://api.github.com/repos/honzo90/BambuHelper/releases/latest
 ```
 
 Kanal stabilny = opublikowane GitHub Releases (nie draft, nie prerelease).
+GitHub `releases/latest` pomija wydania testowe (prerelease).
 Inne płytki korzystają z upstream `Keralots/BambuHelper`.
 
 ## Status wydania
 
-Nie istnieje jeszcze żadne wydanie. Firmware przy HTTP 404 wyświetla czytelny
-komunikat o braku stabilnego release; przycisk instalacji pozostaje ukryty.
-HTTP 403 i awarie sieci traktowane są jako błędy.
+Przygotowano TESTOWE wydanie `v3.9.1-ws43b-test.1` jako GitHub **prerelease**.
+Kanał `releases/latest` nadal pozostaje stabilny i ignoruje prerelease, więc
+brak stabilnego release prawidłowo daje komunikat o braku stabilnego release
+(HTTP 404), a przycisk instalacji pozostaje ukryty. HTTP 403 i awarie sieci
+traktowane są jako błędy.
+
+Testowe wydanie instaluje się **ręcznie**: pobierz plik `-ota.bin`, a następnie
+w WebUI otwórz Firmware update → Manual update, wybierz pobrany plik i kliknij
+Upload firmware. W trakcie aktualizacji utrzymuj zasilanie i otwartą stronę.
+Kanał stabilny nie wybiera tego wydania automatycznie.
 
 ## Format assetu OTA
 
-Przyszły asset aplikacji:
+Asset przygotowanego testowego pakietu:
 
 ```
-BambuHelper-ws_lcd_43b-v<wersja>-ota.bin
+BambuHelper-ws_lcd_43b-v3.9.1-ws43b-test.1-ota.bin
 ```
 
-Przykład planu: tag `v3.9.1`, asset `BambuHelper-ws_lcd_43b-v3.9.1-ota.bin`.
-Firmware obecnie v3.9.0 – nie podniesiony w tej zmianie.
+Wymagania instalacji testowej:
 
-Wydanie wymaga: zgodnego `FW_VERSION`, nowszej wersji, binarium z dedykowanego
-Arduino-ESP32 core 3.3.11/cache64 oraz poprawnego slotu OTA. Full/merged flash/NVS
-nigdy nie są plikiem OTA.
+- istniejąca instalacja WS43B z tabelą OTA `app0`/`app1`,
+- slot OTA `3145728` bytes,
+- binarium aplikacji **nie** służy do pierwszego flashowania czystej płytki
+  (full/merged flash ani NVS nie są plikiem OTA).
+
+Build pochodzi z dedykowanego Arduino-ESP32 core 3.3.11 / cache64.
 
 ## Poprawny URL początkowy
 
@@ -43,24 +53,16 @@ Tag i wersja: litery ASCII, cyfry, kropka, myślnik, podkreślenie; wersja
 zawiera cyfrę. Odrzucane: inne repo/płytki, query, fragment, dodatkowe
 segmenty. Istniejące przekierowanie GitHub do CDN pozostaje obsługiwane.
 
-## Plan publikacji przyszłego wydania
-
-1. Sprawdzić sprzęt osobno.
-2. Nadać zgodną wersję/tag.
-3. Build + checksum.
-4. Opublikować release z kompatybilnym assetem i opisem zmian.
-5. Sprawdzić na urządzeniu.
-
-To plan przyszłych czynności, nie wykonane działania.
-
 ## Zakres tego commitu
 
-Commit przygotowuje źródła kanału. Nie tworzy wydania, nie udostępnia `.bin`
-i nie wgrywa urządzenia. Wgrany firmware nie przełączy repo samodzielnie –
+Commit przygotowuje źródła kanału dla testowego prerelease
+`v3.9.1-ws43b-test.1`. Dokumentacja opisuje **przygotowany** pakiet — nie
+twierdzi, że wydanie zostało już opublikowane ani przetestowane na urządzeniu.
+Nie wgrywa urządzenia. Wgrany firmware nie przełączy repo samodzielnie –
 wymaga późniejszego świadomego wgrania wersji zawierającej zmianę.
 
-Błąd dark-screen/touch-wake pozostaje nierozwiązany. Test build nie oznacza
-potwierdzenia stabilności sprzętu.
+Błąd dark-screen/touch-wake pozostaje **otwarty** (nierozwiązany). Test build
+nie oznacza potwierdzenia stabilności sprzętu.
 
 ## Ograniczenie OTA
 
