@@ -867,5 +867,7 @@
   "Display mode saved.": "Zapisano tryb wyświetlania.",
   "Choose Simple or Advanced display mode.": "Wybierz prosty lub zaawansowany tryb wyświetlania.",
   "Display mode could not be saved. Please retry.": "Nie zapisano trybu wyświetlania. Spróbuj ponownie.",
-  "Invalid display mode": "Nieprawidłowy tryb wyświetlania"
+  "Invalid display mode": "Nieprawidłowy tryb wyświetlania",
+  "No stable release has been published for this channel yet.": "W tym kanale nie opublikowano jeszcze stabilnego wydania.",
+  "Fork release: ": "Wydanie forka: "
 }

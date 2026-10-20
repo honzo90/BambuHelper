@@ -2553,6 +2553,55 @@ static String        otaAutoStatus     = "";
 
 static bool isExpectedOtaAssetUrl(const String& url) {
   if (url.length() == 0) return false;
+
+#if defined(BOARD_IS_WS43B)
+  if (url.indexOf('?') >= 0 || url.indexOf('#') >= 0 || url.indexOf('%') >= 0 || url.indexOf('\\') >= 0) {
+    return false;
+  }
+
+  const String prefix = "https://github.com/honzo90/BambuHelper/releases/download/";
+  if (!url.startsWith(prefix)) return false;
+
+  int slash = url.lastIndexOf('/');
+  if (slash < 0) return false;
+
+  String file = url.substring(slash + 1);
+  if (file.length() == 0) return false;
+
+  String beforeTag = url.substring(0, slash);
+  if (beforeTag != prefix) {
+    int tagSlash = beforeTag.lastIndexOf('/');
+    if (tagSlash != (int)prefix.length() - 1) return false;
+    String tag = beforeTag.substring(tagSlash + 1);
+    if (tag.length() == 0 || tag == "." || tag == "..") return false;
+
+    for (int i = 0; i < (int)tag.length(); ++i) {
+      char c = tag[i];
+      if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) {
+        return false;
+      }
+    }
+
+    const String filePrefix = "BambuHelper-ws_lcd_43b-";
+    if (!file.startsWith(filePrefix) || !file.endsWith("-ota.bin")) return false;
+
+    String version = file.substring(filePrefix.length(), file.length() - 8);
+    if (version.length() == 0) return false;
+
+    bool hasDigit = false;
+    for (int i = 0; i < (int)version.length(); ++i) {
+      char c = version[i];
+      if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) {
+        return false;
+      }
+      if (c >= '0' && c <= '9') hasDigit = true;
+    }
+
+    return hasDigit;
+  }
+
+  return false;
+#else
   if (!url.startsWith("https://github.com/") &&
       !url.startsWith("https://objects.githubusercontent.com/") &&
       !url.startsWith("https://release-assets.githubusercontent.com/")) {
@@ -2566,6 +2615,7 @@ static bool isExpectedOtaAssetUrl(const String& url) {
 
   String prefix = "BambuHelper-" BOARD_VARIANT "-";
   return file.startsWith(prefix) && file.endsWith("-ota.bin");
+#endif
 }
 #endif
 

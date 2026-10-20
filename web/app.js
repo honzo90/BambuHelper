@@ -1982,10 +1982,25 @@ function switchFwTab(t){
 }
 function checkForUpdates(){
   var res = document.getElementById('updateResult'), info = document.getElementById('updateInfo');
+  var ws43b = DEV.board === 'ws_lcd_43b';
   res.style.color = 'var(--info)'; res.textContent = 'Checking...'; info.style.display = 'none'; _autoOtaUrl = '';
-  fetch('https://api.github.com/repos/Keralots/BambuHelper/releases/latest')
-    .then(function(r){ if (!r.ok) throw new Error('GitHub API returned ' + r.status); return r.json(); })
+  if (ws43b){
+    var ib = document.getElementById('installBtn'); if (ib) ib.style.display = 'none';
+    var ul = document.getElementById('updateLink'); if (ul) ul.style.display = 'none';
+  }
+  fetch(ws43b ? 'https://api.github.com/repos/honzo90/BambuHelper/releases/latest'
+              : 'https://api.github.com/repos/Keralots/BambuHelper/releases/latest')
+    .then(function(r){
+      if (r.status === 404 && ws43b){
+        res.style.color = 'var(--info)';
+        res.textContent = 'No stable release has been published for this channel yet.';
+        return null;
+      }
+      if (!r.ok) throw new Error('GitHub API returned ' + r.status);
+      return r.json();
+    })
     .then(function(d){
+      if (!d) return;
       var latest = d.tag_name, current = DEV.fw;
       function parseVer(v){ var m = v.replace(/^v/,'').match(/^(\d+)\.(\d+)(?:\.(\d+))?(.*)$/); return m ? {major:parseInt(m[1]),minor:parseInt(m[2]),patch:m[3]?parseInt(m[3]):0,pre:m[4]!==''} : null; }
       function isNewer(a, b){ var av = parseVer(a), bv = parseVer(b); if (!av || !bv) return a !== b; if (av.major !== bv.major) return av.major > bv.major; if (av.minor !== bv.minor) return av.minor > bv.minor; if (av.patch !== bv.patch) return av.patch > bv.patch; return !av.pre && bv.pre; }
@@ -1994,7 +2009,7 @@ function checkForUpdates(){
       for (var i = 0; i < (d.assets || []).length; i++){ var n = d.assets[i].name; if (n.startsWith(expectedPrefix) && n.endsWith('-ota.bin')){ otaBin = d.assets[i]; break; } }
       if (!otaBin){
         res.style.color = 'var(--info)';
-        res.textContent = 'Upstream release: ' + latest + '. No compatible OTA file for this board. Use a Waveshare 4.3B build.';
+        res.textContent = (DEV.board === 'ws_lcd_43b' ? 'Fork release: ' : 'Upstream release: ') + latest + '. No compatible OTA file for this board. Use a Waveshare 4.3B build.';
         document.getElementById('installBtn').style.display = 'none';
         document.getElementById('updateLink').style.display = 'none';
         return;
@@ -2247,6 +2262,8 @@ function setupWs43bDisplaySettings(){
 /* Waveshare 4.3B: original portal with explicit physical-board capabilities. */
 function setupWs43bPortal(){
   if (typeof DEV === 'undefined' || DEV.board !== 'ws_lcd_43b') return;
+  var notes = document.getElementById('otaReleaseNotes');
+  if (notes) notes.href = 'https://github.com/honzo90/BambuHelper/releases';
   setupWs43bDisplaySettings();
   setupWs43bWeather();
   // Keep fields in the DOM because upstream form serializers address them
