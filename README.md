@@ -72,9 +72,13 @@ The published source baseline passed a fresh-clone firmware build on macOS on
 [WAVESHARE.md](WAVESHARE.md#host-tests). Build success and host tests do not
 resolve the LCD/touch issue or establish complete hardware acceptance.
 
-**No Waveshare 4.3B firmware binary is distributed by this fork.** The upstream
-web flasher, firmware tables and general instructions preserved below cover
-their listed upstream boards; they do not install this 4.3B port. Other boards,
+**OTA update for existing WS43B installations:** the v3.9.1 package is
+`BambuHelper-ws_lcd_43b-v3.9.1-ota.bin`; releases and build metadata are available
+at [GitHub Releases](https://github.com/honzo90/BambuHelper/releases).
+It requires an existing Waveshare 4.3B installation with two 3 MiB OTA slots.
+This application-only image is **not** a first-flash binary. The upstream web
+flasher does not support this 4.3B port. The dark-screen / touch-wake issue
+remains open and physical hardware acceptance is incomplete. Other boards,
 printer models and multi-printer configurations have not all been validated
 as part of this fork.
 

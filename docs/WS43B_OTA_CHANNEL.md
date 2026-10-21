@@ -15,26 +15,34 @@ Inne płytki korzystają z upstream `Keralots/BambuHelper`.
 
 ## Status wydania
 
-Przygotowano TESTOWE wydanie `v3.9.1-ws43b-test.1` jako GitHub **prerelease**.
-Kanał `releases/latest` nadal pozostaje stabilny i ignoruje prerelease, więc
-brak stabilnego release prawidłowo daje komunikat o braku stabilnego release
-(HTTP 404), a przycisk instalacji pozostaje ukryty. HTTP 403 i awarie sieci
-traktowane są jako błędy.
+Wydanie **v3.9.1** jest przeznaczone do publikacji jako zwykły GitHub release,
+aby kanał `releases/latest` mógł je zaoferować w Update online.
+Panel porównuje numery major/minor/patch; przy równych numerach wersja bez
+suffixu jest nowsza od wersji z suffixem. Dlatego `v3.9.1` będzie oferowana
+urządzeniu z `v3.9.1-ws43b-test.1`, a urządzeniu z `v3.9.1` już nie.
 
-Testowe wydanie instaluje się **ręcznie**: pobierz plik `-ota.bin`, a następnie
-w WebUI otwórz Firmware update → Manual update, wybierz pobrany plik i kliknij
-Upload firmware. W trakcie aktualizacji utrzymuj zasilanie i otwartą stronę.
-Kanał stabilny nie wybiera tego wydania automatycznie.
+Zwykły release GitHub jest **sposobem dystrybucji**, nie dowodem stabilności.
+Wyniki nowego buildu i testów należy sprawdzić w `BUILD-INFO.json` dołączonym
+do wydania. Sam numer v3.9.1 nie potwierdza wgrania ani akceptacji fizycznej.
+
+## Dowody (dotyczą test.1)
+
+- **PASS** 21.10.2026: ręczny OTA transfer, restart, odczyt całej aplikacji
+  i settings — OK.
+- **FAIL** runtime120s: świeżość danych mimo WiFi/MQTT; przyczyna nieznana.
+- Obraz/dotyk: nieweryfikowane.
+- Dark-screen / touch-wake: **OPEN**.
+- `setInsecure()` retry i brak podpisów: **nienaprawione**.
 
 ## Format assetu OTA
 
-Asset przygotowanego testowego pakietu:
+Asset przygotowanego wydania:
 
 ```
-BambuHelper-ws_lcd_43b-v3.9.1-ws43b-test.1-ota.bin
+BambuHelper-ws_lcd_43b-v3.9.1-ota.bin
 ```
 
-Wymagania instalacji testowej:
+Wymagania instalacji:
 
 - istniejąca instalacja WS43B z tabelą OTA `app0`/`app1`,
 - slot OTA `3145728` bytes,
@@ -55,13 +63,13 @@ segmenty. Istniejące przekierowanie GitHub do CDN pozostaje obsługiwane.
 
 ## Zakres tego commitu
 
-Commit przygotowuje źródła kanału dla testowego prerelease
-`v3.9.1-ws43b-test.1`. Dokumentacja opisuje **przygotowany** pakiet — nie
-twierdzi, że wydanie zostało już opublikowane ani przetestowane na urządzeniu.
-Nie wgrywa urządzenia. Wgrany firmware nie przełączy repo samodzielnie –
-wymaga późniejszego świadomego wgrania wersji zawierającej zmianę.
+Commit przygotowuje źródła kanału dla zwykłego wydania **v3.9.1**.
+Dokumentacja opisuje **przygotowany** pakiet — nie twierdzi, że wydanie zostało
+opublikowane ani przetestowane na urządzeniu. Nie wgrywa urządzenia. Wgrany
+firmware nie przełączy repo samodzielnie – wymaga późniejszego świadomego
+wgrania wersji zawierającej zmianę.
 
-Błąd dark-screen/touch-wake pozostaje **otwarty** (nierozwiązany). Test build
+Błąd dark-screen/touch-wake pozostaje **otwarty** (nierozwiązany). Build
 nie oznacza potwierdzenia stabilności sprzętu.
 
 ## Ograniczenie OTA
