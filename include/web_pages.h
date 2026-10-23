@@ -1275,6 +1275,20 @@ R"rawliteral(
     </div>
     <div id="fw-tab-auto">
       <p class="small text-dim" style="margin-bottom:var(--sp-3)">Check for and install BambuHelper display device firmware updates directly from GitHub.</p>
+)rawliteral"
+#if defined(BOARD_IS_WS43B)
+R"rawliteral(
+      <div class="hstack" style="margin-bottom:var(--sp-3);gap:var(--sp-3);flex-wrap:wrap">
+        <label for="otaChannel">Update channel</label>
+        <select id="otaChannel" onchange="changeWs43bOtaChannel()">
+          <option value="stable" selected>Stable</option>
+          <option value="beta">Beta</option>
+        </select>
+      </div>
+      <p class="small text-dim">Beta includes test releases and may be unstable. Stable is selected when this page is reopened.</p>
+)rawliteral"
+#endif
+R"rawliteral(
       <div class="hstack" style="margin-bottom:var(--sp-3);gap:var(--sp-3);flex-wrap:wrap">
         <button type="button" class="btn btn-ghost" onclick="checkForUpdates()">Check for Updates</button>
         <span id="updateResult" class="small text-dim" role="status" aria-live="polite"></span>

@@ -22,7 +22,7 @@ class OtaChannel(unittest.TestCase):
         for lang in ('en', 'pl'):
             with self.subTest(lang=lang):
                 src = localize_web.javascript(source) if lang == 'pl' else source
-                js = function(src, 'function checkForUpdates()')
+                js = '\n'.join(function(src, 'function ' + name + '(') for name in ('compareWs43bVersions', 'selectWs43bRelease', 'changeWs43bOtaChannel', 'checkWs43bUpdates', 'checkForUpdates'))
                 expected = [NO, YES] if lang == 'en' else [localize_web.catalog()[NO], localize_web.catalog()[YES]]
                 harness = 'const labels=' + json.dumps(expected) + ';\n' + r'''
 const assert=require('assert');
@@ -37,7 +37,7 @@ const fetch=async(url)=>{
 ''' + js + r'''
 async function check(nextStatus){
  status=nextStatus;
- release={tag_name:'v3.9.1',assets:[{name:'BambuHelper-ws_lcd_43b-v3.9.1-ota.bin',size:2400000,browser_download_url:'https://github.com/honzo90/BambuHelper/releases/download/v3.9.1/BambuHelper-ws_lcd_43b-v3.9.1-ota.bin'}],published_at:'2026-10-11'};
+ release={tag_name:'v3.9.1',draft:false,prerelease:false,assets:[{name:'BambuHelper-ws_lcd_43b-v3.9.1-ota.bin',size:2400000,browser_download_url:'https://github.com/honzo90/BambuHelper/releases/download/v3.9.1/BambuHelper-ws_lcd_43b-v3.9.1-ota.bin'}],published_at:'2026-10-11'};
  checkForUpdates();
  await new Promise(r=>setImmediate(r));
  return fields.updateResult.textContent;
@@ -134,7 +134,9 @@ int main(int argc, char** argv) {
         P = "https://github.com/honzo90/BambuHelper/releases/download/"
         F = "BambuHelper-ws_lcd_43b-v3.9.1-ota.bin"
 
-        ws_valid = [P + "v3.9.1/" + F]
+        ws_valid = [P + "v3.9.1/" + F,
+                    P + "v3.9.1-alpha.1/" + "BambuHelper-ws_lcd_43b-v3.9.1-alpha.1-ota.bin",
+                    P + "v3.9.1-beta.1/" + "BambuHelper-ws_lcd_43b-v3.9.1-beta.1-ota.bin"]
         ws_invalid = [
             "https://github.com/Keralots/BambuHelper/releases/download/v3.9.1/" + F,
             "https://github.com/honzo90/Other/releases/download/v3.9.1/" + F,

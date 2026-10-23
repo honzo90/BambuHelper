@@ -1980,7 +1980,198 @@ function switchFwTab(t){
   document.getElementById('tab-auto-btn').setAttribute('aria-pressed', t === 'auto' ? 'true' : 'false');
   document.getElementById('tab-manual-btn').setAttribute('aria-pressed', t === 'manual' ? 'true' : 'false');
 }
+function compareWs43bVersions(a,b){
+  function parse(v){
+    if (typeof v !== 'string') return null;
+    var m = v.match(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/);
+    if (!m) return null;
+    if (m[0] !== v) return null;
+    var core = [m[1], m[2], m[3]];
+    var pre = m[4] ? m[4].split('.') : null;
+    return {core: core, pre: pre};
+  }
+  function cmpNum(x, y){
+    if (x.length !== y.length) return x.length < y.length ? -1 : 1;
+    if (x < y) return -1;
+    if (x > y) return 1;
+    return 0;
+  }
+  var A = parse(a), B = parse(b);
+  if (!A || !B) return null;
+  for (var i = 0; i < 3; i++){
+    var c = cmpNum(A.core[i], B.core[i]);
+    if (c !== 0) return c;
+  }
+  if (!A.pre && !B.pre) return 0;
+  if (!A.pre) return 1;
+  if (!B.pre) return -1;
+  var n = Math.min(A.pre.length, B.pre.length);
+  for (var k = 0; k < n; k++){
+    var x = A.pre[k], y = B.pre[k];
+    var xd = /^\d+$/.test(x), yd = /^\d+$/.test(y);
+    if (xd && yd){
+      var c = cmpNum(x, y);
+      if (c !== 0) return c;
+    } else if (xd){
+      return -1;
+    } else if (yd){
+      return 1;
+    } else {
+      if (x < y) return -1;
+      if (x > y) return 1;
+    }
+  }
+  if (A.pre.length !== B.pre.length) return A.pre.length < B.pre.length ? -1 : 1;
+  return 0;
+}
+function selectWs43bRelease(data,channel,slotB){
+  if (typeof slotB !== 'number' || !Number.isSafeInteger(slotB) || slotB <= 0) return null;
+  var list;
+  if (channel === 'beta'){
+    if (!Array.isArray(data)) return null;
+    list = data;
+  } else if (channel === 'stable'){
+    if (Array.isArray(data) || data === null || typeof data !== 'object') return null;
+    list = [data];
+  } else {
+    return null;
+  }
+  var best = null, bestTag = null, bestAsset = null;
+  for (var i = 0; i < list.length; i++){
+    var rel = list[i];
+    if (!rel || typeof rel !== 'object') continue;
+    if (rel.draft === true) continue;
+    var tag = rel.tag_name;
+    if (typeof tag !== 'string') continue;
+    if (compareWs43bVersions(tag, tag) === null) continue;
+    var validTag = false;
+    if (rel.prerelease === false){
+      if (rel.prerelease === false && /^v\d+\.\d+\.\d+$/.test(tag)) validTag = true;
+    } else {
+      if (channel === 'beta' && rel.prerelease === true && /^v\d+\.\d+\.\d+-beta\.[1-9]\d*$/.test(tag)) validTag = true;
+    }
+    if (!validTag) continue;
+    if (!Array.isArray(rel.assets)) continue;
+    var expectedName = 'BambuHelper-ws_lcd_43b-' + tag + '-ota.bin';
+    var expectedUrl = 'https://github.com/honzo90/BambuHelper/releases/download/' + tag + '/' + expectedName;
+    var asset = null;
+    for (var a = 0; a < rel.assets.length; a++){
+      var as = rel.assets[a];
+      if (!as || typeof as !== 'object') continue;
+      if (as.name !== expectedName) continue;
+      if (as.browser_download_url !== expectedUrl) continue;
+      var size = as.size;
+      if (typeof size !== 'number' || !Number.isSafeInteger(size) || size <= 0) continue;
+      if (size > slotB) continue;
+      asset = as;
+      break;
+    }
+    if (!asset) continue;
+    if (bestTag === null){ best = rel; bestTag = tag; bestAsset = asset; continue; }
+    if (compareWs43bVersions(tag, bestTag) > 0){ best = rel; bestTag = tag; bestAsset = asset; }
+  }
+  if (!best) return null;
+  return {release:best, asset:bestAsset};
+}
+function changeWs43bOtaChannel(){
+  if (DEV.board !== 'ws_lcd_43b') return;
+  var select = document.getElementById('otaChannel');
+  var installBtn = document.getElementById('installBtn');
+  if (installBtn && installBtn.disabled){
+    if (select) select.value = checkWs43bUpdates.channel || 'stable';
+    return;
+  }
+  checkWs43bUpdates.requestId = (checkWs43bUpdates.requestId || 0) + 1;
+  _autoOtaUrl = '';
+  var res = document.getElementById('updateResult');
+  var info = document.getElementById('updateInfo');
+  var link = document.getElementById('updateLink');
+  if (link) link.href = '';
+  if (res) res.textContent = '';
+  if (info) info.style.display = 'none';
+  if (installBtn) installBtn.style.display = 'none';
+  if (link) link.style.display = 'none';
+}
+function checkWs43bUpdates(){
+  var select = document.getElementById('otaChannel');
+  var channel = (select && select.value === 'beta') ? 'beta' : 'stable';
+  var installBtn = document.getElementById('installBtn');
+  if (installBtn && installBtn.disabled) return;
+  checkWs43bUpdates.channel = channel;
+  var rid = (checkWs43bUpdates.requestId || 0) + 1;
+  checkWs43bUpdates.requestId = rid;
+  var res = document.getElementById('updateResult'), info = document.getElementById('updateInfo');
+  res.style.color = 'var(--info)'; res.textContent = 'Checking...'; info.style.display = 'none'; _autoOtaUrl = '';
+  if (installBtn) installBtn.style.display = 'none';
+  var ul = document.getElementById('updateLink'); if (ul) { ul.href = ''; ul.style.display = 'none'; }
+  var url = channel === 'beta'
+    ? 'https://api.github.com/repos/honzo90/BambuHelper/releases?per_page=100'
+    : 'https://api.github.com/repos/honzo90/BambuHelper/releases/latest';
+  fetch(url)
+    .then(function(r){
+      if (checkWs43bUpdates.requestId !== rid) return;
+      if (r.status === 404 && channel === 'stable'){
+        res.style.color = 'var(--info)';
+        res.textContent = 'No stable release has been published for this channel yet.';
+        return;
+      }
+      if (r.status === 404 && channel === 'beta'){
+        res.style.color = 'var(--info)';
+        res.textContent = 'No compatible release has been published for this channel yet.';
+        return;
+      }
+      if (!r.ok) throw new Error('GitHub API returned ' + r.status);
+      return r.json();
+    })
+    .then(function(d){
+      if (checkWs43bUpdates.requestId !== rid) return;
+      if (d === undefined) return;
+      if (channel === 'beta' && !Array.isArray(d)){
+        res.style.color = 'var(--danger)';
+        res.textContent = 'Invalid GitHub release response.';
+        return;
+      }
+      if (channel === 'stable' && !(d !== null && typeof d === 'object' && !Array.isArray(d))){
+        res.style.color = 'var(--danger)';
+        res.textContent = 'Invalid GitHub release response.';
+        return;
+      }
+      var slotB = Number(DEV.otaSlot);
+      var picked = selectWs43bRelease(d, channel, slotB);
+      if (!picked){
+        res.style.color = 'var(--info)';
+        res.textContent = 'No compatible release has been published for this channel yet.';
+        return;
+      }
+      var current = DEV.fw;
+      if (compareWs43bVersions(current, current) === null){
+        res.style.color = 'var(--danger)';
+        res.textContent = 'Invalid current firmware version.';
+        return;
+      }
+      var cmp = compareWs43bVersions(picked.release.tag_name, current);
+      if (cmp === null || cmp <= 0){
+        res.style.color = 'var(--success)';
+        res.textContent = 'No newer compatible update (' + current + ')';
+        return;
+      }
+      res.style.color = 'var(--warn)'; res.textContent = 'Update available!';
+      document.getElementById('updateVer').textContent = picked.release.tag_name;
+      document.getElementById('updateDate').textContent = new Date(picked.release.published_at).toLocaleDateString();
+      _autoOtaUrl = picked.asset.browser_download_url;
+      var link = document.getElementById('updateLink');
+      link.href = picked.asset.browser_download_url;
+      link.style.display = 'inline-block';
+      installBtn.style.display = 'inline-block';
+      info.style.display = 'block';
+    })
+    .catch(function(e){
+      if (checkWs43bUpdates.requestId !== rid) return;
+      res.style.color = 'var(--danger)'; res.textContent = 'Check failed: ' + e.message; console.warn('updateCheck:',e);
+    });
+}
 function checkForUpdates(){
+  if (DEV.board === 'ws_lcd_43b') return checkWs43bUpdates();
   var res = document.getElementById('updateResult'), info = document.getElementById('updateInfo');
   var ws43b = DEV.board === 'ws_lcd_43b';
   res.style.color = 'var(--info)'; res.textContent = 'Checking...'; info.style.display = 'none'; _autoOtaUrl = '';
