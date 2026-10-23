@@ -43,7 +43,7 @@ bool saveWs43bDisplayMode(bool advanced){
 }
 void loadWs43bDisplayMode(){}
 struct DisplaySettings { uint16_t bgColor, trackColor, progressBarColor; bool fanMatchPrinter; bool pongClock=false; } dispSettings{};
-struct Printer { struct State {bool connected=true; BambuMonitorTelemetry monitor;} state; } printers[1];
+struct Printer { struct State {bool connected=true; bool printing=false; BambuMonitorTelemetry monitor;} state; } printers[1];
 static bool wifi=true;
 bool dashboardCooling=false;
 bool hmsScreenAlerting(){return false;}

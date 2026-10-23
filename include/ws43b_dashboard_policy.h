@@ -92,8 +92,14 @@ inline bool printProgressVisible(const BambuMonitorTelemetry &m,bool online,uint
 inline bool dashboardProgressVisible(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool advanced) {
   return advanced?printProgressVisible(m,online,now):progressCurrent(m,online,now);
 }
-enum class Saver { Clock, Print, Cooling, Pause, Alert };
-inline Saver saver(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool cooling,bool alert) {
+// Presentation only: an online core print whose status is a valid RUNNING/PREPARE
+// but whose job stream has gone stale is shown as Waiting, not as a live print.
+inline bool waitingForJobData(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool corePrinting) {
+  return online && corePrinting && activeJob(m) && !statusCurrent(m,online,now);
+}
+enum class Saver { Clock, Print, Cooling, Pause, Alert, Waiting };
+inline Saver saver(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool cooling,bool alert,bool corePrinting=false) {
+  if(waitingForJobData(m,online,now,corePrinting))return alert?Saver::Alert:Saver::Waiting;
   if(!statusCurrent(m,online,now))return Saver::Clock;
   if(alert)return Saver::Alert;
   if(!strcmp(m.status.value,"PAUSE"))return Saver::Pause;

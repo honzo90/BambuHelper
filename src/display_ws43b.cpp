@@ -93,8 +93,9 @@ void updateIdleView(uint32_t now) {
   // back to monitoring too, including reconnect after unknown/stale data.
   const auto &state = displayedPrinter().state;
   const auto &status = state.monitor.status;
+  const bool online = isWiFiConnected() && state.connected;
   uint8_t current = 0;
-  if (isWiFiConnected() && state.connected && status.current(now)) {
+  if (ws43b_view::statusCurrent(state.monitor, online, now)) {
     if (!strcmp(status.value, "IDLE")) current = 1;
     else if (!strcmp(status.value, "FINISH")) current = 2;
     else if (!strcmp(status.value, "RUNNING")) current = 3;
@@ -109,7 +110,8 @@ void updateIdleView(uint32_t now) {
 #endif
   if(night!=previousNight){nightActivity=now;previousNight=night;}
   const bool nightExpired=night && uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
-  bool daytimePrint = current == 3 || current == 4 || current == 5;
+  bool daytimePrint = current == 3 || current == 4 || current == 5 ||
+                      ws43b_view::waitingForJobData(state.monitor, online, now, state.printing);
 #if WS43B_FULL_WEBUI
   daytimePrint = daytimePrint && !isNightModeActive();
 #endif
@@ -1152,7 +1154,7 @@ ws43b_view::Saver saverView(const BambuMonitorTelemetry &m,bool online,uint32_t 
 #if WS43B_FULL_WEBUI
   alert=hmsScreenAlerting();
 #endif
-  return ws43b_view::saver(m,online,now,coolingView(m),alert);
+  return ws43b_view::saver(m,online,now,coolingView(m),alert,displayedPrinter().state.printing);
 }
 void modernText(const char *,int,int,bool,uint16_t);
 void drawClockBackground(bool,int,uint32_t);
@@ -1285,7 +1287,8 @@ void saverDryingEnd(const MonitorAmsUnit &unit,uint32_t now,int x,int y,int widt
   dashText(text,x,y,width,18,DIM);
 }
 void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &unit,
-                        bool online,uint32_t now,ws43b_view::Activity activity,bool partial) {
+                        bool online,uint32_t now,ws43b_view::Activity activity,bool partial,
+                        bool waiting=false) {
   const uint16_t bg=tft.color565(7,25,34);
   const bool cleaning=activity==ws43b_view::Activity::Cleaning;
   const bool leveling=activity==ws43b_view::Activity::Leveling;
@@ -1297,17 +1300,28 @@ void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &uni
       tft.drawRoundRect(x,220,368,184,14,TRACK);
     }
     char text[100];
-    dashText(saverStageCaption(m,online,now,activity),44,234,328,18,ACCENT);
-    if(progressValid)snprintf(text,sizeof text,"%u%%",unsigned(m.progress.value));
-    else snprintf(text,sizeof text,"--%%");
-    dashText(text,44,257,194,72,progressValid?INK:DIM);
-    if(missing(m.remainingMinutes,online,now)==nullptr)
-      snprintf(text,sizeof text,ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
-    else snprintf(text,sizeof text,"%s",ws43bText("Czas niedostępny","Time unavailable"));
-    dashText(text,44,350,194,14,DIM);
-    tft.fillRoundRect(44,386,328,5,2,TRACK);
-    const int fill=progressValid?328*int(m.progress.value>100?100:m.progress.value)/100:0;
-    if(fill>0)tft.fillRoundRect(44,386,fill,5,2,ACCENT);
+    if(waiting) {
+      dashText(ws43bText("Oczekiwanie na dane","Waiting for data"),44,234,328,18,ACCENT);
+      if(m.progress.valid)snprintf(text,sizeof text,ws43bText("Ostatnio: %u%%","Last: %u%%"),unsigned(m.progress.value));
+      else snprintf(text,sizeof text,"--%%");
+      dashText(text,44,278,194,24,DIM);
+      if(m.remainingMinutes.valid)
+        snprintf(text,sizeof text,ws43bText("Ostatni czas: %u h %02u min","Last remaining: %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+      else snprintf(text,sizeof text,"%s",ws43bText("Ostatni czas: --","Last remaining: --"));
+      dashText(text,44,350,328,14,DIM);
+    } else {
+      dashText(saverStageCaption(m,online,now,activity),44,234,328,18,ACCENT);
+      if(progressValid)snprintf(text,sizeof text,"%u%%",unsigned(m.progress.value));
+      else snprintf(text,sizeof text,"--%%");
+      dashText(text,44,257,194,72,progressValid?INK:DIM);
+      if(missing(m.remainingMinutes,online,now)==nullptr)
+        snprintf(text,sizeof text,ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+      else snprintf(text,sizeof text,"%s",ws43bText("Czas niedostępny","Time unavailable"));
+      dashText(text,44,350,194,14,DIM);
+      tft.fillRoundRect(44,386,328,5,2,TRACK);
+      const int fill=progressValid?328*int(m.progress.value>100?100:m.progress.value)/100:0;
+      if(fill>0)tft.fillRoundRect(44,386,fill,5,2,ACCENT);
+    }
     snprintf(text,sizeof text,ws43bText("SUSZENIE · AMS %u","DRYING · AMS %u"),unsigned(unit.id));
     dashText(text,428,234,328,18,ACCENT);
     snprintf(text,sizeof text,"%u h %02u min",unsigned(unit.dryRemainMin.value/60),unsigned(unit.dryRemainMin.value%60));
@@ -1318,7 +1332,9 @@ void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &uni
   // Independent small dirty regions: never repaint the clock or either timer
   // for an animation frame. The print model retains the selected filament.
   tft.setClipRect(250,258,112,104);tft.fillRect(250,258,112,104,bg);
-  if(cleaning)ws43b_print_scene::cleaning(tft,250,258,dashboardActivity.elapsed(now),bg);
+  if(waiting) {
+    panelIcon(UiAsset::Printer,306,310,bg,48);
+  } else if(cleaning)ws43b_print_scene::cleaning(tft,250,258,dashboardActivity.elapsed(now),bg);
   else if(leveling)ws43b_print_scene::leveling(tft,250,258,now,ACCENT,bg);
   else if(calibration)ws43b_print_scene::calibrationLines(tft,250,258,now,saverFilamentColor(m,online,now),bg);
   else if(progressValid)ws43b_print_scene::draw(tft,250,258,m.progress.value,now,saverFilamentColor(m,online,now),bg,false);
@@ -1332,6 +1348,7 @@ void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &uni
 void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool partial = false) {
   const auto view=saverView(m,online,now);
   if(view==ws43b_view::Saver::Cooling){coolingScreen(m,online,now,partial);return;}
+  const bool waiting=view==ws43b_view::Saver::Waiting;
   const bool print=view==ws43b_view::Saver::Print && clockHasProgress(m,online,now);
   const auto activity=ws43b_view::activity(m,online,now,false);
   const bool cleaning=saverView(m,online,now)==ws43b_view::Saver::Print && activity==ws43b_view::Activity::Cleaning;
@@ -1342,8 +1359,8 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
   const auto *unit=ws43b_view::dryingUnit(m,online,now);
   const bool dryFresh=unit && online && unit->dryRemainMin.current(now);
   const bool notice=view==ws43b_view::Saver::Pause || view==ws43b_view::Saver::Alert;
-  const bool combined=dryFresh&&view==ws43b_view::Saver::Print;
-  const bool dryOnly=!combined&&!print&&!preparationScene&&!notice&&dryFresh;
+  const bool combined=dryFresh&&(view==ws43b_view::Saver::Print||waiting);
+  const bool dryOnly=!combined&&!print&&!preparationScene&&!notice&&!waiting&&dryFresh;
   const uint16_t white=tft.color565(237,247,244);
   if(!partial) {
     drawClockBackground(false,0,now);
@@ -1377,6 +1394,16 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
       tft.fillRoundRect(310,376,450,7,3,TRACK);
       const int fill=450*int(m.progress.value>100?100:m.progress.value)/100;
       if(fill>0)tft.fillRoundRect(310,376,fill,7,3,ACCENT);
+    } else if(waiting) {
+      dashText(ws43bText("Oczekiwanie na dane","Waiting for data"),310,229,466,24,ACCENT);
+      if(m.progress.valid)snprintf(text,sizeof(text),ws43bText("Ostatnio: %u%%","Last: %u%%"),unsigned(m.progress.value));
+      else snprintf(text,sizeof(text),"--%%");
+      dashText(text,310,278,460,30,DIM);
+      if(m.remainingMinutes.valid)
+        snprintf(text,sizeof(text),ws43bText("Ostatni czas: %u h %02u min","Last remaining: %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+      else snprintf(text,sizeof(text),"%s",ws43bText("Ostatni czas: --","Last remaining: --"));
+      dashText(text,310,345,466,18,DIM);
+      panelIcon(UiAsset::Printer,190,298,tft.color565(3,14,23),74);
     } else if(dryOnly) {
       snprintf(text,sizeof text,ws43bText("SUSZENIE · AMS %u","DRYING · AMS %u"),unsigned(unit->id));
       dashText(text,310,229,466,24,ACCENT);
@@ -1405,11 +1432,11 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
     if(unit && !notice && !dryOnly && !combined) {
       if(dryFresh)snprintf(text,sizeof(text),ws43bText("AMS %u · Suszenie · %u h %02u min","AMS %u · Drying · %u h %02u min"),unsigned(unit->id),unsigned(unit->dryRemainMin.value/60),unsigned(unit->dryRemainMin.value%60));
       else snprintf(text,sizeof(text),ws43bText("AMS · Dane sprzed %u min · suszenie niepotwierdzone","AMS · Data %u min old · drying unconfirmed"),unsigned(uint32_t(now-unit->dryRemainMin.updatedMs)/60000u));
-      dashText(text,32, (print||preparationScene)?391:346,736,14,dryFresh?ACCENT:WARN);
+      dashText(text,32, (print||preparationScene||waiting)?391:346,736,14,dryFresh?ACCENT:WARN);
     }
   }
   // Restore only moving regions; large digits stay untouched between samples.
-  if(combined)combinedSaverCards(m,*unit,online,now,activity,partial);
+  if(combined)combinedSaverCards(m,*unit,online,now,activity,partial,waiting);
   else if(preparationScene) {
     const uint16_t bg=tft.color565(3,14,23);
     tft.setClipRect(108,222,170,158);tft.fillRect(108,222,170,158,bg);
@@ -1836,8 +1863,8 @@ void renderWs43bMonitor(bool force) {
     struct tm clockTime{};
     const bool timeValid = getLocalTime(&clockTime, 0);
     char key[240];
-    snprintf(key, sizeof(key), "%d/%u/%d/%u/%d/%d/%d/%d/%d/%d/%d/%lu",
-             valid, unsigned(m.progress.value), remaining, unsigned(m.remainingMinutes.value),
+    snprintf(key, sizeof(key), "p%d/r%d/%d/%u/%d/%u/%d/%d/%d/%d/%d/%d/%d/%lu",
+             m.progress.valid, m.remainingMinutes.valid, valid, unsigned(m.progress.value), remaining, unsigned(m.remainingMinutes.value),
              timeValid, clockTime.tm_year, clockTime.tm_yday, clockTime.tm_hour, clockTime.tm_min,
              netSettings.use24h, int(rotState.displayIndex), (unsigned long)ws43bLanguageRevision());
     const bool cooling = saverView(m,online,now)==ws43b_view::Saver::Cooling;
