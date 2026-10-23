@@ -1,5 +1,6 @@
 #pragma once
 #include "ws43b_ui_icons.h"
+#include "ws43b_version.h"
 
 // Shared startup composition: production assets, palette and fonts via Text.
 // Stages represent observed connection state, never an estimated percentage.
@@ -43,7 +44,7 @@ void draw(Canvas &c,Text text,Phase phase,const Palette &p,bool pl,
           const char *context,uint32_t now) {
   using namespace ws43b_native;
   screen(c,p.background);
-  text("BambuHelper",24,19,400,25,p.ink);
+  text("BambuHelper " WS43B_DISPLAY_VERSION,24,19,400,25,p.ink);
   text(pl?"URUCHAMIANIE":"STARTING UP",602,28,174,14,p.dim);
   c.drawFastHLine(24,62,752,line);
   card(c,24,84,752,252,p.background);
