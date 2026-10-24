@@ -54,7 +54,11 @@ The toolchain workflow was developed on macOS; Linux/Windows are unverified.
 These commands build only. They do not flash a device or contact a printer.
 The resulting firmware uses `BAMBU_MONITOR_ONLY=0` and includes normal printer
 controls; it is not a passive monitor build. Generated output stays ignored.
-Flashing, OTA and recovery instructions are outside this initial source upload.
+For first installation, use the [WS43B browser USB installer](https://honzo90.github.io/BambuHelper/)
+with the exact ESP32-S3-Touch-LCD-4.3B board. Factory installation erases flash
+and saved settings; the browser USB workflow still needs physical acceptance.
+For an existing installation, prefer the panel WebUI OTA flow described in
+[README](README.md#building-and-validation) and [OTA channel notes](docs/WS43B_OTA_CHANNEL.md).
 
 ## Host tests
 

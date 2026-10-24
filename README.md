@@ -72,15 +72,25 @@ The published source baseline passed a fresh-clone firmware build on macOS on
 [WAVESHARE.md](WAVESHARE.md#host-tests). Build success and host tests do not
 resolve the LCD/touch issue or establish complete hardware acceptance.
 
-**OTA update for existing WS43B installations:** the v3.9.1 package is
-`BambuHelper-ws_lcd_43b-v3.9.1-ota.bin`; releases and build metadata are available
-at [GitHub Releases](https://github.com/honzo90/BambuHelper/releases).
-It requires an existing Waveshare 4.3B installation with two 3 MiB OTA slots.
-This application-only image is **not** a first-flash binary. The upstream web
-flasher does not support this 4.3B port. The dark-screen / touch-wake issue
-remains open and physical hardware acceptance is incomplete. Other boards,
-printer models and multi-printer configurations have not all been validated
-as part of this fork.
+**Browser USB installer — WS43B Beta 2:** open
+[honzo90.github.io/BambuHelper](https://honzo90.github.io/BambuHelper/) in desktop
+Chrome or Edge. It is only for **Waveshare ESP32-S3-Touch-LCD-4.3B** and first
+installation: it erases flash, including saved settings and previous firmware.
+The page checks the factory image before enabling installation. This browser
+USB installation workflow still needs physical hardware acceptance.
+
+**OTA updates for existing WS43B installations:** use the panel WebUI. On Beta 1,
+select **Beta → Check for updates** to install `v4.0.0-beta.2`. On Alpha, upload
+`BambuHelper-ws_lcd_43b-v4.0.0-beta.2-ota.bin` through manual OTA once. Packages,
+source commits and build metadata are at
+[GitHub Releases](https://github.com/honzo90/BambuHelper/releases).
+OTA requires the existing WS43B partition layout with two 3 MiB slots; an
+application-only OTA image cannot perform a first installation.
+
+The inherited upstream web flasher does not support this 4.3B port. The
+[dark-screen / touch-wake issue](https://github.com/honzo90/BambuHelper/issues/1)
+remains open. Other boards, printer models and multi-printer configurations
+have not all been validated as part of this fork.
 
 ## Source map
 
