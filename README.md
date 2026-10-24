@@ -1,11 +1,16 @@
 # BambuHelper — Waveshare 4.3B development branch
 
-**English** | [Polski](README.pl.md)
+**English** | [Polski](README.pl.md) | [Deutsch](README.de.md)
 
 A desktop Bambu Lab printer monitor for the **Waveshare ESP32-S3-Touch-LCD-4.3B**:
 an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish,
 English or German interface, and clock/weather views. German is available from
 `v4.0.0-beta.3`.
+
+**Device feedback — 24 October 2026:** the project owner confirmed that
+[Beta 3](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0-beta.3)
+with the German panel menu and WebUI works on their WS43B. This confirms that
+version and interface on one device; the screen-off / touch-wake issue remains open.
 
 This fork builds on [BambuHelper by Keralots and contributors](https://github.com/Keralots/BambuHelper).
 The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
@@ -82,9 +87,11 @@ installation: it erases flash, including saved settings and previous firmware.
 The page checks the factory image before enabling installation. This browser
 USB installation workflow still needs physical hardware acceptance.
 
-**OTA updates for existing WS43B installations:** use the panel WebUI. On Beta 1,
-select **Beta → Check for updates** to install `v4.0.0-beta.2`. On Alpha, upload
-`BambuHelper-ws_lcd_43b-v4.0.0-beta.2-ota.bin` through manual OTA once. Packages,
+**OTA updates for existing WS43B installations:** use the panel WebUI. On Beta 1
+or Beta 2, select **Beta → Check for updates** to install `v4.0.0-beta.3`,
+including the German interface. This also applies after first installation with
+the Beta 2 browser USB installer. On Alpha, upload
+`BambuHelper-ws_lcd_43b-v4.0.0-beta.3-ota.bin` through manual OTA once. Packages,
 source commits and build metadata are at
 [GitHub Releases](https://github.com/honzo90/BambuHelper/releases).
 OTA requires the existing WS43B partition layout with two 3 MiB slots; an

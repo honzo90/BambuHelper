@@ -1,8 +1,8 @@
 # BambuHelper — Waveshare 4.3B
 
-[English](README.md) | **Polski**
+[English](README.md) | **Polski** | [Deutsch](README.de.md)
 
-Monitor drukarek Bambu Lab dla **Waveshare ESP32-S3-Touch-LCD-4.3B**, z dotykowym ekranem RGB **800×480**. Pokazuje dane drukarki i AMS, postęp wydruku, zegar i opcjonalną pogodę. Interfejs panelu oraz konfiguracja przez przeglądarkę są dostępne po polsku i angielsku.
+Monitor drukarek Bambu Lab dla **Waveshare ESP32-S3-Touch-LCD-4.3B**, z dotykowym ekranem RGB **800×480**. Pokazuje dane drukarki i AMS, postęp wydruku, zegar i opcjonalną pogodę. Interfejs panelu oraz konfiguracja przez przeglądarkę są dostępne po polsku, angielsku i niemiecku.
 
 To fork projektu [BambuHelper autorstwa Keralots i współtwórców](https://github.com/Keralots/BambuHelper). Gałąź `waveshare-43b` powstała na bazie oryginalnej wersji **v3.9.0** (`23347fbb`); `main` zachowuje historię projektu źródłowego.
 
@@ -10,9 +10,13 @@ To fork projektu [BambuHelper autorstwa Keralots i współtwórców](https://git
 
 ## Instalacja i aktualizacje
 
-Obecny pakiet: **v0.9 / Beta 2**, wewnętrzny numer firmware **`v4.0.0-beta.2`**.
+Obecny pakiet: **[v0.9 / Beta 3](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0-beta.3)**, wewnętrzny numer firmware **`v4.0.0-beta.3`**.
+
+**Potwierdzenie z urządzenia — 24 października 2026:** właściciel projektu potwierdził działanie Bety 3 z niemieckim menu i WebUI na swoim panelu WS43B. To potwierdzenie tej wersji i interfejsu; nie zamyka zgłoszenia dotyczącego wygaszania i wybudzania.
 
 ### Pierwsza instalacja przez USB
+
+Instalator USB udostępnia **Betę 2**. Po pierwszej konfiguracji przejdź do **Bety 3** przez OTA, aby korzystać z niemieckiego interfejsu.
 
 1. Otwórz **[instalator BambuHelper](https://honzo90.github.io/BambuHelper/)** w Chrome lub Edge na komputerze. Instalacja przez USB nie działa na iPhonie.
 2. Podłącz panel kablem USB obsługującym transmisję danych. Instalator jest przeznaczony wyłącznie dla **Waveshare ESP32-S3-Touch-LCD-4.3B**.
@@ -23,8 +27,8 @@ Obecny pakiet: **v0.9 / Beta 2**, wewnętrzny numer firmware **`v4.0.0-beta.2`**
 
 ### Aktualizacja działającego panelu przez OTA
 
-- **Beta 1 → Beta 2:** w WebUI wybierz kanał **Beta** i **Sprawdź aktualizacje**.
-- **Alpha → Beta 2:** jednorazowo użyj ręcznej aktualizacji OTA i pliku `BambuHelper-ws_lcd_43b-v4.0.0-beta.2-ota.bin`.
+- **Beta 1 lub Beta 2 → Beta 3:** w WebUI wybierz kanał **Beta** i **Sprawdź aktualizacje**.
+- **Alpha → Beta 3:** jednorazowo użyj ręcznej aktualizacji OTA i pliku `BambuHelper-ws_lcd_43b-v4.0.0-beta.3-ota.bin`.
 - Pakiety, informacje o kompilacji i powiązane wersje źródeł: **[GitHub Releases](https://github.com/honzo90/BambuHelper/releases)**.
 
 OTA wymaga istniejącego układu partycji WS43B z **dwoma slotami po 3 MiB**. Plik OTA zawiera samą aplikację i nie służy do pierwszej instalacji. Oryginalny instalator projektu Keralots nie obsługuje tego portu 4.3B.
