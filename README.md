@@ -1,5 +1,7 @@
 # BambuHelper — Waveshare 4.3B development branch
 
+**English** | [Polski](README.pl.md)
+
 A desktop Bambu Lab printer monitor for the **Waveshare ESP32-S3-Touch-LCD-4.3B**:
 an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish or
 English interface, and clock/weather views.
