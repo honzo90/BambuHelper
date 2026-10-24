@@ -54,7 +54,7 @@ bool advancedDisplay=false;
 bool ws43bAdvancedDisplay(){return advancedDisplay;}
 ws43b_view::ActivityClock dashboardActivity;
 struct{bool use24h=true;}netSettings;
-const char*ws43bText(const char*pl,const char*){return pl;}
+const char*ws43bText(const char*pl,const char*,const char* = nullptr){return pl;}
 void dashText(const char*s,int,int,int,int=18,uint16_t=INK){texts.push_back(s);}
 void modernText(const char*s,int,int,bool,uint16_t){texts.push_back(s);}
 bool getLocalTime(tm*t,int){*t={};t->tm_year=126;t->tm_mday=13;t->tm_mon=9;t->tm_hour=20;return true;}

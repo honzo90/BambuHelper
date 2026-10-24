@@ -23,7 +23,7 @@ struct{int displayIndex=0;}rotState;
 constexpr int BG=0x0084,CARD=1,INK=2,DIM=3,WARN=4,ACCENT=5,TRACK=6;
 constexpr uint8_t ws43b_v2_12[]={0},ws43b_v2_b29[]={0};
 uint16_t v2Ink(){return INK;}uint16_t v2Dim(){return DIM;}
-const char* ws43bText(const char*p,const char*){return p;}
+const char* ws43bText(const char*p,const char*,const char* = nullptr){return p;}
 struct Text{std::string value;int color;};std::vector<Text> text;
 int top=66;
 int v2Text(const char*s,int x,int y,int w,const uint8_t*,int h,int color,bool=false,bool=true){

@@ -1,7 +1,8 @@
 # Waveshare ESP32-S3-Touch-LCD-4.3B
 
 This branch contains the 800×480 display/touch port, native dashboard and scenes,
-clock/weather views, Polish/English interface, and its host regression tests.
+clock/weather views, Polish/English/German interface, and its host regression tests.
+German UI support is available from `v4.0.0-beta.3`.
 The board profile is `boards/ws_lcd_43b.ini`. Other board definitions are inherited
 from upstream and have not been hardware-tested as part of this publication.
 

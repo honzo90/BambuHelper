@@ -42,7 +42,7 @@ constexpr uint16_t BG=0,CARD=1,INK=2,WARN=3,DIM=4,ACCENT=5,TRACK=6;
 unsigned selectedAms=0;
 bool advancedDisplay=true; // Existing detailed assertions describe advanced mode.
 bool ws43bAdvancedDisplay(){return advancedDisplay;}
-const char *ws43bText(const char *pl,const char*) { return pl; }
+const char *ws43bText(const char *pl,const char*,const char* = nullptr) { return pl; }
 struct Rect { int x,y,w,h,color; };
 struct Text { std::string value;int x,y,w,size,color; };
 struct Canvas {

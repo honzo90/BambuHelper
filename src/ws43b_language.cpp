@@ -2,9 +2,23 @@
 #if defined(BOARD_IS_WS43B)
 #include "ws43b_language.h"
 #include <Preferences.h>
+#include <cstring>
 static uint8_t language = 0;
 static uint32_t revision = 0;
 bool ws43bPolish() { return language == 0; }
+uint8_t ws43bLanguage() { return language; }
+const char* ws43bLanguageCode() {
+  if (language == 0) return "pl";
+  if (language == 2) return "de";
+  return "en";
+}
+bool ws43bParseLanguage(const char* code, uint8_t& value) {
+  if (!code) return false;
+  if (strcmp(code, "pl") == 0) { value = 0; return true; }
+  if (strcmp(code, "en") == 0) { value = 1; return true; }
+  if (strcmp(code, "de") == 0) { value = 2; return true; }
+  return false;
+}
 uint32_t ws43bLanguageRevision() { return revision; }
 void loadWs43bLanguage() {
   Preferences p;
@@ -12,10 +26,10 @@ void loadWs43bLanguage() {
   if (!p.begin(NVS_NAMESPACE, true)) return;
   const uint16_t stored = p.getUShort("w43_lang", 0);
   p.end();
-  if (stored <= 1) language = uint8_t(stored);
+  if (stored <= 2) language = uint8_t(stored);
 }
 bool saveWs43bLanguage(uint8_t value) {
-  if (value > 1) return false;
+  if (value > 2) return false;
   if (value == language) return true;
   Preferences p;
   if (!p.begin(NVS_NAMESPACE, false)) return false;

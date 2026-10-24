@@ -106,7 +106,7 @@ void glowTick(Canvas &,unsigned,bool){
 }
 bool bambuMqttReceivePending(unsigned){return rxPending;}
 uint32_t ws43bLanguageRevision(){return language;}
-const char *ws43bText(const char *p,const char*){return p;}
+const char *ws43bText(const char *p,const char*,const char* = nullptr){return p;}
 void updateIdleView(uint32_t){}void cancelWs43bMonitorTouch(){++cancelCount;}
 bool clockValid=true;unsigned clockMinute=15;
 bool getLocalTime(tm *t,uint32_t){*t={};t->tm_year=126;t->tm_yday=100;t->tm_mday=10;t->tm_mon=3;t->tm_hour=10;t->tm_min=clockMinute;return clockValid;}

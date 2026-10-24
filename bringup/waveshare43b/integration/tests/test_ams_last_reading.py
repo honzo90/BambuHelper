@@ -18,7 +18,7 @@ namespace lgfx {using rgb565_t=uint16_t;}
 #include <vector>
 #include <cassert>
 #include <algorithm>
-const char *ws43bText(const char *pl,const char*){return pl;}
+const char *ws43bText(const char *pl,const char*,const char* = nullptr){return pl;}
 unsigned selectedAms=0;constexpr int BG=0,CARD=1,INK=2,WARN=3,DIM=4,ACCENT=5,TRACK=6;
 std::vector<std::string> text;std::vector<int> colors;
 using UiAsset=ws43b_assets::Asset;

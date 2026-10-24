@@ -463,15 +463,16 @@ static void handleWeatherSave() {
 }
 static void handleLanguageGet() {
   server.sendHeader("Cache-Control", "no-store");
-  server.send(200, "application/json", ws43bPolish() ? "{\"language\":\"pl\"}" : "{\"language\":\"en\"}");
+  server.send(200, "application/json", ws43bText("{\"language\":\"pl\"}","{\"language\":\"en\"}","{\"language\":\"de\"}"));
 }
 static void handleLanguageSave() {
   const String value = server.arg("language");
-  if (value != "pl" && value != "en") {
+  uint8_t language;
+  if (!ws43bParseLanguage(value.c_str(), language)) {
     server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid language\"}");
     return;
   }
-  if (!saveWs43bLanguage(value == "pl" ? 0 : 1)) {
+  if (!saveWs43bLanguage(language)) {
     server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Language could not be saved\"}");
     return;
   }
@@ -2314,7 +2315,7 @@ static void handleSettingsExport() {
   native["screen_off"] = clock.screenOff;
   native["use24h"] = clock.use24h;
   native["display_mode"] = ws43bAdvancedDisplay() ? "advanced" : "simple";
-  native["language"] = ws43bPolish() ? "pl" : "en";
+  native["language"] = ws43bLanguageCode();
 #endif
   // Display
   char buf[8];
@@ -2668,7 +2669,7 @@ static void handleSettingsImportFinish() {
   auto importedClock = ws43bClockSettings();
   bool importedAdvancedDisplay = ws43bAdvancedDisplay();
   auto importedWeather = ws43bWeatherConfig();
-  uint8_t importedLanguage = ws43bPolish() ? 0 : 1;
+  uint8_t importedLanguage = ws43bLanguage();
   if (!doc["waveshare43b"].isNull()) {
     JsonObject native = doc["waveshare43b"];
     if (!native || !native["idle_minutes"].is<uint16_t>() ||
@@ -2685,10 +2686,9 @@ static void handleSettingsImportFinish() {
     }
     if (!native["language"].isNull()) {
       const char* lang = native["language"].is<const char*>() ? native["language"].as<const char*>() : "";
-      if (strcmp(lang, "pl") && strcmp(lang, "en")) {
+      if (!ws43bParseLanguage(lang, importedLanguage)) {
         server.send(400, "text/plain", "Invalid language"); return;
       }
-      importedLanguage = strcmp(lang, "pl") ? 1 : 0;
     }
     if(!native["weather"].isNull() && !ws43b_weather::parseConfig(native["weather"].as<JsonVariantConst>(),importedWeather)) {
       server.send(400,"text/plain","Invalid weather settings");return;

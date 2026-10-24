@@ -111,36 +111,36 @@ bool ws43bSolarNight(bool &night){
 }
 const char *ws43bWeatherDescription(int c){
  switch(c) {
-  case 0: return ws43bText("Bezchmurnie","Clear");
-  case 1: return ws43bText("Przeważnie bezchmurnie","Mainly clear");
-  case 2: return ws43bText("Częściowe zachmurzenie","Partly cloudy");
-  case 3: return ws43bText("Zachmurzenie","Cloudy");
-  case 45: return ws43bText("Mgła","Fog");
-  case 48: return ws43bText("Mgła osadzająca szadź","Rime fog");
-  case 51: return ws43bText("Lekka mżawka","Light drizzle");
-  case 53: return ws43bText("Umiarkowana mżawka","Moderate drizzle");
-  case 55: return ws43bText("Silna mżawka","Heavy drizzle");
-  case 56: return ws43bText("Lekka marznąca mżawka","Light freezing drizzle");
-  case 57: return ws43bText("Silna marznąca mżawka","Heavy freezing drizzle");
-  case 61: return ws43bText("Lekki deszcz","Light rain");
-  case 63: return ws43bText("Umiarkowany deszcz","Moderate rain");
-  case 65: return ws43bText("Silny deszcz","Heavy rain");
-  case 66: return ws43bText("Lekki marznący deszcz","Light freezing rain");
-  case 67: return ws43bText("Silny marznący deszcz","Heavy freezing rain");
-  case 71: return ws43bText("Lekki śnieg","Light snow");
-  case 73: return ws43bText("Umiarkowany śnieg","Moderate snow");
-  case 75: return ws43bText("Silny śnieg","Heavy snow");
-  case 77: return ws43bText("Śnieg ziarnisty","Snow grains");
-  case 80: return ws43bText("Lekkie przelotne opady","Light rain showers");
-  case 81: return ws43bText("Przelotny deszcz","Rain showers");
-  case 82: return ws43bText("Gwałtowne opady deszczu","Violent rain showers");
-  case 85: return ws43bText("Przelotny śnieg","Snow showers");
-  case 86: return ws43bText("Silne przelotne opady śniegu","Heavy snow showers");
-  case 95: return ws43bText("Burza","Thunderstorm");
-  case 96: return ws43bText("Burza z drobnym gradem","Thunderstorm with small hail");
-  case 97: return ws43bText("Silna burza","Heavy thunderstorm");
-  case 99: return ws43bText("Burza z silnym gradem","Thunderstorm with heavy hail");
-  default: return ws43bText("Pogoda","Weather");
+  case 0: return ws43bText("Bezchmurnie","Clear","Klar");
+  case 1: return ws43bText("Przeważnie bezchmurnie","Mainly clear","Überwiegend klar");
+  case 2: return ws43bText("Częściowe zachmurzenie","Partly cloudy","Teilweise bewölkt");
+  case 3: return ws43bText("Zachmurzenie","Cloudy","Bewölkt");
+  case 45: return ws43bText("Mgła","Fog","Nebel");
+  case 48: return ws43bText("Mgła osadzająca szadź","Rime fog","Nebel mit Reifbildung");
+  case 51: return ws43bText("Lekka mżawka","Light drizzle","Leichter Nieselregen");
+  case 53: return ws43bText("Umiarkowana mżawka","Moderate drizzle","Mäßiger Nieselregen");
+  case 55: return ws43bText("Silna mżawka","Heavy drizzle","Starker Nieselregen");
+  case 56: return ws43bText("Lekka marznąca mżawka","Light freezing drizzle","Leichter gefrierender Nieselregen");
+  case 57: return ws43bText("Silna marznąca mżawka","Heavy freezing drizzle","Starker gefrierender Nieselregen");
+  case 61: return ws43bText("Lekki deszcz","Light rain","Leichter Regen");
+  case 63: return ws43bText("Umiarkowany deszcz","Moderate rain","Mäßiger Regen");
+  case 65: return ws43bText("Silny deszcz","Heavy rain","Starker Regen");
+  case 66: return ws43bText("Lekki marznący deszcz","Light freezing rain","Leichter gefrierender Regen");
+  case 67: return ws43bText("Silny marznący deszcz","Heavy freezing rain","Starker gefrierender Regen");
+  case 71: return ws43bText("Lekki śnieg","Light snow","Leichter Schneefall");
+  case 73: return ws43bText("Umiarkowany śnieg","Moderate snow","Mäßiger Schneefall");
+  case 75: return ws43bText("Silny śnieg","Heavy snow","Starker Schneefall");
+  case 77: return ws43bText("Śnieg ziarnisty","Snow grains","Schneegriesel");
+  case 80: return ws43bText("Lekkie przelotne opady","Light rain showers","Leichte Regenschauer");
+  case 81: return ws43bText("Przelotny deszcz","Rain showers","Regenschauer");
+  case 82: return ws43bText("Gwałtowne opady deszczu","Violent rain showers","Heftige Regenschauer");
+  case 85: return ws43bText("Przelotny śnieg","Snow showers","Schneeschauer");
+  case 86: return ws43bText("Silne przelotne opady śniegu","Heavy snow showers","Starke Schneeschauer");
+  case 95: return ws43bText("Burza","Thunderstorm","Gewitter");
+  case 96: return ws43bText("Burza z drobnym gradem","Thunderstorm with small hail","Gewitter mit kleinem Hagel");
+  case 97: return ws43bText("Silna burza","Heavy thunderstorm","Starkes Gewitter");
+  case 99: return ws43bText("Burza z silnym gradem","Thunderstorm with heavy hail","Gewitter mit starkem Hagel");
+  default: return ws43bText("Pogoda","Weather","Wetter");
  }
 }
 // Completion lives on the device, never in browser storage. Skip changes no settings.

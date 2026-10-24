@@ -55,7 +55,7 @@ def inputs():
         paths += [p for p in (ROOT / directory).rglob('*') if p.is_file()]
     paths += [ROOT / 'boards/ws_lcd_43b.ini', ROOT / 'web/app.css', ROOT / 'web/app.js',
               ROOT / 'tools/gen_web_assets.py', HERE / 'partitions.csv', Path(__file__),
-              HERE / 'cache64_sdk.py', HERE / 'fixture_profile.py', HERE / 'localize_web.py', HERE / 'locale/pl.json', HERE / 'locale/language_picker.html', HERE / 'locale/monitor_en.json']
+              HERE / 'cache64_sdk.py', HERE / 'fixture_profile.py', HERE / 'localize_web.py', HERE / 'locale/pl.json', HERE / 'locale/language_picker.html', HERE / 'locale/monitor_en.json', HERE / 'locale/de.json', HERE / 'locale/monitor_de.json']
     # Generated headers are already covered by include/. Record their source
     # artwork, fonts and pipeline provenance too, without transient raster/cache
     # outputs or the separate design-preview working directory.
@@ -264,7 +264,7 @@ def main():
               'core_version': cfg['core_version'], 'manufacturer_commit': REF_COMMIT,
               'source_sha256': sources, 'dependency_file_sha256': library_hashes,
               'i2c_link_check': i2c_check,
-              'web_localization': {'languages': ['pl', 'en'], 'pygments': pygments.__version__},
+              'web_localization': {'languages': ['pl', 'en', 'de'], 'pygments': pygments.__version__},
               'compile_log_sha256': digest(logpath), 'artifacts': {}, 'uploaded': False}
     record['private_sdk'] = ({'profile': sdk_profile, 'sdk_path': sdk_record['sdk_path'],
                               'manifest_sha256': sdk_manifest_hash, 'inputs_unchanged': sdk_unchanged,

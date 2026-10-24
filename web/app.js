@@ -2491,64 +2491,64 @@ setupWs43bPortal();
 function setupWs43bWeather(){
   if(document.getElementById('wsWeatherCard'))return;
   var host=document.querySelector('#sec-display');if(!host)return;
-  var pl=document.documentElement.lang==='pl';function W(a,b){return pl?a:b;}
+  var lang=['pl','en','de'].includes(document.documentElement.lang)?document.documentElement.lang:'en';var pl=lang==='pl';function W(a,b,c){return lang==='de'?c:pl?a:b;}
   var card=document.createElement('div');card.id='wsWeatherCard';card.className='card ws-weather-controls';
-  card.innerHTML='<h3>'+W('Pogoda i słoneczny tryb nocny','Weather and solar night schedule')+'</h3>'+
-    '<p>'+W('Źródło: Open-Meteo. Godzina i data używają strefy czasowej panelu.','Source: Open-Meteo. Time and date use the panel timezone.')+'</p>'+
-    '<form id="wsWeatherForm"><div class="field"><label for="wsWeatherQuery">'+W('Miejscowość lub kod pocztowy','City or postal code')+'</label><input type="text" id="wsWeatherQuery" maxlength="80" autocomplete="off" enterkeyhint="search"><button class="btn btn-ghost" type="button" id="wsWeatherSearch">'+W('Szukaj','Search')+'</button><select id="wsWeatherResults" aria-label="Location" hidden disabled></select><p id="wsWeatherLocation"></p></div>'+
-    '<label><input type="checkbox" id="wsWeatherEnabled"> '+W('Pogoda na wydruku i zegarze','Weather on print and clock screens')+'</label><br>'+
-    '<label><input type="checkbox" id="wsWeatherSolar"> '+W('Noc od zachodu do wschodu słońca','Night from sunset to sunrise')+'</label>'+
-    '<p>'+W('Zakończenie kreatora włącza harmonogram nocny. Ręczne godziny są zapasowe przy braku danych słonecznych. Wyłącz tę opcję, aby zawsze używać ręcznych godzin.','Finishing setup enables the night schedule. Manual hours are the fallback when solar data is unavailable. Disable this option to always use manual hours.')+'</p>'+
-    '<div class="field"><label>'+W('Nocny czas bez dotyku','Night inactivity timeout')+'</label><select id="wsWeatherNight"><option value="30">30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>'+
-    '<p>'+W('Nocne podświetlenie wyłączone: ekran gaśnie, a dotyk wybudza go na wybrany czas. Włączone: po tym czasie pojawia się zegar z kolorami przyciemnionymi do 30%. Dotyk przywraca normalne kolory.','Night backlight off: the screen is dark and touch wakes it for the selected time. On: this timeout opens the clock with colors dimmed to 30%. Touch restores normal colors.')+'</p>'+
-    '<button class="btn btn-primary" type="submit" id="wsWeatherSave" disabled>'+W('Zapisz pogodę i tryb nocny','Save weather and night settings')+'</button><p id="wsWeatherStatus" role="status"></p></form>';
+  card.innerHTML='<h3>'+W('Pogoda i słoneczny tryb nocny','Weather and solar night schedule',"Wetter und Nachtplan nach Sonnenstand")+'</h3>'+
+    '<p>'+W('Źródło: Open-Meteo. Godzina i data używają strefy czasowej panelu.','Source: Open-Meteo. Time and date use the panel timezone.',"Quelle: Open-Meteo. Uhrzeit und Datum verwenden die Zeitzone des Panels.")+'</p>'+
+    '<form id="wsWeatherForm"><div class="field"><label for="wsWeatherQuery">'+W('Miejscowość lub kod pocztowy','City or postal code',"Ort oder Postleitzahl")+'</label><input type="text" id="wsWeatherQuery" maxlength="80" autocomplete="off" enterkeyhint="search"><button class="btn btn-ghost" type="button" id="wsWeatherSearch">'+W('Szukaj','Search',"Suchen")+'</button><select id="wsWeatherResults" aria-label="'+W('Miejscowość','Location','Standort')+'" hidden disabled></select><p id="wsWeatherLocation"></p></div>'+
+    '<label><input type="checkbox" id="wsWeatherEnabled"> '+W('Pogoda na wydruku i zegarze','Weather on print and clock screens',"Wetter in Druck- und Uhransicht")+'</label><br>'+
+    '<label><input type="checkbox" id="wsWeatherSolar"> '+W('Noc od zachodu do wschodu słońca','Night from sunset to sunrise',"Nacht von Sonnenuntergang bis Sonnenaufgang")+'</label>'+
+    '<p>'+W('Zakończenie kreatora włącza harmonogram nocny. Ręczne godziny są zapasowe przy braku danych słonecznych. Wyłącz tę opcję, aby zawsze używać ręcznych godzin.','Finishing setup enables the night schedule. Manual hours are the fallback when solar data is unavailable. Disable this option to always use manual hours.',"Der Abschluss der Einrichtung aktiviert den Nachtplan. Ohne Sonnenstandsdaten gelten die manuellen Zeiten. Deaktiviere diese Option, um immer manuelle Zeiten zu verwenden.")+'</p>'+
+    '<div class="field"><label>'+W('Nocny czas bez dotyku','Night inactivity timeout',"Nächtliche Inaktivitätszeit")+'</label><select id="wsWeatherNight"><option value="30">30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>'+
+    '<p>'+W('Nocne podświetlenie wyłączone: ekran gaśnie, a dotyk wybudza go na wybrany czas. Włączone: po tym czasie pojawia się zegar z kolorami przyciemnionymi do 30%. Dotyk przywraca normalne kolory.','Night backlight off: the screen is dark and touch wakes it for the selected time. On: this timeout opens the clock with colors dimmed to 30%. Touch restores normal colors.',"Nachthintergrundbeleuchtung aus: Der Bildschirm ist dunkel, eine Berührung weckt ihn für die gewählte Zeit. Ein: Nach Ablauf dieser Zeit erscheint die Uhr mit auf 30% gedimmten Farben. Eine Berührung stellt die normalen Farben wieder her.")+'</p>'+
+    '<button class="btn btn-primary" type="submit" id="wsWeatherSave" disabled>'+W('Zapisz pogodę i tryb nocny','Save weather and night settings',"Wetter- und Nachteinstellungen speichern")+'</button><p id="wsWeatherStatus" role="status"></p></form>';
   host.appendChild(card);
   var cfg=null,results=[],form=document.getElementById('wsWeatherForm'),status=document.getElementById('wsWeatherStatus'),save=document.getElementById('wsWeatherSave');
   var wizard=null;
-  var launch=document.createElement('button');launch.type='button';launch.className='btn btn-ghost';launch.textContent=W('Konfiguruj pogodę i noc','Set up weather and night');host.insertBefore(launch,card);
+  var launch=document.createElement('button');launch.type='button';launch.className='btn btn-ghost';launch.textContent=W('Konfiguruj pogodę i noc','Set up weather and night',"Wetter und Nacht einrichten");host.insertBefore(launch,card);
   function openWizard(state){
     if(wizard)return;
     wizard=document.createElement('dialog');wizard.className='ws-setup-dialog';wizard.setAttribute('aria-labelledby','wsSetupTitle');
-    var title=document.createElement('h2');title.id='wsSetupTitle';title.tabIndex=-1;title.textContent=W('Dokończ ustawienia ekranu','Finish display setup');wizard.appendChild(title);
-    var hint=document.createElement('p');hint.textContent=W('Ustaw lokalizację i nocny ekran. Wi-Fi i drukarka pozostają bez zmian. Możesz pominąć i wrócić tutaj później.','Set your location and night display. Wi-Fi and printer settings are preserved. You can skip and return later.');wizard.appendChild(hint);
+    var title=document.createElement('h2');title.id='wsSetupTitle';title.tabIndex=-1;title.textContent=W('Dokończ ustawienia ekranu','Finish display setup',"Anzeigeeinrichtung abschließen");wizard.appendChild(title);
+    var hint=document.createElement('p');hint.textContent=W('Ustaw lokalizację i nocny ekran. Wi-Fi i drukarka pozostają bez zmian. Możesz pominąć i wrócić tutaj później.','Set your location and night display. Wi-Fi and printer settings are preserved. You can skip and return later.',"Lege Standort und Nachtanzeige fest. WLAN- und Druckereinstellungen bleiben erhalten. Du kannst diesen Schritt überspringen und später zurückkehren.");wizard.appendChild(hint);
     wizard.appendChild(card);
-    var label=document.createElement('label');label.textContent=W('Nocą: ','At night: ');
+    var label=document.createElement('label');label.textContent=W('Nocą: ','At night: ',"Nachts: ");
     var action=document.createElement('select');action.id='wsSetupAction';
-    [[true,W('Wyłącz ekran; dotyk wybudza','Screen off; touch wakes')],[false,W('Zegar, data i pogoda','Clock, date and weather')]].forEach(function(v){var o=document.createElement('option');o.value=v[0]?'1':'0';o.textContent=v[1];action.appendChild(o);});
+    [[true,W('Wyłącz ekran; dotyk wybudza','Screen off; touch wakes',"Bildschirm aus; Berührung weckt")],[false,W('Zegar, data i pogoda','Clock, date and weather',"Uhr, Datum und Wetter")]].forEach(function(v){var o=document.createElement('option');o.value=v[0]?'1':'0';o.textContent=v[1];action.appendChild(o);});
     action.value=state.dark?'1':'0';label.appendChild(action);wizard.insertBefore(label,card);
-    var skip=document.createElement('button');skip.type='button';skip.className='btn btn-ghost';skip.textContent=W('Pomiń na razie','Skip for now');wizard.appendChild(skip);
-    skip.onclick=async function(){skip.disabled=true;try{await completeSetup(true);closeWizard();}catch(e){status.textContent=W('Nie zapisano pominięcia. Spróbuj ponownie.','Could not save skip. Retry.');}finally{skip.disabled=false;}};
+    var skip=document.createElement('button');skip.type='button';skip.className='btn btn-ghost';skip.textContent=W('Pomiń na razie','Skip for now',"Vorerst überspringen");wizard.appendChild(skip);
+    skip.onclick=async function(){skip.disabled=true;try{await completeSetup(true);closeWizard();}catch(e){status.textContent=W('Nie zapisano pominięcia. Spróbuj ponownie.','Could not save skip. Retry.',"Überspringen konnte nicht gespeichert werden. Erneut versuchen.");}finally{skip.disabled=false;}};
     wizard.addEventListener('cancel',function(e){e.preventDefault();skip.click();});
-    save.textContent=W('Zapisz i zakończ','Save and finish');document.body.appendChild(wizard);wizard.showModal();title.focus({preventScroll:true});wizard.scrollTop=0;
+    save.textContent=W('Zapisz i zakończ','Save and finish',"Speichern und abschließen");document.body.appendChild(wizard);wizard.showModal();title.focus({preventScroll:true});wizard.scrollTop=0;
   }
-  function closeWizard(){if(!wizard)return;host.appendChild(card);wizard.close();wizard.remove();wizard=null;save.textContent=W('Zapisz pogodę i tryb nocny','Save weather and night settings');}
+  function closeWizard(){if(!wizard)return;host.appendChild(card);wizard.close();wizard.remove();wizard=null;save.textContent=W('Zapisz pogodę i tryb nocny','Save weather and night settings',"Wetter- und Nachteinstellungen speichern");}
   async function completeSetup(skip){
     var body=new URLSearchParams({action:skip?'skip':'finish',dark:document.getElementById('wsSetupAction').value});
     var response=await fetch('/monitor/weather/setup',{method:'POST',body:body});if(!response.ok)throw Error();
     if(!skip){var enabled=document.getElementById('nighten'),brightness=document.getElementById('nbright');if(enabled)enabled.checked=true;if(brightness)brightness.value=body.get('dark')==='1'?'0':'255';}
   }
-  async function readSetup(auto){try{var response=await fetch('/monitor/weather/setup',{cache:'no-store'});if(!response.ok)throw Error();var state=await response.json();if(!auto||!state.done)openWizard(state);}catch(e){status.textContent=W('Nie odczytano kreatora. Spróbuj ponownie.','Setup could not load. Retry.');}}
+  async function readSetup(auto){try{var response=await fetch('/monitor/weather/setup',{cache:'no-store'});if(!response.ok)throw Error();var state=await response.json();if(!auto||!state.done)openWizard(state);}catch(e){status.textContent=W('Nie odczytano kreatora. Spróbuj ponownie.','Setup could not load. Retry.',"Einrichtung konnte nicht geladen werden. Erneut versuchen.");}}
   launch.onclick=function(){if(cfg)readSetup(false);};
-  function locationText(){document.getElementById('wsWeatherLocation').textContent=cfg.city||W('Nie wybrano miejscowości','No location selected');}
+  function locationText(){document.getElementById('wsWeatherLocation').textContent=cfg.city||W('Nie wybrano miejscowości','No location selected',"Kein Ort ausgewählt");}
   fetch('/monitor/weather',{cache:'no-store'}).then(function(r){if(!r.ok)throw Error();return r.json();}).then(function(c){
     cfg=c;locationText();document.getElementById('wsWeatherEnabled').checked=c.enabled;document.getElementById('wsWeatherSolar').checked=c.solar;document.getElementById('wsWeatherNight').value=String(c.night_seconds);save.disabled=false;readSetup(true);
-  }).catch(function(){status.textContent=W('Nie odczytano ustawień. Odśwież stronę.','Could not load settings. Reload the page.');});
+  }).catch(function(){status.textContent=W('Nie odczytano ustawień. Odśwież stronę.','Could not load settings. Reload the page.',"Einstellungen konnten nicht geladen werden. Lade die Seite neu.");});
   document.getElementById('wsWeatherQuery').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();document.getElementById('wsWeatherSearch').click();}});
   document.getElementById('wsWeatherResults').onchange=function(){if(this.value==='')return;var r=results[Number(this.value)];if(!cfg||!r)return;cfg.latitude=r.latitude;cfg.longitude=r.longitude;cfg.city=r.name;locationText();};
   document.getElementById('wsWeatherSearch').onclick=async function(){
     if(!cfg)return;var name=document.getElementById('wsWeatherQuery').value.trim();if(name.length<2)return;
-    this.disabled=true;status.textContent=W('Szukam…','Searching…');var select=document.getElementById('wsWeatherResults');select.hidden=true;select.disabled=true;var controller=new AbortController(),timer=setTimeout(function(){controller.abort();},8000);
-    try{var response=await fetch('https://geocoding-api.open-meteo.com/v1/search?count=5&language='+ (pl?'pl':'en')+'&name='+encodeURIComponent(name),{signal:controller.signal});if(!response.ok)throw Error();
+    this.disabled=true;status.textContent=W('Szukam…','Searching…',"Suche läuft…");var select=document.getElementById('wsWeatherResults');select.hidden=true;select.disabled=true;var controller=new AbortController(),timer=setTimeout(function(){controller.abort();},8000);
+    try{var response=await fetch('https://geocoding-api.open-meteo.com/v1/search?count=5&language='+lang+'&name='+encodeURIComponent(name),{signal:controller.signal});if(!response.ok)throw Error();
       var json=await response.json();results=(json.results||[]).filter(function(r){return typeof r.name==='string'&&new TextEncoder().encode(r.name).length<64&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);});
-      select.replaceChildren();var placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=W('Wybierz miejscowość z listy','Choose a location');placeholder.disabled=true;select.appendChild(placeholder);
+      select.replaceChildren();var placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=W('Wybierz miejscowość z listy','Choose a location',"Ort auswählen");placeholder.disabled=true;select.appendChild(placeholder);
       results.forEach(function(r,i){var o=document.createElement('option');o.value=String(i);o.textContent=[r.name,r.admin4&&r.admin4!==r.name?r.admin4:'',r.admin1,r.country].filter(Boolean).join(' — ');select.appendChild(o);});
-      if(results.length){select.value='';select.hidden=false;select.disabled=false;status.textContent=W('Wybierz właściwą miejscowość z listy.','Choose the correct location from the list.');}else status.textContent=W('Brak tej nazwy w bazie. Spróbuj nazwy dzielnicy, części miejscowości lub pobliskiego miasta. Samo wpisanie nazwy nie wybiera lokalizacji.','Name not found. Try a district, village or nearby city. Typing a name alone does not select a location.');
-    }catch(e){status.textContent=W('Wyszukiwanie niedostępne. Spróbuj ponownie.','Search unavailable. Please retry.');}
+      if(results.length){select.value='';select.hidden=false;select.disabled=false;status.textContent=W('Wybierz właściwą miejscowość z listy.','Choose the correct location from the list.',"Wähle den richtigen Ort aus der Liste.");}else status.textContent=W('Brak tej nazwy w bazie. Spróbuj nazwy dzielnicy, części miejscowości lub pobliskiego miasta. Samo wpisanie nazwy nie wybiera lokalizacji.','Name not found. Try a district, village or nearby city. Typing a name alone does not select a location.',"Name nicht gefunden. Einen Ortsteil, ein Dorf oder eine nahe gelegene Stadt versuchen. Die Eingabe eines Namens allein wählt keinen Standort aus.");
+    }catch(e){status.textContent=W('Wyszukiwanie niedostępne. Spróbuj ponownie.','Search unavailable. Please retry.',"Suche nicht verfügbar. Bitte erneut versuchen.");}
     finally{clearTimeout(timer);this.disabled=false;}
   };
   form.onsubmit=async function(e){e.preventDefault();if(!cfg)return;save.disabled=true;
     cfg.enabled=document.getElementById('wsWeatherEnabled').checked;cfg.solar=document.getElementById('wsWeatherSolar').checked;cfg.night_seconds=Number(document.getElementById('wsWeatherNight').value);
-    try{var r=await fetch('/monitor/weather',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(!r.ok)throw Error();if(wizard){await completeSetup(false);closeWizard();}status.textContent=W('Zapisano. Pobranie pogody może potrwać chwilę.','Saved. Weather may take a moment to load.');}
-    catch(e){status.textContent=W('Nie zapisano. Wybierz miejscowość i spróbuj ponownie.','Not saved. Select a location and retry.');}finally{save.disabled=false;}
+    try{var r=await fetch('/monitor/weather',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(!r.ok)throw Error();if(wizard){await completeSetup(false);closeWizard();}status.textContent=W('Zapisano. Pobranie pogody może potrwać chwilę.','Saved. Weather may take a moment to load.',"Gespeichert. Das Laden der Wetterdaten kann kurz dauern.");}
+    catch(e){status.textContent=W('Nie zapisano. Wybierz miejscowość i spróbuj ponownie.','Not saved. Select a location and retry.',"Nicht gespeichert. Einen Ort wählen und erneut versuchen.");}finally{save.disabled=false;}
   };
 }

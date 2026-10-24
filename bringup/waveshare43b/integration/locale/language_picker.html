@@ -1,13 +1,13 @@
 <div style="padding:8px 0">
-<label for="uiLanguage">Language / Język</label>
-<select id="uiLanguage" aria-label="Language / Język"><option value="pl">Polski</option><option value="en">English</option></select>
+<label for="uiLanguage">Language / Język / Sprache</label>
+<select id="uiLanguage" aria-label="Language / Język / Sprache"><option value="pl">Polski</option><option value="en">English</option><option value="de">Deutsch</option></select>
 <small>Shared with the panel. Reload this page after changing it on the display.</small>
 <span id="uiLanguageStatus" role="status"></span>
 </div>
 <script>
 (function(){
   var select=document.getElementById('uiLanguage'), status=document.getElementById('uiLanguageStatus');
-  var current=document.documentElement.lang==='pl'?'pl':'en';
+  var current=['pl','en','de'].includes(document.documentElement.lang)?document.documentElement.lang:'en';
   select.value=current;
   select.addEventListener('change',async function(){
     select.disabled=true;status.textContent='';
@@ -17,7 +17,7 @@
       location.reload();
     } catch(e) {
       select.value=current;
-      status.textContent=current==='pl'?'Nie zapisano języka. Spróbuj ponownie.':'Language not saved. Please retry.';
+      status.textContent=current==='de'?'Sprache konnte nicht gespeichert werden. Bitte erneut versuchen.':current==='pl'?'Nie zapisano języka. Spróbuj ponownie.':'Language not saved. Please retry.';
       select.disabled=false;
     }
   });

@@ -22,7 +22,7 @@ class DetailsLastReading(unittest.TestCase):
 using String=std::string;
 constexpr int CARD=1,INK=2,DIM=3,WARN=4,ACCENT=5,TRACK=6;
 constexpr int ws43b_dash_14=14,ws43b_dash_18=18,ws43b_dash_30=30;
-const char* ws43bText(const char* pl,const char*){return pl;}
+const char* ws43bText(const char* pl,const char*,const char* = nullptr){return pl;}
 struct {bool fanMatchPrinter=false;} dispSettings;
 struct Text{std::string value;int x,y,color;};std::vector<Text> texts;
 struct Bar{int x,y,w,h,color;};std::vector<Bar> bars;

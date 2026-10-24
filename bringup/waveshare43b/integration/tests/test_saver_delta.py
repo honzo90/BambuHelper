@@ -32,7 +32,7 @@ int main(){
    subprocess.run([str(p/'test')],check=True,capture_output=True)
  def test_weather_description_uses_same_classification_as_icon(self):
   s=(ROOT/'src/ws43b_weather.cpp').read_text();a=s.index('const char *ws43bWeatherDescription(');b=s.index('// Completion',a)
-  code='#include "ws43b_weather_background.h"\n#include <cassert>\n#include <cstring>\nconst char* ws43bText(const char*,const char*en){return en;}\n'+s[a:b]+r'''
+  code='#include "ws43b_weather_background.h"\n#include <cassert>\n#include <cstring>\nconst char* ws43bText(const char*,const char*en,const char* = nullptr){return en;}\n'+s[a:b]+r'''
 int main(){
  assert(!strcmp(ws43bWeatherDescription(0),"Clear"));assert(!strcmp(ws43bWeatherDescription(1),"Mainly clear"));
  assert(!strcmp(ws43bWeatherDescription(2),"Partly cloudy"));assert(!strcmp(ws43bWeatherDescription(3),"Cloudy"));

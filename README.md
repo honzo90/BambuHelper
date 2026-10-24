@@ -3,8 +3,9 @@
 **English** | [Polski](README.pl.md)
 
 A desktop Bambu Lab printer monitor for the **Waveshare ESP32-S3-Touch-LCD-4.3B**:
-an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish or
-English interface, and clock/weather views.
+an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish,
+English or German interface, and clock/weather views. German is available from
+`v4.0.0-beta.3`.
 
 This fork builds on [BambuHelper by Keralots and contributors](https://github.com/Keralots/BambuHelper).
 The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
@@ -21,8 +22,8 @@ These **800×480 host-rendered previews** use the published Waveshare display
 functions, fonts and assets with synthetic demo data. They illustrate the
 layouts; the demo header and host rasterization can differ from the device.
 They are not photographs or framebuffer captures, and do not establish LCD,
-touch or wake stability. The examples show the Polish interface; English is
-also available.
+touch or wake stability. The examples show the Polish interface; English and
+German are also available (German from `v4.0.0-beta.3`).
 
 <table>
 <tr>
@@ -51,7 +52,7 @@ Click an image for its native resolution. [Preview provenance and source hashes]
 | **AMS telemetry** | Tray/material/color information, remaining filament, temperature, humidity and drying state where the printer/AMS reports those fields. |
 | **Data freshness** | Per-field validity and freshness tracking, retention of fields omitted from MQTT delta reports, and a distinction between a real zero and a missing reading. |
 | **Display modes and scenes** | Simple mode plus an Advanced mode marked as in development; print, drying and cooling scenes, clock and screensaver views including Pong and a water clock. |
-| **Polish / English** | A saved language choice shared by the on-device interface and web configuration portal. |
+| **Polish / English / German** | A saved language choice shared by the on-device interface and web configuration portal. German is available from `v4.0.0-beta.3`. |
 | **Optional weather** | Open-Meteo weather data, sunrise/sunset information and night scheduling. Weather and location lookup require Internet access. |
 | **Web configuration and diagnostics** | WiFi/printer/display settings, inherited control and OTA code, plus `/monitor/status` and framebuffer-capture tools for development. |
 | **Build and test tooling** | A separate Arduino CLI build, a pinned cache64 SDK workflow, host regression tests, synthetic MQTT fixtures, visual assets and font generators. |

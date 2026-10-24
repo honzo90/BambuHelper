@@ -284,7 +284,7 @@ void footer(const BambuMonitorTelemetry &, uint32_t now) {
   const uint16_t activeBg=BG==ws43b_style::background&&ACCENT==ws43b_style::mint?ws43b_native::rgb(31,57,49):ws43b_native::mix(bg,ACCENT,35);
   tft.fillRect(0,435,800,45,bg);tft.drawFastHLine(0,435,800,ws43b_native::line);
   const Page pages[]={Page::Dashboard,Page::Ams,Page::Details,Page::Settings};
-  const char *names[]={ws43bText("Wydruk","Print"),"AMS",ws43bText("Szczegóły","Details"),ws43bText("Ustawienia","Settings")};
+  const char *names[]={ws43bText("Wydruk","Print","Druck"),"AMS",ws43bText("Szczegóły","Details","Details"),ws43bText("Ustawienia","Settings","Einstellungen")};
   const ws43b_assets::Asset icons[]={ws43b_assets::Asset::Print,ws43b_assets::Asset::AMS,ws43b_assets::Asset::Details,ws43b_assets::Asset::Settings};
   for(int i=0;i<4;++i) {
     const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
@@ -323,7 +323,7 @@ bool startupVisible=false;
 uint32_t startupLastAnimation=0;
 ws43b_boot::Palette startupPalette() {return {BG,v2Accent(),v2Ink(),v2Dim()};}
 void startupScreen(ws43b_boot::Phase phase,const char *context,uint32_t now) {
-  ws43b_boot::draw(tft,startupText,phase,startupPalette(),ws43bPolish(),context,now);
+  ws43b_boot::draw(tft,startupText,phase,startupPalette(),ws43bPolish(),context,now,ws43bLanguage()==2);
   startupVisible=true;startupLastAnimation=now;
 }
 void animateStartupScreen(uint32_t now) {
@@ -335,8 +335,8 @@ void animateStartupScreen(uint32_t now) {
 }
 template <class Field>
 const char *missing(const Field &f, bool online, uint32_t now) {
-  if (!f.valid) return ws43bText("Brak danych", "No data");
-  if (!online || !f.current(now)) return ws43bText("Nieaktualne", "Outdated");
+  if (!f.valid) return ws43bText("Brak danych", "No data","Keine Daten");
+  if (!online || !f.current(now)) return ws43bText("Nieaktualne", "Outdated","Veraltet");
   return nullptr;
 }
 template <class Field>
@@ -357,19 +357,19 @@ void temperature(int y, const char *title, const MonitorField<float> &actual,
   label(buf, tempX + 18, y + 37, 140, 38,
         why ? &fonts::FreeSans9pt7b : &fonts::FreeSansBold18pt7b, why ? DIM : INK);
   const char *targetMissing = missing(target, online, now);
-  if (targetMissing) snprintf(buf, sizeof(buf), ws43bText("Cel: %s", "Target: %s"), target.valid ? ws43bText("stare", "stale") : ws43bText("brak", "none"));
-  else snprintf(buf, sizeof(buf), ws43bText("Cel: %.0f C", "Target: %.0f C"), double(target.value));
+  if (targetMissing) snprintf(buf, sizeof(buf), ws43bText("Cel: %s", "Target: %s","Soll: %s"), target.valid ? ws43bText("stare", "stale","veraltet") : ws43bText("brak", "none","keine"));
+  else snprintf(buf, sizeof(buf), ws43bText("Cel: %.0f C", "Target: %.0f C","Soll: %.0f C"), double(target.value));
   small(buf, tempX + 154, y + 48, 94);
 }
 const char *statusText(const MonitorText<16> &f, bool online, uint32_t now) {
   if (const char *why = missing(f, online, now)) return why;
-  if (!strcmp(f.value, "RUNNING")) return ws43bText("Drukowanie", "Printing");
-  if (!strcmp(f.value, "PAUSE")) return ws43bText("Pauza", "Paused");
-  if (!strcmp(f.value, "PREPARE")) return ws43bText("Przygotowanie", "Preparing");
-  if (!strcmp(f.value, "FINISH")) return ws43bText("Wydruk zakończony", "Print finished");
-  if (!strcmp(f.value, "FAILED")) return ws43bText("Błąd wydruku", "Print failed");
-  if (!strcmp(f.value, "IDLE")) return ws43bText("Gotowa", "Ready");
-  return ws43bText("Inny stan", "Other state");
+  if (!strcmp(f.value, "RUNNING")) return ws43bText("Drukowanie", "Printing","Druckt");
+  if (!strcmp(f.value, "PAUSE")) return ws43bText("Pauza", "Paused","Pausiert");
+  if (!strcmp(f.value, "PREPARE")) return ws43bText("Przygotowanie", "Preparing","Vorbereitung");
+  if (!strcmp(f.value, "FINISH")) return ws43bText("Wydruk zakończony", "Print finished","Druck abgeschlossen");
+  if (!strcmp(f.value, "FAILED")) return ws43bText("Błąd wydruku", "Print failed","Druck fehlgeschlagen");
+  if (!strcmp(f.value, "IDLE")) return ws43bText("Gotowa", "Ready","Bereit");
+  return ws43bText("Inny stan", "Other state","Anderer Zustand");
 }
 void detailCard(const char *title, const char *value, int x, int y, int w, uint16_t valueColor=INK) {
   tft.fillRoundRect(x,y,w,96,12,CARD);
@@ -410,9 +410,9 @@ void amsReadingAge(char *out,size_t cap,const Field &field,bool online,uint32_t 
   if(!field.valid)return;
   const uint32_t seconds=uint32_t(now-field.updatedMs)/1000u;
   if(online && field.current(now))return;
-  if(seconds<60)snprintf(out,cap,ws43bText("%lu s temu","%lu s ago"),(unsigned long)seconds);
-  else if(seconds<3600)snprintf(out,cap,ws43bText("%lu min temu","%lu min ago"),(unsigned long)(seconds/60));
-  else snprintf(out,cap,ws43bText("%lu h temu","%lu h ago"),(unsigned long)(seconds/3600));
+  if(seconds<60)snprintf(out,cap,ws43bText("%lu s temu","%lu s ago","%lu s zuvor"),(unsigned long)seconds);
+  else if(seconds<3600)snprintf(out,cap,ws43bText("%lu min temu","%lu min ago","vor %lu min"),(unsigned long)(seconds/60));
+  else snprintf(out,cap,ws43bText("%lu h temu","%lu h ago","vor %lu h"),(unsigned long)(seconds/3600));
   if(!online) {
     const size_t used=strlen(out);
     snprintf(out+used,cap-used," · offline");
@@ -426,8 +426,8 @@ void jobLayerText(char *out,size_t cap,const BambuMonitorTelemetry &m,bool onlin
   if(m.totalLayers.valid)snprintf(total,sizeof(total),"%u",unsigned(m.totalLayers.value));else snprintf(total,sizeof(total),"--");
   amsReadingAge(age,sizeof(age),m.totalLayers,online,now);
   if(m.layerNum.valid && (!online || !m.layerNum.current(now)))
-    snprintf(out,cap,ws43bText("%s / %s · ostatnie odczyty","%s / %s · last readings"),layer,total);
-  else if(age[0])snprintf(out,cap,ws43bText("%s / %s · razem: %s","%s / %s · total: %s"),layer,total,age);
+    snprintf(out,cap,ws43bText("%s / %s · ostatnie odczyty","%s / %s · last readings","%s / %s · letzte Werte"),layer,total);
+  else if(age[0])snprintf(out,cap,ws43bText("%s / %s · razem: %s","%s / %s · total: %s","%s / %s · gesamt: %s"),layer,total,age);
   else snprintf(out,cap,"%s / %s",layer,total);
 }
 void amsView(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool details=false,
@@ -447,27 +447,27 @@ void amsView(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool detail
   // change only on explicit updates; newSession() clears all cached fields.
   const bool linkCurrent=online && m.hasUsefulData && uint32_t(now-m.lastUsefulMs)<=BAMBU_MONITOR_FRESH_MS;
   char buf[180];
-  if(details && unit)snprintf(buf,sizeof(buf),"AMS · ID %u%s",unsigned(unit->id),linkCurrent?"":ws43bText(" · nieaktualne"," · outdated"));
-  else snprintf(buf,sizeof(buf),"AMS%s",linkCurrent?"":ws43bText(" · nieaktualne"," · outdated"));
+  if(details && unit)snprintf(buf,sizeof(buf),"AMS · ID %u%s",unsigned(unit->id),linkCurrent?"":ws43bText(" · nieaktualne"," · outdated"," · veraltet"));
+  else snprintf(buf,sizeof(buf),"AMS%s",linkCurrent?"":ws43bText(" · nieaktualne"," · outdated"," · veraltet"));
   if(summary)dashText(buf,24,heading,details?510:360,18,linkCurrent?INK:WARN);
-  if(summary && details)button(ws43bText("Kolejny AMS >","Next AMS >"),550,86,226,38,false);
-  if(!unit) { dashText(ws43bText("Brak danych AMS","No AMS data"),24,row,700,18,DIM); return; }
+  if(summary && details)button(ws43bText("Kolejny AMS >","Next AMS >","Nächstes AMS >"),550,86,226,38,false);
+  if(!unit) { dashText(ws43bText("Brak danych AMS","No AMS data","Keine AMS-Daten"),24,row,700,18,DIM); return; }
   char temp[32],humidity[32],dry[32],ages[3][64];
   if(unit->temp.valid)snprintf(temp,sizeof(temp),"%.0f°C",double(unit->temp.value));
-  else snprintf(temp,sizeof(temp),"%s",ws43bText("Brak danych","No data"));
+  else snprintf(temp,sizeof(temp),"%s",ws43bText("Brak danych","No data","Keine Daten"));
   amsReadingAge(ages[0],sizeof(ages[0]),unit->temp,linkCurrent,now);
   // Prefer a current sensor; otherwise keep the most recent known measurement.
   const bool raw=ws43b_live::amsHumidityUsesRaw(*unit,now);
   const auto &hum=raw?unit->humidityRaw:unit->humidity;
   if(hum.valid)snprintf(humidity,sizeof(humidity),raw?"%u%% RH":"%u/5",unsigned(hum.value));
-  else snprintf(humidity,sizeof(humidity),"%s",ws43bText("Brak danych","No data"));
+  else snprintf(humidity,sizeof(humidity),"%s",ws43bText("Brak danych","No data","Keine Daten"));
   amsReadingAge(ages[1],sizeof(ages[1]),hum,linkCurrent,now);
-  if(unit->dryRemainMin.valid && unit->dryRemainMin.value==0)snprintf(dry,sizeof(dry),"%s",ws43bText("Wyłączone","Off"));
+  if(unit->dryRemainMin.valid && unit->dryRemainMin.value==0)snprintf(dry,sizeof(dry),"%s",ws43bText("Wyłączone","Off","Aus"));
   else if(unit->dryRemainMin.valid)snprintf(dry,sizeof(dry),"%u h %02u min",unsigned(unit->dryRemainMin.value/60),unsigned(unit->dryRemainMin.value%60));
-  else snprintf(dry,sizeof(dry),"%s",ws43bText("Brak danych","No data"));
+  else snprintf(dry,sizeof(dry),"%s",ws43bText("Brak danych","No data","Keine Daten"));
   amsReadingAge(ages[2],sizeof(ages[2]),unit->dryRemainMin,linkCurrent,now);
   if(summary && details) {
-    const char *titles[]={ws43bText("TEMPERATURA","TEMPERATURE"),ws43bText("WILGOTNOŚĆ","HUMIDITY")};
+    const char *titles[]={ws43bText("TEMPERATURA","TEMPERATURE","TEMPERATUR"),ws43bText("WILGOTNOŚĆ","HUMIDITY","FEUCHTIGKEIT")};
     const char *values[]={temp,humidity};
     for(int i=0;i<2;++i) {
       const int x=24+190*i;
@@ -480,10 +480,10 @@ void amsView(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool detail
     const bool drying=amsDryingAnimated(m,online,now);
     tft.fillRoundRect(404,126,372,112,12,CARD);
     tft.drawRoundRect(404,126,372,112,12,drying?ACCENT:TRACK);
-    dashText(ws43bText("SUSZENIE","DRYING"),420,138,238,14,drying?ACCENT:DIM);
+    dashText(ws43bText("SUSZENIE","DRYING","TROCKNUNG"),420,138,238,14,drying?ACCENT:DIM);
     dashText(dry,420,166,238,24,ages[2][0]?DIM:INK);
-    dashText(ages[2][0]?ages[2]:drying?ws43bText("Pozostały czas","Time remaining"):
-      unit->dryRemainMin.valid?ws43bText("Suszenie nieaktywne","Drying inactive"):ws43bText("Oczekiwanie na dane","Waiting for data"),
+    dashText(ages[2][0]?ages[2]:drying?ws43bText("Pozostały czas","Time remaining","Restzeit"):
+      unit->dryRemainMin.valid?ws43bText("Suszenie nieaktywne","Drying inactive","Trocknung inaktiv"):ws43bText("Oczekiwanie na dane","Waiting for data","Warte auf Daten"),
       420,208,238,14,ages[2][0]?WARN:DIM);
     if(drying)amsDryingAnimation(now);
     else panelIcon(UiAsset::Spool,718,184,CARD,58,true,DIM);
@@ -504,7 +504,7 @@ void amsView(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool detail
     const int height=details?174:92;
     tft.fillRoundRect(x,row,182,height,12,CARD);
     tft.drawRoundRect(x,row,182,height,12,active?ACCENT:TRACK);
-    const char *type=empty?ws43bText("Pusty","Empty"):identified?tray.type.value:ws43bText("Brak danych","No data");
+    const char *type=empty?ws43bText("Pusty","Empty","Leer"):identified?tray.type.value:ws43bText("Brak danych","No data","Keine Daten");
     char age[64];amsReadingAge(age,sizeof(age),tray.remain,linkCurrent,now);
     if(empty || (!identified && !known)) {
       snprintf(buf,sizeof(buf),"SLOT %d",i+1);
@@ -512,7 +512,7 @@ void amsView(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool detail
       // Unknown telemetry is not evidence of an empty spool.
       const int iconX=x+91,iconY=row+(details?85:40);
       panelIcon(empty?UiAsset::EmptySlot:UiAsset::UnknownData,iconX,iconY,CARD,details?48:33);
-      dashText(empty?ws43bText("Pusty slot","Empty slot"):ws43bText("Brak odczytu","No reading"),
+      dashText(empty?ws43bText("Pusty slot","Empty slot","Leerer Platz"):ws43bText("Brak odczytu","No reading","Kein Messwert"),
                x+12,row+(details?126:60),158,details?18:14,DIM);
       continue;
     }
@@ -525,14 +525,14 @@ void amsView(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool detail
       if(known)snprintf(buf,sizeof(buf),"%u%%",unsigned(tray.remain.value));else snprintf(buf,sizeof(buf),"--");
       dashText(buf,x+12,row+110,158,30,recent?INK:DIM);
       if(known&&age[0])dashText(age,x+12,row+145,158,14,WARN);
-      else dashText(active?ws43bText("W użyciu","In use"):known?ws43bText("Pozostało","Remaining"):empty?ws43bText("Pusty slot","Empty slot"):ws43bText("Ilość nieznana","Amount unknown"),x+12,row+145,158,14,active?ACCENT:DIM);
+      else dashText(active?ws43bText("W użyciu","In use","In Gebrauch"):known?ws43bText("Pozostało","Remaining","Verbleibend"):empty?ws43bText("Pusty slot","Empty slot","Leerer Platz"):ws43bText("Ilość nieznana","Amount unknown","Menge unbekannt"),x+12,row+145,158,14,active?ACCENT:DIM);
     } else {
       panelIcon(UiAsset::Spool,x+38,row+44,CARD,69,true,filament);
       snprintf(buf,sizeof(buf),"%d %s",i+1,type);dashText(buf,x+76,row+8,98,14,linkCurrent?INK:DIM);
       if(known)snprintf(buf,sizeof(buf),"%u%%",unsigned(tray.remain.value));else snprintf(buf,sizeof(buf),"--");
       dashText(buf,x+76,row+32,98,24,recent?INK:DIM);
       if(known&&age[0])dashText(age,x+76,row+60,98,14,WARN);
-      else if(active)dashText(ws43bText("W użyciu","In use"),x+76,row+60,98,14,ACCENT);
+      else if(active)dashText(ws43bText("W użyciu","In use","In Gebrauch"),x+76,row+60,98,14,ACCENT);
     }
     const int barY=row+height-9;
     if(recent) {
@@ -560,17 +560,17 @@ void dashboardTemperature(int channel,int y,const char *name,const MonitorField<
   else snprintf(buf,sizeof(buf),"--");
   v2Text(buf,649,y+12,121,ws43b_v2_b29,29,fresh?v2Ink():v2Dim(),true,false);
   const char *status=!fresh?missing(actual,online,now):changing?
-    (state==ws43b_view::Thermal::Heating?ws43bText("Nagrzewanie","Heating"):ws43bText("Stygnięcie","Cooling")):
-    state==ws43b_view::Thermal::Unknown?ws43bText("Pomiar","Measuring"):
-    !targetFresh?ws43bText("Odczyt","Reading"):ws43bText("Stabilna","Stable");
+    (state==ws43b_view::Thermal::Heating?ws43bText("Nagrzewanie","Heating","Aufheizen"):ws43bText("Stygnięcie","Cooling","Abkühlung")):
+    state==ws43b_view::Thermal::Unknown?ws43bText("Pomiar","Measuring","Messung läuft"):
+    !targetFresh?ws43bText("Odczyt","Reading","Messwert"):ws43bText("Stabilna","Stable","Stabil");
   amsReadingAge(age,sizeof(age),actual,online,now);
   amsReadingAge(targetAge,sizeof(targetAge),target,online,now);
-  if(channel!=2 && target.valid && age[0])snprintf(buf,sizeof(buf),ws43bText("%s · cel %.0f°%s","%s · target %.0f°%s"),age,double(target.value),targetAge[0]?ws43bText(" stary"," stale"):"");
+  if(channel!=2 && target.valid && age[0])snprintf(buf,sizeof(buf),ws43bText("%s · cel %.0f°%s","%s · target %.0f°%s","%s · Soll %.0f°%s"),age,double(target.value),targetAge[0]?ws43bText(" stary"," stale"," veraltet"):"");
   else if(age[0])snprintf(buf,sizeof(buf),"%s",age);
-  else if(channel!=2 && target.valid && targetAge[0])snprintf(buf,sizeof(buf),ws43bText("Cel %.0f° · nieaktualny","Target %.0f° · outdated"),double(target.value));
-  else if(channel==2)snprintf(buf,sizeof(buf),"%s",fresh?ws43bText("Temperatura komory","Chamber temperature"):status);
-  else if(target.valid)snprintf(buf,sizeof(buf),ws43bText("Cel %.0f° · %s","Target %.0f° · %s"),double(target.value),status);
-  else snprintf(buf,sizeof(buf),ws43bText("Cel -- · %s","Target -- · %s"),status);
+  else if(channel!=2 && target.valid && targetAge[0])snprintf(buf,sizeof(buf),ws43bText("Cel %.0f° · nieaktualny","Target %.0f° · outdated","Soll %.0f° · veraltet"),double(target.value));
+  else if(channel==2)snprintf(buf,sizeof(buf),"%s",fresh?ws43bText("Temperatura komory","Chamber temperature","Bauraumtemperatur"):status);
+  else if(target.valid)snprintf(buf,sizeof(buf),ws43bText("Cel %.0f° · %s","Target %.0f° · %s","Soll %.0f° · %s"),double(target.value),status);
+  else snprintf(buf,sizeof(buf),ws43bText("Cel -- · %s","Target -- · %s","Soll -- · %s"),status);
   v2Text(buf,585,y+47,185,ws43b_v2_12,12,age[0]||targetAge[0]?WARN:changing?color:v2Dim());
 }
 // Solar data selects the visual day/night palette. If unavailable, use the
@@ -676,10 +676,10 @@ void dashboardCoolingCard(const BambuMonitorTelemetry &m,uint32_t now,bool parti
   if(!partial) {
     tft.fillRoundRect(24,84,460,193,14,CARD);
     tft.drawRoundRect(24,84,460,193,14,ACCENT);
-    dashText(ws43bText("Chłodzenie stołu","Bed cooling"),40,101,420,18,ACCENT);
+    dashText(ws43bText("Chłodzenie stołu","Bed cooling","Bett kühlt ab"),40,101,420,18,ACCENT);
     char temp[32];snprintf(temp,sizeof(temp),"%.0f°C",double(m.bedTemp.value));
     dashText(temp,244,142,216,30,INK);
-    dashText(ws43bText("Grzanie wyłączone","Heater off"),244,184,216,14,DIM);
+    dashText(ws43bText("Grzanie wyłączone","Heater off","Heizung aus"),244,184,216,14,DIM);
   }
   // The only animated area: no repaint of AMS, text or weather background.
   tft.setClipRect(40,128,178,90);tft.fillRect(40,128,178,90,CARD);
@@ -711,7 +711,7 @@ void dashboardAms(const BambuMonitorTelemetry &m,bool online,uint32_t now,ws43b_
   const bool linkCurrent=online&&m.hasUsefulData&&uint32_t(now-m.lastUsefulMs)<=BAMBU_MONITOR_FRESH_MS;
   if(regions&ws43b_repaint::regionBit(R::AmsSummary)) {
     v2Clear(16,314,768,27);
-    v2Text(linkCurrent?"AMS":ws43bText("AMS · nieaktualne","AMS · outdated"),20,320,190,ws43b_v2_b16,16,linkCurrent?v2Ink():WARN);
+    v2Text(linkCurrent?"AMS":ws43bText("AMS · nieaktualne","AMS · outdated","AMS · veraltet"),20,320,190,ws43b_v2_b16,16,linkCurrent?v2Ink():WARN);
     char temp[24],humidity[24],ages[2][64],buf[200];
     if(unit) {
       if(unit->temp.valid)snprintf(temp,sizeof(temp),"%.0f°C",double(unit->temp.value));else snprintf(temp,sizeof(temp),"--°C");
@@ -722,7 +722,7 @@ void dashboardAms(const BambuMonitorTelemetry &m,bool online,uint32_t now,ws43b_
       amsReadingAge(ages[1],sizeof(ages[1]),hum,linkCurrent,now);
       if(ages[0][0]&&ages[1][0]&&!strcmp(ages[0],ages[1]))snprintf(buf,sizeof(buf),"%s · %s · %s",temp,humidity,ages[0]);
       else snprintf(buf,sizeof(buf),"%s%s%s%s · %s%s%s%s",temp,ages[0][0]?" (":"",ages[0],ages[0][0]?")":"",humidity,ages[1][0]?" (":"",ages[1],ages[1][0]?")":"");
-    } else snprintf(buf,sizeof(buf),"%s",ws43bText("Oczekiwanie na dane AMS","Waiting for AMS data"));
+    } else snprintf(buf,sizeof(buf),"%s",ws43bText("Oczekiwanie na dane AMS","Waiting for AMS data","Warte auf AMS-Daten"));
     v2Text(buf,212,323,568,ws43b_v2_12,12,v2Dim(),true);
   }
   for(int i=0;i<4;++i) {
@@ -741,18 +741,18 @@ void dashboardAms(const BambuMonitorTelemetry &m,bool online,uint32_t now,ws43b_
         [=](int px,int py){return dashboardSlotBg(px,py,active);});
       snprintf(buf,sizeof(buf),"SLOT %d",i+1);
       v2Text(buf,x+73,356,103,ws43b_v2_b14,14,v2Dim());
-      v2Text(empty?ws43bText("Pusty","Empty"):ws43bText("Brak odczytu","No reading"),x+73,383,103,ws43b_v2_b14,14,v2Dim());
+      v2Text(empty?ws43bText("Pusty","Empty","Leer"):ws43bText("Brak odczytu","No reading","Kein Messwert"),x+73,383,103,ws43b_v2_b14,14,v2Dim());
       continue;
     }
     const uint16_t filament=identified&&tray->colorRgb565.valid?tray->colorRgb565.value:v2Dim();
     ws43b_native::sprite(tft,ws43b_assets::Asset::Spool,x+3,350,[=](int px,int py){return dashboardSlotBg(px,py,active);},true,filament);
-    snprintf(buf,sizeof(buf),"%d %s",i+1,identified?tray->type.value:ws43bText("Materiał","Material"));
+    snprintf(buf,sizeof(buf),"%d %s",i+1,identified?tray->type.value:ws43bText("Materiał","Material","Material"));
     v2Text(buf,x+73,356,103,ws43b_v2_b14,14,linkCurrent?v2Ink():v2Dim());
     if(known)snprintf(buf,sizeof(buf),"%u%%",unsigned(tray->remain.value));else snprintf(buf,sizeof(buf),"--");
     v2Text(buf,x+73,377,103,ws43b_v2_b23,23,recent?v2Ink():v2Dim(),false,false);
     char age[64];amsReadingAge(age,sizeof(age),tray->remain,linkCurrent,now);
     if(known&&age[0])v2Text(age,x+74,405,102,ws43b_v2_12,12,WARN);
-    else if(active)v2Text(ws43bText("W użyciu","In use"),x+74,405,102,ws43b_v2_12,12,v2Accent());
+    else if(active)v2Text(ws43bText("W użyciu","In use","In Gebrauch"),x+74,405,102,ws43b_v2_12,12,v2Accent());
     else if(recent) {
       tft.fillRoundRect(x+74,407,97,4,2,ws43b_native::rgb(52,73,89));
       const unsigned amount=tray->remain.value>100?100:unsigned(tray->remain.value);
@@ -774,11 +774,11 @@ void dashboardMaterialLine(char *out,size_t cap,const BambuMonitorTelemetry &m,b
   const bool layerOld=m.layerNum.valid&&(!online||!m.layerNum.current(now));
   const bool totalOld=m.totalLayers.valid&&(!online||!m.totalLayers.current(now));
   const bool materialOld=tray&&(!online||!m.activeTrayRaw.current(now));
-  const char *notice=!online?"Offline":!ws43b_view::statusCurrent(m,online,now)?ws43bText("Dane nieaktualne","Data outdated"):layerOld?ws43bText("Warstwa nieaktualna","Layer outdated"):
-    totalOld?ws43bText("Razem: ostatni odczyt","Total: last reading"):nameOld?ws43bText("Nazwa: ostatni odczyt","Name: last reading"):
-    materialOld?ws43bText("Materiał: ostatni odczyt","Material: last reading"):ws43bText("Dane na żywo","Live data");
+  const char *notice=!online?"Offline":!ws43b_view::statusCurrent(m,online,now)?ws43bText("Dane nieaktualne","Data outdated","Daten veraltet"):layerOld?ws43bText("Warstwa nieaktualna","Layer outdated","Schichtdaten veraltet"):
+    totalOld?ws43bText("Razem: ostatni odczyt","Total: last reading","Gesamt: letzter Wert"):nameOld?ws43bText("Nazwa: ostatni odczyt","Name: last reading","Name: letzter Wert"):
+    materialOld?ws43bText("Materiał: ostatni odczyt","Material: last reading","Material: letzter Stand"):ws43bText("Dane na żywo","Live data","Aktuelle Daten");
   if(tray&&tray->type.valid)snprintf(out,cap,"%s · AMS %u / %u · %s",notice,unsigned(unit->id)+1,unsigned(m.activeTrayRaw.value%4)+1,tray->type.value);
-  else snprintf(out,cap,"%s · %s",notice,ws43bText("Materiał: brak danych","Material unavailable"));
+  else snprintf(out,cap,"%s · %s",notice,ws43bText("Materiał: brak danych","Material unavailable","Material unbekannt"));
 }
 void dashboardScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,
                      ws43b_repaint::Mask regions=ws43b_repaint::All) {
@@ -788,22 +788,22 @@ void dashboardScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,
     const bool advanced=ws43bAdvancedDisplay();
     const bool preparing=advanced&&ws43b_view::beforeFirstLayer(m,online,now);
     const bool progress=ws43b_view::dashboardProgressVisible(m,online,now,advanced);
-    const char *title=!advanced?ws43bText("POSTĘP WYDRUKU","PRINT PROGRESS"):
-      dashboardActivity.state==ws43b_view::Activity::Cleaning?ws43bText("CZYSZCZENIE DYSZY","NOZZLE CLEANING"):
-      dashboardActivity.state==ws43b_view::Activity::Leveling?ws43bText("POZIOMOWANIE STOŁU","BED LEVELING"):
-      dashboardActivity.state==ws43b_view::Activity::CalibrationLines?ws43bText("LINIE KALIBRACYJNE","CALIBRATION LINES"):
-      preparing?ws43bText("PRZYGOTOWANIE","PREPARING"):ws43bText("POSTĘP WYDRUKU","PRINT PROGRESS");
+    const char *title=!advanced?ws43bText("POSTĘP WYDRUKU","PRINT PROGRESS","DRUCKFORTSCHRITT"):
+      dashboardActivity.state==ws43b_view::Activity::Cleaning?ws43bText("CZYSZCZENIE DYSZY","NOZZLE CLEANING","DÜSENREINIGUNG"):
+      dashboardActivity.state==ws43b_view::Activity::Leveling?ws43bText("POZIOMOWANIE STOŁU","BED LEVELING","BETTNIVELLIERUNG"):
+      dashboardActivity.state==ws43b_view::Activity::CalibrationLines?ws43bText("LINIE KALIBRACYJNE","CALIBRATION LINES","KALIBRIERLINIEN"):
+      preparing?ws43bText("PRZYGOTOWANIE","PREPARING","VORBEREITUNG"):ws43bText("POSTĘP WYDRUKU","PRINT PROGRESS","DRUCKFORTSCHRITT");
     v2Text(title,32,80,196,ws43b_v2_13,13,v2Dim());
     char buf[200];
     if(preparing) {
-      v2Text(ws43bText("Przed pierwszą","Before the first"),32,112,190,ws43b_v2_b17,17,v2Ink());
-      v2Text(ws43bText("warstwą","layer"),32,139,190,ws43b_v2_b17,17,v2Ink());
+      v2Text(ws43bText("Przed pierwszą","Before the first","Vor der ersten"),32,112,190,ws43b_v2_b17,17,v2Ink());
+      v2Text(ws43bText("warstwą","layer","Schicht"),32,139,190,ws43b_v2_b17,17,v2Ink());
     } else {
       if(progress)snprintf(buf,sizeof(buf),"%u",unsigned(m.progress.value));else snprintf(buf,sizeof(buf),"--");
       const int numberWidth=v2Text(buf,30,99,163,ws43b_v2_b64,64,progress?v2Ink():v2Dim(),false,false);
       if(progress)v2Text("%",30+numberWidth,120,48,ws43b_v2_b43,43,v2Ink(),false,false);
     }
-    v2Text(ws43bText("Pozostało","Remaining"),33,170,184,ws43b_v2_13,13,v2Dim());
+    v2Text(ws43bText("Pozostało","Remaining","Verbleibend"),33,170,184,ws43b_v2_13,13,v2Dim());
     const bool remaining=!missing(m.remainingMinutes,online,now);
     if(remaining) {
       if(m.remainingMinutes.value<60)snprintf(buf,sizeof(buf),"%u min",unsigned(m.remainingMinutes.value));
@@ -813,34 +813,34 @@ void dashboardScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,
     struct tm local{};
     if(remaining&&ws43b_view::statusCurrent(m,online,now)&&(!strcmp(m.status.value,"RUNNING")||!strcmp(m.status.value,"PREPARE"))&&getLocalTime(&local,0)) {
       const time_t end=time(nullptr)+60u*m.remainingMinutes.value;localtime_r(&end,&local);
-      snprintf(buf,sizeof(buf),ws43bText("Koniec około %02d:%02d","Ends around %02d:%02d"),local.tm_hour,local.tm_min);
+      snprintf(buf,sizeof(buf),ws43bText("Koniec około %02d:%02d","Ends around %02d:%02d","Ende ca. %02d:%02d"),local.tm_hour,local.tm_min);
     } else snprintf(buf,sizeof(buf),"%s",missing(m.remainingMinutes,online,now)?missing(m.remainingMinutes,online,now):statusText(m.status,online,now));
     v2Text(buf,33,223,190,ws43b_v2_13,13,v2Dim());
     dashboardActivityIcon(now,true);
     tft.fillRoundRect(32,247,468,6,3,ws43b_native::rgb(53,75,93));
     if(progress&&m.progress.value>0)tft.fillRoundRect(32,247,468*(m.progress.value>100?100:m.progress.value)/100,6,3,v2Accent());
     const bool nameOld=m.subtaskName.valid&&(!online||!m.subtaskName.current(now));
-    v2Text(m.subtaskName.valid?m.subtaskName.value:ws43bText("Brak nazwy wydruku","Job name unavailable"),33,265,advanced?306:466,ws43b_v2_b17,17,nameOld?v2Dim():v2Ink());
+    v2Text(m.subtaskName.valid?m.subtaskName.value:ws43bText("Brak nazwy wydruku","Job name unavailable","Druckname unbekannt"),33,265,advanced?306:466,ws43b_v2_b17,17,nameOld?v2Dim():v2Ink());
     if(advanced) {
       char layer[24],total[24];
       if(m.layerNum.valid)snprintf(layer,sizeof(layer),"%u",unsigned(m.layerNum.value));else snprintf(layer,sizeof(layer),"--");
       if(m.totalLayers.valid)snprintf(total,sizeof(total),"%u",unsigned(m.totalLayers.value));else snprintf(total,sizeof(total),"--");
-      snprintf(buf,sizeof(buf),ws43bText("Warstwa %s / %s","Layer %s / %s"),layer,total);
+      snprintf(buf,sizeof(buf),ws43bText("Warstwa %s / %s","Layer %s / %s","Schicht %s / %s"),layer,total);
       v2Text(buf,346,267,153,ws43b_v2_13,13,v2Dim(),true);
       dashboardMaterialLine(buf,sizeof(buf),m,online,now);
       v2Text(buf,33,288,466,ws43b_v2_12,12,v2Dim());
     } else {
-      const char *notice=!online?ws43bText("Offline · ostatnie dane","Offline · last readings"):
-        !ws43b_view::statusCurrent(m,online,now)?ws43bText("Oczekiwanie na aktualne dane","Waiting for current data"):
-        nameOld?ws43bText("Nazwa: ostatni odczyt","Name: last reading"):ws43bText("Dane z drukarki","Printer data");
+      const char *notice=!online?ws43bText("Offline · ostatnie dane","Offline · last readings","Offline · letzte Werte"):
+        !ws43b_view::statusCurrent(m,online,now)?ws43bText("Oczekiwanie na aktualne dane","Waiting for current data","Warte auf aktuelle Daten"):
+        nameOld?ws43bText("Nazwa: ostatni odczyt","Name: last reading","Name: letzter Wert"):ws43bText("Dane z drukarki","Printer data","Druckerdaten");
       v2Text(notice,33,288,466,ws43b_v2_12,12,v2Dim());
     }
     dashboardCoolingPainted=false;
   }
-  if(regions&ws43b_repaint::regionBit(R::Nozzle))dashboardTemperature(0,66,ws43bText("DYSZA","NOZZLE"),m.nozzleTemp,m.nozzleTarget,online,now);
-  if(regions&ws43b_repaint::regionBit(R::Bed))dashboardTemperature(1,150,ws43bText("STÓŁ","BED"),m.bedTemp,m.bedTarget,online,now);
+  if(regions&ws43b_repaint::regionBit(R::Nozzle))dashboardTemperature(0,66,ws43bText("DYSZA","NOZZLE","DÜSE"),m.nozzleTemp,m.nozzleTarget,online,now);
+  if(regions&ws43b_repaint::regionBit(R::Bed))dashboardTemperature(1,150,ws43bText("STÓŁ","BED","BETT"),m.bedTemp,m.bedTarget,online,now);
   MonitorField<float> noTarget;
-  if(regions&ws43b_repaint::regionBit(R::Chamber))dashboardTemperature(2,234,ws43bText("KOMORA","CHAMBER"),m.chamberTemp,noTarget,online,now);
+  if(regions&ws43b_repaint::regionBit(R::Chamber))dashboardTemperature(2,234,ws43bText("KOMORA","CHAMBER","BAURAUM"),m.chamberTemp,noTarget,online,now);
   dashboardAms(m,online,now,regions);
 }
 // Match the dashboard/AMS policy: label actual observation age only when
@@ -857,15 +857,15 @@ void detailsScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now) {
   tft.fillRoundRect(24, 86, 752, 120, 10, CARD);
   char nameAge[64],jobTitle[100];
   amsReadingAge(nameAge,sizeof(nameAge),m.subtaskName,online,now);
-  snprintf(jobTitle,sizeof(jobTitle),"%s%s%s",ws43bText("ZADANIE","JOB"),nameAge[0]?" · ":"",nameAge);
+  snprintf(jobTitle,sizeof(jobTitle),"%s%s%s",ws43bText("ZADANIE","JOB","AUFTRAG"),nameAge[0]?" · ":"",nameAge);
   dashText(jobTitle,40,99,530,14,nameAge[0]?WARN:DIM);
 #if WS43B_FULL_WEBUI
-  button(ws43bText("Wskaźniki >","Gauges >"),600,90,160,30,false);
+  button(ws43bText("Wskaźniki >","Gauges >","Anzeigen >"),600,90,160,30,false);
 #endif
   const char *why = missing(m.subtaskName, online, now);
   // Fit two lines with the actual selected font. UTF-8 is left intact; avoid
   // splitting a multibyte sequence when a long name wraps or is abbreviated.
-  const char *source = m.subtaskName.valid ? m.subtaskName.value : ws43bText("Brak nazwy wydruku","Job name unavailable");
+  const char *source = m.subtaskName.valid ? m.subtaskName.value : ws43bText("Brak nazwy wydruku","Job name unavailable","Druckname unbekannt");
   tft.loadFont(ws43b_dash_18);
   for (int line = 0; line < 2 && *source; ++line) {
     char text[132]{};
@@ -895,22 +895,22 @@ void detailsScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now) {
   jobLayerText(buf,sizeof(buf),m,online,now);
   char *ageSuffix=strstr(buf," · ");
   if(ageSuffix)*ageSuffix=0;
-  detailCard(ws43bText("WARSTWA / RAZEM", "LAYER / TOTAL"), buf, 24, 218, 240);
+  detailCard(ws43bText("WARSTWA / RAZEM", "LAYER / TOTAL","SCHICHT / GESAMT"), buf, 24, 218, 240);
   if(ageSuffix)dashText(ageSuffix+4,40,293,208,14,WARN);
-  if (!m.chamberTemp.valid) snprintf(buf, sizeof(buf), "%s", ws43bText("Brak danych","No data"));
+  if (!m.chamberTemp.valid) snprintf(buf, sizeof(buf), "%s", ws43bText("Brak danych","No data","Keine Daten"));
   else snprintf(buf, sizeof(buf), "%.0f°C", double(m.chamberTemp.value));
-  detailReadingCard(ws43bText("TEMP. KOMORY", "CHAMBER TEMP."),buf,280,218,m.chamberTemp,online,now);
-  if (!m.speedLevel.valid) snprintf(buf, sizeof(buf), "%s", ws43bText("Brak danych","No data"));
+  detailReadingCard(ws43bText("TEMP. KOMORY", "CHAMBER TEMP.","BAURAUMTEMP."),buf,280,218,m.chamberTemp,online,now);
+  if (!m.speedLevel.valid) snprintf(buf, sizeof(buf), "%s", ws43bText("Brak danych","No data","Keine Daten"));
   else {
-    const char *names[] = {ws43bText("Brak danych", "No data"), ws43bText("Cichy", "Silent"), "Standard", "Sport", "Ludicrous"};
+    const char *names[] = {ws43bText("Brak danych", "No data","Keine Daten"), ws43bText("Cichy", "Silent","Leise"), "Standard", "Sport", "Ludicrous"};
     snprintf(buf, sizeof(buf), "%s", m.speedLevel.value <= 4 ? names[m.speedLevel.value] : names[0]);
   }
-  detailReadingCard(ws43bText("TRYB PRĘDKOŚCI", "SPEED MODE"),buf,536,218,m.speedLevel,online,now);
+  detailReadingCard(ws43bText("TRYB PRĘDKOŚCI", "SPEED MODE","GESCHWINDIGKEIT"),buf,536,218,m.speedLevel,online,now);
   const MonitorField<uint8_t> *fans[] = {&m.partFanPct, &m.auxFanPct, &m.chamberFanPct};
   const uint8_t rounded[] = {m.partFanRoundedPct, m.auxFanRoundedPct, m.chamberFanRoundedPct};
-  const char *names[] = {ws43bText("NAWIEW NA WYDRUK", "PART FAN"), ws43bText("WENT. POMOCNICZY", "AUXILIARY FAN"), ws43bText("WENTYLATOR KOMORY", "CHAMBER FAN")};
+  const char *names[] = {ws43bText("NAWIEW NA WYDRUK", "PART FAN","BAUTEILLÜFTER"), ws43bText("WENT. POMOCNICZY", "AUXILIARY FAN","ZUSATZLÜFTER"), ws43bText("WENTYLATOR KOMORY", "CHAMBER FAN","BAURAUMLÜFTER")};
   for (int i = 0; i < 3; ++i) {
-    if (!fans[i]->valid) snprintf(buf, sizeof(buf), "%s", ws43bText("Brak danych","No data"));
+    if (!fans[i]->valid) snprintf(buf, sizeof(buf), "%s", ws43bText("Brak danych","No data","Keine Daten"));
     else snprintf(buf, sizeof(buf), "%u%%", dispSettings.fanMatchPrinter ? rounded[i] : fans[i]->value);
     const int x=24+256*i;
     detailReadingCard(names[i],buf,x,326,*fans[i],online,now);
@@ -929,13 +929,13 @@ void settingRow(const char *title,const char *value,int y,bool selected=false) {
   tft.drawLine(727,y+18,733,y+24,DIM);tft.drawLine(733,y+24,727,y+30,DIM);
 }
 void settingsScreen() {
-  dashText(ws43bText("Ustawienia", "Settings"),44,91,520,24,INK);
+  dashText(ws43bText("Ustawienia", "Settings","Einstellungen"),44,91,520,24,INK);
   const bool holding=touchHeld&&!touchMoved&&systemTouchArea(pressX,pressY);
   const uint32_t elapsed=holding?uint32_t(millis()-pressMs):0;
   dashText("System",680,96,96,18,holding?INK:DIM);
   if(holding)tft.fillRect(680,121,80*(elapsed>3000?3000:elapsed)/3000,2,ACCENT);
-  const char *titles[]={ws43bText("Wygląd", "Appearance"),ws43bText("Zegar i ekran", "Clock and screen"),ws43bText("Pogoda i noc", "Weather and night"),ws43bText("Język i dane", "Language and data")};
-  const char *hints[]={ws43bText("Motyw kolorystyczny", "Color theme"),ws43bText("Czas bez dotyku i wygaszanie", "Idle timeout and sleep"),ws43bText("Pogoda, słońce i czas nocny", "Weather, sun and night timeout"),ws43bText("Polski / English, wentylatory", "Polski / English, fans")};
+  const char *titles[]={ws43bText("Wygląd", "Appearance","Darstellung"),ws43bText("Zegar i ekran", "Clock and screen","Uhr und Bildschirm"),ws43bText("Pogoda i noc", "Weather and night","Wetter und Nacht"),ws43bText("Język i dane", "Language and data","Sprache und Daten")};
+  const char *hints[]={ws43bText("Motyw kolorystyczny", "Color theme","Farbdesign"),ws43bText("Czas bez dotyku i wygaszanie", "Idle timeout and sleep","Inaktivität und Ruhe"),ws43bText("Pogoda, słońce i czas nocny", "Weather, sun and night timeout","Wetter, Sonne und Nachttimer"),ws43bText("PL / EN / DE, wentylatory", "PL / EN / DE, fans","PL / EN / DE, Lüfter")};
   for(int i=0;i<4;++i) {
     const int x=24+(i%2)*384,y=140+(i/2)*132;
     tft.fillRoundRect(x,y,368,114,12,CARD);
@@ -947,31 +947,31 @@ void settingsScreen() {
   }
 }
 void systemSettingsScreen() {
-  button(ws43bText("< Ustawienia","< Settings"),24,82,240,40,false);
+  button(ws43bText("< Ustawienia","< Settings","< Einstellungen"),24,82,240,40,false);
   dashText("System",290,92,480,24,INK);
-  button(ws43bText("Ustawienia fabryczne","Factory reset"),44,164,708,56,false);
+  button(ws43bText("Ustawienia fabryczne","Factory reset","Werkseinstellungen"),44,164,708,56,false);
   tft.drawRoundRect(44,164,708,56,9,RED);
-  dashText(ws43bText("Usuwa konfigurację panelu i uruchamia go ponownie.","Clears panel configuration and restarts it."),44,246,708,18,DIM);
-  dashText(ws43bText("Ustawienia drukarki pozostają bez zmian.","Printer settings remain unchanged."),44,280,708,18,DIM);
+  dashText(ws43bText("Usuwa konfigurację panelu i uruchamia go ponownie.","Clears panel configuration and restarts it.","Löscht die Panelkonfiguration und startet neu."),44,246,708,18,DIM);
+  dashText(ws43bText("Ustawienia drukarki pozostają bez zmian.","Printer settings remain unchanged.","Druckereinstellungen bleiben unverändert."),44,280,708,18,DIM);
 }
 void factoryResetScreen(uint32_t now) {
-  dashText(ws43bText("Ustawienia fabryczne","Factory reset"),44,90,708,24,WARN);
-  dashText(ws43bText("Usunie: sieci Wi-Fi, konfigurację drukarek,","Removes: Wi-Fi networks, printer configuration,"),44,142,708,18,INK);
-  dashText(ws43bText("token chmury, pogodę i ustawienia panelu.","cloud token, weather and panel settings."),44,174,708,18,INK);
-  dashText(ws43bText("Firmware i ustawienia drukarki pozostaną.","Firmware and printer settings are preserved."),44,216,708,18,DIM);
-  dashText(ws43bText("Po restarcie: asystent konfiguracji Wi-Fi.","After restart: Wi-Fi setup assistant."),44,248,708,18,DIM);
+  dashText(ws43bText("Ustawienia fabryczne","Factory reset","Werkseinstellungen"),44,90,708,24,WARN);
+  dashText(ws43bText("Usunie: sieci Wi-Fi, konfigurację drukarek,","Removes: Wi-Fi networks, printer configuration,","Löscht: WLANs, Druckerkonfiguration,"),44,142,708,18,INK);
+  dashText(ws43bText("token chmury, pogodę i ustawienia panelu.","cloud token, weather and panel settings.","Cloud-Token, Wetter und Paneleinstellungen."),44,174,708,18,INK);
+  dashText(ws43bText("Firmware i ustawienia drukarki pozostaną.","Firmware and printer settings are preserved.","Firmware und Druckereinstellungen bleiben erhalten."),44,216,708,18,DIM);
+  dashText(ws43bText("Po restarcie: asystent konfiguracji Wi-Fi.","After restart: Wi-Fi setup assistant.","Nach Neustart: WLAN-Assistent."),44,248,708,18,DIM);
   const bool holding=touchHeld&&!touchMoved&&pressX>=44&&pressX<752&&pressY>=296&&pressY<356;
   const uint32_t elapsed=holding?uint32_t(now-pressMs):0;
-  button(elapsed>=3000?ws43bText("Puść, aby zresetować","Release to reset"):
-    ws43bText("Przytrzymaj 3 s, aby zresetować","Hold for 3 seconds to reset"),44,296,708,60,holding);
+  button(elapsed>=3000?ws43bText("Puść, aby zresetować","Release to reset","Zum Zurücksetzen loslassen"):
+    ws43bText("Przytrzymaj 3 s, aby zresetować","Hold for 3 seconds to reset","Zum Zurücksetzen 3 Sekunden halten"),44,296,708,60,holding);
   if(holding)tft.fillRect(56,348,684*(elapsed>3000?3000:elapsed)/3000,4,WARN);
-  button(ws43bText("Anuluj","Cancel"),44,374,708,42,false);
+  button(ws43bText("Anuluj","Cancel","Abbrechen"),44,374,708,42,false);
 }
 void appearanceSettingsScreen() {
 
-  button(ws43bText("< Ustawienia", "< Settings"),44,98,174,36,false);
-  dashText(ws43bText("Wygląd", "Appearance"),244,102,490,24,INK);
-  const char *names[]={ws43bText("Miętowy", "Mint"),ws43bText("Zielony", "Green"),ws43bText("Bursztynowy", "Amber")};
+  button(ws43bText("< Ustawienia", "< Settings","< Einstellungen"),44,98,174,36,false);
+  dashText(ws43bText("Wygląd", "Appearance","Darstellung"),244,102,490,24,INK);
+  const char *names[]={ws43bText("Miętowy", "Mint","Minze"),ws43bText("Zielony", "Green","Grün"),ws43bText("Bursztynowy", "Amber","Bernstein")};
   const uint16_t accents[]={0x67B6,0x77B2,0xF5CB};
   for(uint8_t i=0;i<3;++i) {
     const int y=151+66*i;
@@ -985,23 +985,23 @@ void appearanceSettingsScreen() {
       tft.fillRoundRect(398+j*32,y+13,24,22,4,samples[j]);
       tft.drawRoundRect(398+j*32,y+13,24,22,4,j==2?accents[i]:TRACK);
     }
-    if(selected)dashText(ws43bText("Wybrany","Selected"),550,y+13,140,18,ACCENT);
+    if(selected)dashText(ws43bText("Wybrany","Selected","Ausgewählt"),550,y+13,140,18,ACCENT);
     tft.drawCircle(724,y+24,8,selected?ACCENT:DIM);
     if(selected)tft.fillCircle(724,y+24,4,ACCENT);
   }
-  button(ws43bText("Prosty","Simple"),44,347,220,46,!ws43bAdvancedDisplay());
-  button(ws43bText("Zaawansowany (w budowie)","Advanced (in development)"),276,347,476,46,ws43bAdvancedDisplay());
+  button(ws43bText("Prosty","Simple","Einfach"),44,347,220,46,!ws43bAdvancedDisplay());
+  button(ws43bText("Zaawansowany (w budowie)","Advanced (in development)","Erweitert (in Entwicklung)"),276,347,476,46,ws43bAdvancedDisplay());
   if(settingsNotice)small(settingsNotice,44,404,708);
-  else dashText(ws43bText("Tryb ekranu: Wydruk i wygaszacz. Alarmy w obu trybach.","Display mode: Print and screensaver. Alerts in both modes."),44,404,708,14,DIM);
+  else dashText(ws43bText("Tryb ekranu: Wydruk i wygaszacz. Alarmy w obu trybach.","Display mode: Print and screensaver. Alerts in both modes.","Anzeigemodus: Druck und Bildschirmschoner. Warnungen in beiden Modi."),44,404,708,14,DIM);
 }
 void generalSettingsScreen() {
 
-  button(ws43bText("< Ustawienia", "< Settings"),44,98,174,36,false);
-  dashText(ws43bText("Język i dane", "Language and data"),244,102,490,24,INK);
-  settingRow(ws43bText("Język","Language"),ws43bPolish()?"Polski":"English",151);
-  settingRow(ws43bText("Wentylatory","Fans"),dispSettings.fanMatchPrinter?ws43bText("Co 10%","Steps of 10%"):ws43bText("Co 1%","Steps of 1%"),217);
-  settingRow(ws43bText("Otwórz WebUI","Open WebUI"),ws43bText("Kod QR","QR code"),283);
-  dashText(ws43bText("Język wspólny dla panelu i WebUI.","Language shared by panel and WebUI."),44,348,708,18,DIM);
+  button(ws43bText("< Ustawienia", "< Settings","< Einstellungen"),44,98,174,36,false);
+  dashText(ws43bText("Język i dane", "Language and data","Sprache und Daten"),244,102,490,24,INK);
+  settingRow(ws43bText("Język","Language","Sprache"),ws43bText("Polski","English","Deutsch"),151);
+  settingRow(ws43bText("Wentylatory","Fans","Lüfter"),dispSettings.fanMatchPrinter?ws43bText("Co 10%","Steps of 10%","10%-Schritte"):ws43bText("Co 1%","Steps of 1%","1%-Schritte"),217);
+  settingRow(ws43bText("Otwórz WebUI","Open WebUI","WebUI öffnen"),ws43bText("Kod QR","QR code","QR-Code"),283);
+  dashText(ws43bText("Język wspólny dla panelu i WebUI.","Language shared by panel and WebUI.","Gemeinsame Sprache für Panel und WebUI."),44,348,708,18,DIM);
   small(settingsNotice,44,382,710);
 }
 void connectedWifiName(int x,int y,int w) {
@@ -1015,16 +1015,16 @@ void connectedWifiName(int x,int y,int w) {
     while(split && (uint8_t(ssid[split])&0xc0)==0x80) --split;
   }
   tft.unloadFont();
-  dashText(ssid.length()?ssid.substring(0,split).c_str():ws43bText("Brak nazwy sieci","Network name unavailable"),x,y,w,18,INK);
+  dashText(ssid.length()?ssid.substring(0,split).c_str():ws43bText("Brak nazwy sieci","Network name unavailable","Netzwerkname nicht verfügbar"),x,y,w,18,INK);
   if(split<ssid.length()) dashText(ssid.substring(split).c_str(),x,y+26,w,18,INK);
 }
 void webQrScreen() {
-  button(ws43bText("< Język i dane", "< Language and data"),24,82,280,40,false);
-  dashText(ws43bText("Otwórz WebUI", "Open WebUI"),350,92,420,24,INK);
+  button(ws43bText("< Język i dane", "< Language and data","< Sprache und Daten"),24,82,280,40,false);
+  dashText(ws43bText("Otwórz WebUI", "Open WebUI","WebUI öffnen"),350,92,420,24,INK);
   const IPAddress ip=WiFi.localIP();
   if(!isWiFiConnected() || uint32_t(ip)==0) {
-    dashText(ws43bText("Brak połączenia Wi-Fi", "No Wi-Fi connection"),48,200,704,24,DIM);
-    dashText(ws43bText("Kod QR pojawi się po uzyskaniu adresu IP.","QR code appears once an IP address is available."),48,249,704,18,DIM);
+    dashText(ws43bText("Brak połączenia Wi-Fi", "No Wi-Fi connection","Keine WLAN-Verbindung"),48,200,704,24,DIM);
+    dashText(ws43bText("Kod QR pojawi się po uzyskaniu adresu IP.","QR code appears once an IP address is available.","QR-Code erscheint, sobald eine IP-Adresse verfügbar ist."),48,249,704,18,DIM);
     return;
   }
   const String url=String("http://")+ip.toString()+"/";
@@ -1032,37 +1032,37 @@ void webQrScreen() {
   tft.qrcode(url.c_str(),48,132,280,2,true);
   tft.fillRoundRect(338,132,438,280,12,CARD);
   tft.drawRoundRect(338,132,438,280,12,TRACK);
-  dashText(ws43bText("Połączono z Wi-Fi:", "Connected to Wi-Fi:"),352,140,420,18,DIM);
+  dashText(ws43bText("Połączono z Wi-Fi:", "Connected to Wi-Fi:","Mit WLAN verbunden:"),352,140,420,18,DIM);
   connectedWifiName(352,168,420);
   dashText(url.c_str(),352,234,420,24,INK);
-  dashText(ws43bText("Zeskanuj aparatem telefonu.","Scan with your phone camera."),352,286,420,18,DIM);
-  dashText(ws43bText("Telefon musi mieć dostęp", "Your phone needs access"),352,330,420,18,DIM);
-  dashText(ws43bText("do sieci panelu.", "to the panel network."),352,356,420,18,DIM);
+  dashText(ws43bText("Zeskanuj aparatem telefonu.","Scan with your phone camera.","Mit der Handykamera scannen."),352,286,420,18,DIM);
+  dashText(ws43bText("Telefon musi mieć dostęp", "Your phone needs access","Dein Handy braucht Zugriff"),352,330,420,18,DIM);
+  dashText(ws43bText("do sieci panelu.", "to the panel network.","auf das Panel-Netzwerk."),352,356,420,18,DIM);
 }
 void clockSettingsScreen() {
   const auto &clock = ws43bClockSettings();
 
-  button(ws43bText("< Ustawienia", "< Settings"), 44, 98, 174, 36, false);
-  small(ws43bText("ZEGAR I WYGASZANIE", "CLOCK AND IDLE SCREEN"), 222, 105, 520, ACCENT);
+  button(ws43bText("< Ustawienia", "< Settings","< Einstellungen"), 44, 98, 174, 36, false);
+  small(ws43bText("ZEGAR I WYGASZANIE", "CLOCK AND IDLE SCREEN","UHR UND RUHEANSICHT"), 222, 105, 520, ACCENT);
   char buf[64];
   if (clock.idleMinutes) snprintf(buf, sizeof(buf), "%u min", unsigned(clock.idleMinutes));
-  else snprintf(buf, sizeof(buf), ws43bText("Wyłączone", "Disabled"));
-  settingRow(ws43bText("Bez dotyku","No touch"),buf,151);
-  settingRow(ws43bText("Po czasie","On timeout"),clock.screenOff?ws43bText("Wyłącz ekran","Turn off screen"):ws43bText("Pokaż zegar","Show clock"),217);
-  settingRow(ws43bText("Format czasu","Time format"),clock.use24h?"24 h":"12 h (AM/PM)",283);
+  else snprintf(buf, sizeof(buf), ws43bText("Wyłączone", "Disabled","Deaktiviert"));
+  settingRow(ws43bText("Bez dotyku","No touch","Ohne Berührung"),buf,151);
+  settingRow(ws43bText("Po czasie","On timeout","Nach Ablauf der Wartezeit"),clock.screenOff?ws43bText("Wyłącz ekran","Turn off screen","Bildschirm ausschalten"):ws43bText("Pokaż zegar","Show clock","Uhr anzeigen"),217);
+  settingRow(ws43bText("Format czasu","Time format","Zeitformat"),clock.use24h?"24 h":"12 h (AM/PM)",283);
 
   small(settingsNotice, 44, 382, 710);
 }
 void weatherSettingsScreen() {
   const auto c=ws43bWeatherConfig();
-  button(ws43bText("< Ustawienia","< Settings"),44,98,174,36,false);
-  small(ws43bText("POGODA I DZIEŃ/NOC","WEATHER AND DAY/NIGHT"),222,105,530,ACCENT);
-  settingRow(ws43bText("Pokaż pogodę","Show weather"),c.enabled?ws43bText("Włączone","On"):ws43bText("Wyłączone","Off"),151,c.enabled);
-  settingRow(ws43bText("Tryb nocny","Night mode"),c.solar?ws43bText("Zachód / wschód słońca","Sunset / sunrise"):ws43bText("Ręczne godziny","Manual hours"),217,c.solar);
+  button(ws43bText("< Ustawienia","< Settings","< Einstellungen"),44,98,174,36,false);
+  small(ws43bText("POGODA I DZIEŃ/NOC","WEATHER AND DAY/NIGHT","WETTER UND TAG/NACHT"),222,105,530,ACCENT);
+  settingRow(ws43bText("Pokaż pogodę","Show weather","Wetter anzeigen"),c.enabled?ws43bText("Włączone","On","Ein"):ws43bText("Wyłączone","Off","Aus"),151,c.enabled);
+  settingRow(ws43bText("Tryb nocny","Night mode","Nachtmodus"),c.solar?ws43bText("Zachód / wschód słońca","Sunset / sunrise","Sonnenuntergang / -aufgang"):ws43bText("Ręczne godziny","Manual hours","Manuelle Zeiten"),217,c.solar);
   char text[80];snprintf(text,sizeof(text),"%u s",c.nightSeconds);
-  settingRow(ws43bText("Noc: bez dotyku","Night: no touch"),text,283);
-  dashText(*c.city?c.city:ws43bText("Wybierz miejscowość w WebUI","Choose location in WebUI"),44,349,710,18,DIM);
-  small(dpSettings.nightModeEnabled?settingsNotice:ws43bText("Harmonogram nocny włącz w WebUI.","Enable the night schedule in WebUI."),44,382,710);
+  settingRow(ws43bText("Noc: bez dotyku","Night: no touch","Nachts: ohne Berührung"),text,283);
+  dashText(*c.city?c.city:ws43bText("Wybierz miejscowość w WebUI","Choose location in WebUI","Ort in der WebUI wählen"),44,349,710,18,DIM);
+  small(dpSettings.nightModeEnabled?settingsNotice:ws43bText("Harmonogram nocny włącz w WebUI.","Enable the night schedule in WebUI.","Nachtzeitplan in der WebUI aktivieren."),44,382,710);
 }
 #if WS43B_FULL_WEBUI
 bool gaugeDataFresh(uint8_t type, const BambuState &state, uint32_t now) {
@@ -1107,11 +1107,11 @@ void gaugesScreen(const PrinterSlot &slot, bool online, uint32_t now) {
     const int cx = 150 + (i % 3) * 250, cy = 168 + (i / 3) * 176;
     if (type == GAUGE_EMPTY) continue;
     if(type==GAUGE_PROGRESS && ws43b_view::beforeFirstLayer(slot.state.monitor,online,now)) {
-      small(ws43bText("Przygotowanie", "Preparing"),cx-90,cy-10,180);
+      small(ws43bText("Przygotowanie", "Preparing","Vorbereitung"),cx-90,cy-10,180);
       continue;
     }
     if (type != GAUGE_CLOCK && type != GAUGE_POWER && (!online || !gaugeDataFresh(type, slot.state, now))) {
-      small(online ? ws43bText("Brak danych", "No data") : ws43bText("Nieaktualne", "Outdated"), cx - 72, cy - 10, 145);
+      small(online ? ws43bText("Brak danych", "No data","Keine Daten") : ws43bText("Nieaktualne", "Outdated","Veraltet"), cx - 72, cy - 10, 145);
       continue;
     }
     drawGaugeTile(type, slot.state, rotState.displayIndex, cx, cy, 67, 8, true, false);
@@ -1165,19 +1165,19 @@ void coolingScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool 
     drawClockBackground(false,0,now);
     char text[80];struct tm local{};const bool synced=getLocalTime(&local,0);
     if(synced)snprintf(text,sizeof(text),"%02d.%02d.%04d",local.tm_mday,local.tm_mon+1,local.tm_year+1900);
-    else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time"));
+    else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time","Uhrzeit wird synchronisiert"));
     modernText(text,400,34,false,DIM);
     if(synced)snprintf(text,sizeof(text),"%02d:%02d",ws43b_water::hour(local.tm_hour,netSettings.use24h),local.tm_min);else snprintf(text,sizeof(text),"--:--");
     modernText(text,400,133,true,INK);
     if(synced&&!netSettings.use24h)dashText(local.tm_hour<12?"AM":"PM",626,151,72,18,DIM);
     tft.drawFastHLine(260,208,280,TRACK);
-    dashText(ws43bText("CHŁODZENIE STOŁU","BED COOLING"),310,239,466,24,ACCENT);
+    dashText(ws43bText("CHŁODZENIE STOŁU","BED COOLING","BETTKÜHLUNG"),310,239,466,24,ACCENT);
     if(fresh)snprintf(text,sizeof(text),"%.0f°C",double(m.bedTemp.value));else snprintf(text,sizeof(text),"--°C");
     dashText(text,310,290,466,30,INK);
-    dashText(fresh?ws43bText("Grzanie wyłączone","Heater off"):ws43bText("Dane nieaktualne","Data outdated"),310,340,466,18,fresh?DIM:WARN);
+    dashText(fresh?ws43bText("Grzanie wyłączone","Heater off","Heizung aus"):ws43bText("Dane nieaktualne","Data outdated","Daten veraltet"),310,340,466,18,fresh?DIM:WARN);
     if(const auto *u=ws43b_view::dryingUnit(m,online,now)) {
       const bool current=online&&u->dryRemainMin.current(now);
-      snprintf(text,sizeof(text),current?ws43bText("AMS · Suszenie: %u h %02u min","AMS · Drying: %u h %02u min"):ws43bText("AMS · Ostatnio: %u h %02u min","AMS · Last: %u h %02u min"),unsigned(u->dryRemainMin.value/60),unsigned(u->dryRemainMin.value%60));
+      snprintf(text,sizeof(text),current?ws43bText("AMS · Suszenie: %u h %02u min","AMS · Drying: %u h %02u min","AMS · Trocknung: %u h %02u min"):ws43bText("AMS · Ostatnio: %u h %02u min","AMS · Last: %u h %02u min","AMS · Zuletzt: %u h %02u min"),unsigned(u->dryRemainMin.value/60),unsigned(u->dryRemainMin.value%60));
       dashText(text,32,391,736,14,current?ACCENT:WARN);
     }
   }
@@ -1211,7 +1211,7 @@ void clockWeatherIcon(const BambuMonitorTelemetry &,bool,uint32_t now) {
   const auto weather=ws43bWeatherData();
   const bool fresh=ws43b_weather::fresh(weather,time(nullptr));
   if(!fresh) {
-    dashText(ws43bText("Pogoda chwilowo niedostępna","Weather temporarily unavailable"),32,423,736,18,DIM);
+    dashText(ws43bText("Pogoda chwilowo niedostępna","Weather temporarily unavailable","Wetter vorübergehend nicht verfügbar"),32,423,736,18,DIM);
     dashText(config.city,32,450,610,14,DIM);
     return;
   }
@@ -1221,7 +1221,7 @@ void clockWeatherIcon(const BambuMonitorTelemetry &,bool,uint32_t now) {
   if(fresh)snprintf(text,sizeof(text),"%.0f°C",double(weather.temperature));
   else snprintf(text,sizeof(text),"--°C");
   dashText(text,78,431,110,30,INK);
-  dashText(fresh?ws43bWeatherDescription(weather.code):ws43bText("Brak danych pogody","No weather data"),204,421,568,18,INK);
+  dashText(fresh?ws43bWeatherDescription(weather.code):ws43bText("Brak danych pogody","No weather data","Keine Wetterdaten"),204,421,568,18,INK);
   dashText(config.city,204,449,440,14,DIM);
   dashText("Open-Meteo",665,449,115,14,DIM);
 }
@@ -1256,17 +1256,17 @@ const char *saverStageCaption(const BambuMonitorTelemetry &m,bool online,uint32_
                              ws43b_view::Activity activity) {
   using A=ws43b_view::Activity;
   if(ws43bAdvancedDisplay())switch(activity) {
-    case A::Cleaning:return ws43bText("Czyszczenie dyszy","Nozzle cleaning");
-    case A::Leveling:return ws43bText("Poziomowanie stołu","Bed leveling");
-    case A::CalibrationLines:return ws43bText("Linie kalibracyjne","Calibration lines");
-    case A::Heating:return ws43bText("Nagrzewanie","Heating");
-    case A::Change:return ws43bText("Zmiana filamentu","Changing filament");
-    case A::Load:return ws43bText("Ładowanie filamentu","Loading filament");
-    case A::Unload:return ws43bText("Wyładowywanie filamentu","Unloading filament");
+    case A::Cleaning:return ws43bText("Czyszczenie dyszy","Nozzle cleaning","Düsenreinigung");
+    case A::Leveling:return ws43bText("Poziomowanie stołu","Bed leveling","Bettnivellierung");
+    case A::CalibrationLines:return ws43bText("Linie kalibracyjne","Calibration lines","Kalibrierlinien");
+    case A::Heating:return ws43bText("Nagrzewanie","Heating","Aufheizen");
+    case A::Change:return ws43bText("Zmiana filamentu","Changing filament","Filamentwechsel");
+    case A::Load:return ws43bText("Ładowanie filamentu","Loading filament","Filament laden");
+    case A::Unload:return ws43bText("Wyładowywanie filamentu","Unloading filament","Filament entladen");
     default:break;
   }
   return ws43b_view::beforeFirstLayer(m,online,now)||!strcmp(m.status.value,"PREPARE")?
-    ws43bText("PRZYGOTOWANIE","PREPARING"):ws43bText("DRUKOWANIE","PRINTING");
+    ws43bText("PRZYGOTOWANIE","PREPARING","VORBEREITUNG"):ws43bText("DRUKOWANIE","PRINTING","DRUCKT");
 }
 void saverDryingMetrics(const MonitorAmsUnit &unit,bool online,uint32_t now,int x,int y,int width,int size=18) {
   char temp[24],rh[24],text[64];
@@ -1282,8 +1282,8 @@ void saverDryingEnd(const MonitorAmsUnit &unit,uint32_t now,int x,int y,int widt
   if(getLocalTime(&local,0)) {
     const time_t end=time(nullptr)-uint32_t(now-unit.dryRemainMin.updatedMs)/1000u+time_t(unit.dryRemainMin.value)*60;
     struct tm finish{};localtime_r(&end,&finish);
-    snprintf(text,sizeof text,ws43bText("Koniec około %02d:%02d%s","Ends around %02d:%02d%s"),ws43b_water::hour(finish.tm_hour,netSettings.use24h),finish.tm_min,netSettings.use24h?"":finish.tm_hour<12?" AM":" PM");
-  } else snprintf(text,sizeof text,"%s",ws43bText("Oczekiwanie na godzinę","Waiting for clock sync"));
+    snprintf(text,sizeof text,ws43bText("Koniec około %02d:%02d%s","Ends around %02d:%02d%s","Ende gegen %02d:%02d%s"),ws43b_water::hour(finish.tm_hour,netSettings.use24h),finish.tm_min,netSettings.use24h?"":finish.tm_hour<12?" AM":" PM");
+  } else snprintf(text,sizeof text,"%s",ws43bText("Oczekiwanie na godzinę","Waiting for clock sync","Warte auf Zeitsynchronisierung"));
   dashText(text,x,y,width,18,DIM);
 }
 void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &unit,
@@ -1301,13 +1301,13 @@ void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &uni
     }
     char text[100];
     if(waiting) {
-      dashText(ws43bText("Oczekiwanie na dane","Waiting for data"),44,234,328,18,ACCENT);
-      if(m.progress.valid)snprintf(text,sizeof text,ws43bText("Ostatnio: %u%%","Last: %u%%"),unsigned(m.progress.value));
+      dashText(ws43bText("Oczekiwanie na dane","Waiting for data","Warte auf Daten"),44,234,328,18,ACCENT);
+      if(m.progress.valid)snprintf(text,sizeof text,ws43bText("Ostatnio: %u%%","Last: %u%%","Zuletzt: %u%%"),unsigned(m.progress.value));
       else snprintf(text,sizeof text,"--%%");
       dashText(text,44,278,194,24,DIM);
       if(m.remainingMinutes.valid)
-        snprintf(text,sizeof text,ws43bText("Ostatni czas: %u h %02u min","Last remaining: %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
-      else snprintf(text,sizeof text,"%s",ws43bText("Ostatni czas: --","Last remaining: --"));
+        snprintf(text,sizeof text,ws43bText("Ostatni czas: %u h %02u min","Last remaining: %u h %02u min","Zuletzt verbleibend: %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+      else snprintf(text,sizeof text,"%s",ws43bText("Ostatni czas: --","Last remaining: --","Letzte Restzeit: --"));
       dashText(text,44,350,328,14,DIM);
     } else {
       dashText(saverStageCaption(m,online,now,activity),44,234,328,18,ACCENT);
@@ -1315,14 +1315,14 @@ void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &uni
       else snprintf(text,sizeof text,"--%%");
       dashText(text,44,257,194,72,progressValid?INK:DIM);
       if(missing(m.remainingMinutes,online,now)==nullptr)
-        snprintf(text,sizeof text,ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
-      else snprintf(text,sizeof text,"%s",ws43bText("Czas niedostępny","Time unavailable"));
+        snprintf(text,sizeof text,ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min","Restzeit %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+      else snprintf(text,sizeof text,"%s",ws43bText("Czas niedostępny","Time unavailable","Zeit unbekannt"));
       dashText(text,44,350,194,14,DIM);
       tft.fillRoundRect(44,386,328,5,2,TRACK);
       const int fill=progressValid?328*int(m.progress.value>100?100:m.progress.value)/100:0;
       if(fill>0)tft.fillRoundRect(44,386,fill,5,2,ACCENT);
     }
-    snprintf(text,sizeof text,ws43bText("SUSZENIE · AMS %u","DRYING · AMS %u"),unsigned(unit.id));
+    snprintf(text,sizeof text,ws43bText("SUSZENIE · AMS %u","DRYING · AMS %u","TROCKNUNG · AMS %u"),unsigned(unit.id));
     dashText(text,428,234,328,18,ACCENT);
     snprintf(text,sizeof text,"%u h %02u min",unsigned(unit.dryRemainMin.value/60),unsigned(unit.dryRemainMin.value%60));
     dashText(text,428,278,240,30,INK);
@@ -1366,7 +1366,7 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
     drawClockBackground(false,0,now);
     struct tm local{};char text[160];const bool timeValid=getLocalTime(&local,0);
     if(timeValid)snprintf(text,sizeof(text),"%02d.%02d.%04d",local.tm_mday,local.tm_mon+1,local.tm_year+1900);
-    else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time"));
+    else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time","Uhrzeit wird synchronisiert"));
     modernText(text,400,34,false,DIM);
     if(timeValid)snprintf(text,sizeof(text),"%02d:%02d",ws43b_water::hour(local.tm_hour,netSettings.use24h),local.tm_min);
     else snprintf(text,sizeof(text),"--:--");
@@ -1377,35 +1377,35 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
       // Both cards are rendered below on full and partial frames.
     } else if(preparationScene && !print) {
       dashText(saverStageCaption(m,online,now,activity),310,239,466,24,ACCENT);
-      dashText(ws43bText("Przygotowanie wydruku","Preparing to print"),310,293,466,24,white);
+      dashText(ws43bText("Przygotowanie wydruku","Preparing to print","Druckvorbereitung"),310,293,466,24,white);
       if(genericPreparation && !missing(m.remainingMinutes,online,now)) {
-        snprintf(text,sizeof text,ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+        snprintf(text,sizeof text,ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min","Restzeit %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
         dashText(text,310,341,466,18,DIM);
-      } else dashText(!ws43bAdvancedDisplay()?ws43bText("Oczekiwanie na aktualny postęp","Waiting for current progress"):
-        genericPreparation?ws43bText("Oczekiwanie na pierwszą warstwę","Waiting for the first layer"):calibration?ws43bText("Drukowanie linii kalibracyjnych","Printing calibration lines"):leveling?ws43bText("Sprawdzanie punktów na stole","Probing points on the bed"):ws43bText("Dysza czyści się przed drukiem","Nozzle wipe before printing"),310,341,466,18,DIM);
+      } else dashText(!ws43bAdvancedDisplay()?ws43bText("Oczekiwanie na aktualny postęp","Waiting for current progress","Warte auf aktuellen Fortschritt"):
+        genericPreparation?ws43bText("Oczekiwanie na pierwszą warstwę","Waiting for the first layer","Warte auf erste Schicht"):calibration?ws43bText("Drukowanie linii kalibracyjnych","Printing calibration lines","Druckt Kalibrierlinien"):leveling?ws43bText("Sprawdzanie punktów na stole","Probing points on the bed","Druckbettpunkte abtasten"):ws43bText("Dysza czyści się przed drukiem","Nozzle wipe before printing","Düse vor Druckbeginn reinigen"),310,341,466,18,DIM);
     } else if(print) {
       dashText(saverStageCaption(m,online,now,activity),310,229,466,24,ACCENT);
       snprintf(text,sizeof(text),"%u%%",unsigned(m.progress.value));
       dashText(text,310,263,460,72,white);
       if(missing(m.remainingMinutes,online,now)==nullptr)
-        snprintf(text,sizeof(text),ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
-      else snprintf(text,sizeof(text),"%s",ws43bText("Czas: brak aktualnych danych","Time: no current data"));
+        snprintf(text,sizeof(text),ws43bText("Pozostało %u h %02u min","Remaining %u h %02u min","Restzeit %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+      else snprintf(text,sizeof(text),"%s",ws43bText("Czas: brak aktualnych danych","Time: no current data","Zeit: keine aktuellen Daten"));
       dashText(text,310,345,466,18,DIM);
       tft.fillRoundRect(310,376,450,7,3,TRACK);
       const int fill=450*int(m.progress.value>100?100:m.progress.value)/100;
       if(fill>0)tft.fillRoundRect(310,376,fill,7,3,ACCENT);
     } else if(waiting) {
-      dashText(ws43bText("Oczekiwanie na dane","Waiting for data"),310,229,466,24,ACCENT);
-      if(m.progress.valid)snprintf(text,sizeof(text),ws43bText("Ostatnio: %u%%","Last: %u%%"),unsigned(m.progress.value));
+      dashText(ws43bText("Oczekiwanie na dane","Waiting for data","Warte auf Daten"),310,229,466,24,ACCENT);
+      if(m.progress.valid)snprintf(text,sizeof(text),ws43bText("Ostatnio: %u%%","Last: %u%%","Zuletzt: %u%%"),unsigned(m.progress.value));
       else snprintf(text,sizeof(text),"--%%");
       dashText(text,310,278,460,30,DIM);
       if(m.remainingMinutes.valid)
-        snprintf(text,sizeof(text),ws43bText("Ostatni czas: %u h %02u min","Last remaining: %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
-      else snprintf(text,sizeof(text),"%s",ws43bText("Ostatni czas: --","Last remaining: --"));
+        snprintf(text,sizeof(text),ws43bText("Ostatni czas: %u h %02u min","Last remaining: %u h %02u min","Zuletzt verbleibend: %u h %02u min"),unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+      else snprintf(text,sizeof(text),"%s",ws43bText("Ostatni czas: --","Last remaining: --","Letzte Restzeit: --"));
       dashText(text,310,345,466,18,DIM);
       panelIcon(UiAsset::Printer,190,298,tft.color565(3,14,23),74);
     } else if(dryOnly) {
-      snprintf(text,sizeof text,ws43bText("SUSZENIE · AMS %u","DRYING · AMS %u"),unsigned(unit->id));
+      snprintf(text,sizeof text,ws43bText("SUSZENIE · AMS %u","DRYING · AMS %u","TROCKNUNG · AMS %u"),unsigned(unit->id));
       dashText(text,310,229,466,24,ACCENT);
       snprintf(text,sizeof(text),"%u h %02u min",unsigned(unit->dryRemainMin.value/60),unsigned(unit->dryRemainMin.value%60));
       dashText(text,310,277,466,30,white);
@@ -1417,21 +1417,21 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
       const bool ready=current&&!strcmp(m.status.value,"IDLE");
       const bool paused=view==ws43b_view::Saver::Pause;
       const bool alert=view==ws43b_view::Saver::Alert;
-      const char *message=alert?ws43bText("BŁĄD DRUKARKI","PRINTER ERROR"):paused?ws43bText("WYDRUK WSTRZYMANY","PRINT PAUSED"):
-        finished?ws43bText("WYDRUK ZAKOŃCZONY","PRINT FINISHED"):ready?ws43bText("Gotowa do pracy","Ready"):
-        !online?ws43bText("Brak połączenia z drukarką","Printer disconnected"):ws43bText("Oczekiwanie na aktualne dane","Waiting for current data");
+      const char *message=alert?ws43bText("BŁĄD DRUKARKI","PRINTER ERROR","DRUCKERFEHLER"):paused?ws43bText("WYDRUK WSTRZYMANY","PRINT PAUSED","DRUCK PAUSIERT"):
+        finished?ws43bText("WYDRUK ZAKOŃCZONY","PRINT FINISHED","DRUCK FERTIG"):ready?ws43bText("Gotowa do pracy","Ready","Bereit"):
+        !online?ws43bText("Brak połączenia z drukarką","Printer disconnected","Drucker getrennt"):ws43bText("Oczekiwanie na aktualne dane","Waiting for current data","Warte auf aktuelle Daten");
       panelIcon(alert?UiAsset::Alert:paused?UiAsset::Pause:
         finished?UiAsset::Check:ready?UiAsset::Printer:!online?UiAsset::Network:UiAsset::UnknownData,
         180,285,tft.color565(3,14,23),64,alert||paused||finished,alert?RED:paused?WARN:ACCENT);
       dashText(message,250,250,520,24,alert?RED:paused?WARN:INK);
-      if(paused || alert)dashText(ws43bText("Sprawdź komunikat na drukarce","Check the message on the printer"),250,300,520,18,DIM);
+      if(paused || alert)dashText(ws43bText("Sprawdź komunikat na drukarce","Check the message on the printer","Meldung am Drucker prüfen"),250,300,520,18,DIM);
       else if(finished && m.progress.current(now)) {
         snprintf(text,sizeof(text),"%u%%",unsigned(m.progress.value));dashText(text,250,299,520,30,ACCENT);
-      } else if(!ready&&!finished)dashText(ws43bText("Ostatnie dane mogą być nieaktualne","Last readings may be outdated"),250,300,520,18,WARN);
+      } else if(!ready&&!finished)dashText(ws43bText("Ostatnie dane mogą być nieaktualne","Last readings may be outdated","Letzte Werte können veraltet sein"),250,300,520,18,WARN);
     }
     if(unit && !notice && !dryOnly && !combined) {
-      if(dryFresh)snprintf(text,sizeof(text),ws43bText("AMS %u · Suszenie · %u h %02u min","AMS %u · Drying · %u h %02u min"),unsigned(unit->id),unsigned(unit->dryRemainMin.value/60),unsigned(unit->dryRemainMin.value%60));
-      else snprintf(text,sizeof(text),ws43bText("AMS · Dane sprzed %u min · suszenie niepotwierdzone","AMS · Data %u min old · drying unconfirmed"),unsigned(uint32_t(now-unit->dryRemainMin.updatedMs)/60000u));
+      if(dryFresh)snprintf(text,sizeof(text),ws43bText("AMS %u · Suszenie · %u h %02u min","AMS %u · Drying · %u h %02u min","AMS %u · Trocknung · %u h %02u min"),unsigned(unit->id),unsigned(unit->dryRemainMin.value/60),unsigned(unit->dryRemainMin.value%60));
+      else snprintf(text,sizeof(text),ws43bText("AMS · Dane sprzed %u min · suszenie niepotwierdzone","AMS · Data %u min old · drying unconfirmed","AMS · Daten %u min alt · Trocknung unbestätigt"),unsigned(uint32_t(now-unit->dryRemainMin.updatedMs)/60000u));
       dashText(text,32, (print||preparationScene||waiting)?391:346,736,14,dryFresh?ACCENT:WARN);
     }
   }
@@ -1455,15 +1455,15 @@ void setupScreen(bool ap, bool wifi) {
     const String ssid=WiFi.SSID();
     startupScreen(ws43b_boot::Phase::Wifi,ssid.c_str(),millis());
     small(ws43bText("Konfiguracja sieci będzie dostępna po zakończeniu próby.",
-                   "Network setup will be available after this attempt."),24,444,752);
+                   "Network setup will be available after this attempt.","Die Netzwerkeinrichtung ist nach diesem Versuch verfügbar."),24,444,752);
     return;
   }
   ws43b_native::screen(tft,BG);
   v2Text("BambuHelper",24,19,400,ws43b_v2_b25,25,v2Ink());
-  v2Text(ws43bText("KONFIGURACJA","SETUP"),602,28,174,ws43b_v2_b14,14,v2Dim());
+  v2Text(ws43bText("KONFIGURACJA","SETUP","EINRICHTUNG"),602,28,174,ws43b_v2_b14,14,v2Dim());
   tft.drawFastHLine(24,62,752,ws43b_native::line);
   if(ap) {
-    dashText(ws43bText("Połącz telefon z panelem","Connect your phone to the panel"),32,116,736,24,ACCENT);
+    dashText(ws43bText("Połącz telefon z panelem","Connect your phone to the panel","Telefon mit dem Panel verbinden"),32,116,736,24,ACCENT);
     const String ssid=getAPSSID();
     // Wi-Fi QR syntax: escape reserved characters independently of text labels.
     auto escaped=[](const String &value) {
@@ -1479,39 +1479,39 @@ void setupScreen(bool ap, bool wifi) {
     tft.fillRect(32,150,280,280,TFT_WHITE);
     tft.qrcode(payload.c_str(),48,166,248,2,true);
     ws43b_native::card(tft,326,150,450,280,BG);
-    dashText(ws43bText("Zeskanuj aparatem telefonu","Scan with your phone camera"),340,169,430,18,INK);
-    dashText(ws43bText("Sieć Wi-Fi","Wi-Fi network"),340,217,430,14,DIM);
+    dashText(ws43bText("Zeskanuj aparatem telefonu","Scan with your phone camera","Mit der Handykamera scannen"),340,169,430,18,INK);
+    dashText(ws43bText("Sieć Wi-Fi","Wi-Fi network","WLAN-Netzwerk"),340,217,430,14,DIM);
     dashText(ssid.c_str(),340,242,430,24,INK);
-    dashText(ws43bText("Hasło","Password"),340,284,430,14,DIM);
+    dashText(ws43bText("Hasło","Password","Passwort"),340,284,430,14,DIM);
     dashText(WIFI_AP_PASSWORD,340,309,430,24,INK);
-    dashText(ws43bText("Następnie otwórz w przeglądarce:","Then open in your browser:"),340,357,430,14,DIM);
+    dashText(ws43bText("Następnie otwórz w przeglądarce:","Then open in your browser:","Dann im Browser öffnen:"),340,357,430,14,DIM);
     dashText("http://192.168.4.1/",340,383,430,24,INK);
-    dashText(ws43bText("Brak internetu w tej sieci jest normalny.","No internet on this setup network is normal."),32,448,736,14,DIM);
+    dashText(ws43bText("Brak internetu w tej sieci jest normalny.","No internet on this setup network is normal.","Kein Internet in diesem Einrichtungsnetzwerk ist normal."),32,448,736,14,DIM);
     return;
   }
   if (wifi && uint32_t(WiFi.localIP())!=0) {
-    dashText(ws43bText("Dodaj drukarkę","Add a printer"),32,116,736,24,ACCENT);
+    dashText(ws43bText("Dodaj drukarkę","Add a printer","Drucker hinzufügen"),32,116,736,24,ACCENT);
     const String url=String("http://")+WiFi.localIP().toString()+"/";
     // URL QR opens WebUI; no Wi-Fi or printer credentials in this payload.
     tft.qrcode(url.c_str(),32,158,272,2,true);
     ws43b_native::card(tft,320,150,456,280,BG);
-    dashText(ws43bText("Połączono z Wi-Fi:","Connected to Wi-Fi:"),336,161,440,18,DIM);
+    dashText(ws43bText("Połączono z Wi-Fi:","Connected to Wi-Fi:","Mit WLAN verbunden:"),336,161,440,18,DIM);
     connectedWifiName(336,189,440);
-    dashText(ws43bText("Konfiguracja panelu:","Panel setup:"),336,249,440,18,DIM);
+    dashText(ws43bText("Konfiguracja panelu:","Panel setup:","Panel-Einrichtung:"),336,249,440,18,DIM);
     dashText(url.c_str(),336,280,440,24,INK);
-    dashText(ws43bText("Zeskanuj kod aparatem telefonu.","Scan the code with your phone."),336,334,440,18,INK);
-    dashText(ws43bText("Telefon musi mieć dostęp","Your phone needs access"),336,369,440,18,DIM);
-    dashText(ws43bText("do sieci panelu.","to the panel network."),336,395,440,18,DIM);
+    dashText(ws43bText("Zeskanuj kod aparatem telefonu.","Scan the code with your phone.","Scanne den Code mit deinem Handy."),336,334,440,18,INK);
+    dashText(ws43bText("Telefon musi mieć dostęp","Your phone needs access","Dein Handy braucht Zugriff"),336,369,440,18,DIM);
+    dashText(ws43bText("do sieci panelu.","to the panel network.","auf das Panel-Netzwerk."),336,395,440,18,DIM);
   }
 
-  dashText(ws43bText("Tryb monitorowania","Monitoring mode"),24,451,752,14,DIM);
+  dashText(ws43bText("Tryb monitorowania","Monitoring mode","Überwachungsmodus"),24,451,752,14,DIM);
 }
 }
 
 void beginWs43bErrorScreen(const char *printer) {
   tft.fillScreen(ws43b_style::background);
   panelIcon(UiAsset::Alert,48,40,ws43b_style::background,40,true,RED);
-  dashText(ws43bText("Komunikaty drukarki","Printer messages"),80,24,696,30,INK);
+  dashText(ws43bText("Komunikaty drukarki","Printer messages","Druckermeldungen"),80,24,696,30,INK);
   dashText(printer,24,66,752,14,DIM);
 }
 void drawWs43bErrorCard(unsigned row,const char *title,const char *code,const char *description,uint16_t color) {
@@ -1537,8 +1537,8 @@ void drawWs43bErrorCard(unsigned row,const char *title,const char *code,const ch
 }
 void endWs43bErrorScreen(unsigned remaining) {
   char text[120];
-  if(remaining)snprintf(text,sizeof(text),ws43bText("Dalsze komunikaty: %u · pełna lista w WebUI","More messages: %u · full list in WebUI"),remaining);
-  else snprintf(text,sizeof(text),"%s",ws43bText("Dotknij, aby wrócić","Tap to return"));
+  if(remaining)snprintf(text,sizeof(text),ws43bText("Dalsze komunikaty: %u · pełna lista w WebUI","More messages: %u · full list in WebUI","Weitere Meldungen: %u · alle in der WebUI"),remaining);
+  else snprintf(text,sizeof(text),"%s",ws43bText("Dotknij, aby wrócić","Tap to return","Zum Zurückkehren antippen"));
   dashText(text,24,439,752,18,DIM);
 }
 
@@ -1547,7 +1547,7 @@ void drawWs43bBootScreen() {
   tft.startWrite();
   startupScreen(ws43b_boot::Phase::Panel,nullptr,millis());
   small(ws43bText("Twój wydruk. Wszystko w jednym miejscu.",
-                 "Your print. Everything in one place."),24,444,752,v2Dim());
+                 "Your print. Everything in one place.","Dein Druck. Alles an einem Ort."),24,444,752,v2Dim());
   tft.endWrite();
 }
 void tickWs43bBootScreen() { animateStartupScreen(millis()); }
@@ -1678,7 +1678,7 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     else if(pressY>=217&&pressY<265)c.solar=!c.solar;
     else if(pressY>=283&&pressY<331)c.nightSeconds=c.nightSeconds==30?60:c.nightSeconds==60?300:30;
     else return;
-    settingsNotice=saveWs43bWeather(c)?ws43bText("Zapisano ustawienia.","Settings saved."):ws43bText("Wybierz miejscowosc w WebUI.","Choose location in WebUI.");
+    settingsNotice=saveWs43bWeather(c)?ws43bText("Zapisano ustawienia.","Settings saved.","Einstellungen gespeichert."):ws43bText("Wybierz miejscowosc w WebUI.","Choose location in WebUI.","Ort in der WebUI wählen.");
   } else if (page == Page::ClockSettings) {
     const auto &clock = ws43bClockSettings();
     uint16_t idle = clock.idleMinutes;
@@ -1693,7 +1693,7 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     } else if (pressY >= 217 && pressY < 265) off = !off;
     else if (pressY >= 283 && pressY < 331) use24h = !use24h;
     else return;
-    settingsNotice = saveWs43bClockSettings(idle, off, use24h) ? ws43bText("Zapisano ustawienia zegara.", "Clock settings saved.") : ws43bText("Blad zapisu. Sprobuj ponownie.", "Save failed. Please retry.");
+    settingsNotice = saveWs43bClockSettings(idle, off, use24h) ? ws43bText("Zapisano ustawienia zegara.", "Clock settings saved.","Uhreinstellungen gespeichert.") : ws43bText("Blad zapisu. Sprobuj ponownie.", "Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
   } else if (page == Page::Settings) {
     if(pressX<24||pressX>=776||pressY<140||pressY>=386)return;
     const int x=pressX-24,y=pressY-140;
@@ -1713,21 +1713,21 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     if(page==Page::Appearance && pressY>=347&&pressY<393) {
       if(pressX>=264&&pressX<276)return;
       const bool saved=saveWs43bDisplayMode(pressX>=276);
-      settingsNotice=saved?ws43bText("Zapisano tryb ekranu.","Display mode saved."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.");
+      settingsNotice=saved?ws43bText("Zapisano tryb ekranu.","Display mode saved.","Anzeigemodus gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
       painted=false;return;
     }
     if(page==Page::GeneralSettings && pressY>=283&&pressY<331) {
       page=Page::WebQr;painted=false;return;
     }
     if(page==Page::GeneralSettings && pressY>=151&&pressY<199) {
-      const bool saved=saveWs43bLanguage(ws43bPolish()?1:0);
-      settingsNotice=saved?ws43bText("Zapisano jezyk.","Language saved."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.");
+      const bool saved=saveWs43bLanguage((ws43bLanguage()+1)%3);
+      settingsNotice=saved?ws43bText("Zapisano jezyk.","Language saved.","Sprache gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
     } else {
       uint8_t theme=ws43bViewTheme();bool fanMatch=dispSettings.fanMatchPrinter;
       if(page==Page::Appearance && pressY>=151&&pressY<331 && (pressY-151)%66<48)theme=(pressY-151)/66;
       else if(page==Page::GeneralSettings && pressY>=217&&pressY<265)fanMatch=!fanMatch;
       else return;
-      settingsNotice=saveWs43bViewSettings(theme,fanMatch)?ws43bText("Zapisano ustawienia panelu.","Panel settings saved."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.");
+      settingsNotice=saveWs43bViewSettings(theme,fanMatch)?ws43bText("Zapisano ustawienia panelu.","Panel settings saved.","Paneleinstellungen gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
     }
   } else return;
   painted = false;
@@ -1743,11 +1743,11 @@ void renderWs43bMonitor(bool force) {
   static bool otaWasActive=false;
   if(ws43b::otaDisplayActive()){otaWasActive=true;return;}
   if(otaWasActive){otaWasActive=false;painted=false;force=true;cancelWs43bMonitorTouch();}
-  if (!settingsNotice && page!=Page::Appearance) settingsNotice = ws43bText("Zmiany dotycza tylko panelu.", "Changes affect this panel only.");
+  if (!settingsNotice && page!=Page::Appearance) settingsNotice = ws43bText("Zmiany dotycza tylko panelu.", "Changes affect this panel only.","Änderungen betreffen nur dieses Panel.");
   static uint32_t languageRevision = 0;
   if (languageRevision != ws43bLanguageRevision()) {
     languageRevision = ws43bLanguageRevision();
-    settingsNotice = ws43bText("Zapisano jezyk.", "Language saved.");
+    settingsNotice = ws43bText("Zapisano jezyk.", "Language saved.","Sprache gespeichert.");
     painted = false;
   }
   static uint32_t displayModeRevision=0;
@@ -2017,21 +2017,21 @@ void renderWs43bMonitor(bool force) {
   }
   const char *headerStatus=statusText(m.status,online,now);
   if(ws43b_view::statusCurrent(m,online,now) && !m.status.current(now))
-    headerStatus=!strcmp(m.status.value,"RUNNING")?ws43bText("Drukowanie","Printing"):ws43bText("Przygotowanie","Preparing");
-  if(ws43b_view::beforeFirstLayer(m,online,now))headerStatus=ws43bText("Przygotowanie","Preparing");
+    headerStatus=!strcmp(m.status.value,"RUNNING")?ws43bText("Drukowanie","Printing","Druckt"):ws43bText("Przygotowanie","Preparing","Vorbereitung");
+  if(ws43b_view::beforeFirstLayer(m,online,now))headerStatus=ws43bText("Przygotowanie","Preparing","Vorbereitung");
   if(page==Page::Dashboard) {
     switch(monitorFilamentStage(m,online,now)) {
-      case 4:headerStatus=ws43bText("Zmiana filamentu","Changing filament");break;
-      case 22:headerStatus=ws43bText("Wyładowywanie filamentu","Unloading filament");break;
-      case 24:headerStatus=ws43bText("Ładowanie filamentu","Loading filament");break;
+      case 4:headerStatus=ws43bText("Zmiana filamentu","Changing filament","Filamentwechsel");break;
+      case 22:headerStatus=ws43bText("Wyładowywanie filamentu","Unloading filament","Filament entladen");break;
+      case 24:headerStatus=ws43bText("Ładowanie filamentu","Loading filament","Filament laden");break;
     }
   }
   if(page==Page::Dashboard && dashboardActivity.state==ws43b_view::Activity::CalibrationLines)
-    headerStatus=ws43bText("Linie kalibracyjne","Calibration lines");
+    headerStatus=ws43bText("Linie kalibracyjne","Calibration lines","Kalibrierlinien");
   if(page==Page::Dashboard && dashboardActivity.state==ws43b_view::Activity::Leveling)
-    headerStatus=ws43bText("Poziomowanie stołu","Bed leveling");
+    headerStatus=ws43bText("Poziomowanie stołu","Bed leveling","Bettnivellierung");
   if(page==Page::Dashboard && dashboardActivity.state==ws43b_view::Activity::Cleaning)
-    headerStatus=ws43bText("Czyszczenie dyszy","Cleaning nozzle");
+    headerStatus=ws43bText("Czyszczenie dyszy","Cleaning nozzle","Düse wird gereinigt");
   // Receiving one temperature must not make an expired print state look current.
   const bool statusCurrent = ws43b_view::statusCurrent(m,online,now);
   const bool activePrint = statusCurrent && (!strcmp(m.status.value,"RUNNING") ||

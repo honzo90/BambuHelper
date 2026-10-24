@@ -122,7 +122,7 @@ class DashboardVlwRenderingTest(unittest.TestCase):
         weather_end = weather.index('\n  }', weather_start)
         weather_call = weather[weather_start:weather_end]
         slot_match = re.search(
-            r'v2Text\(empty\?ws43bText\("Pusty","Empty"\):ws43bText\("Brak odczytu","No reading"\),[^\n]+;',
+            r'v2Text\(empty\?ws43bText\("Pusty","Empty"(?:,\s*"(?:[^"\\]|\\.)*")?\):ws43bText\("Brak odczytu","No reading"(?:,\s*"(?:[^"\\]|\\.)*")?\),[^\n]+;',
             display)
         if slot_match is None:
             raise AssertionError('The native missing/empty slot call was not found')
@@ -141,7 +141,7 @@ constexpr int FONT_NONE=0,TL_DATUM=0;
 uint16_t v2Ink(){return 0;}
 uint16_t v2Dim(){return 0;}
 bool polish=true;
-const char *ws43bText(const char *pl,const char *en){return polish?pl:en;}
+const char *ws43bText(const char *pl,const char *en,const char* = nullptr){return polish?pl:en;}
 uint32_t be32(const uint8_t *data) {
   return (uint32_t(data[0])<<24)|(uint32_t(data[1])<<16)|(uint32_t(data[2])<<8)|data[3];
 }

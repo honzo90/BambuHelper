@@ -31,8 +31,10 @@ bool weatherEnabled=false;
 WeatherConfig ws43bWeatherConfig(){WeatherConfig c;c.enabled=weatherEnabled;return c;}
 bool saveWs43bWeather(WeatherConfig){return true;}
 static bool polish = true;
+static uint8_t language = 0;
 bool ws43bPolish(){ return polish; }
-bool saveWs43bLanguage(uint8_t value){ if(value>1)return false; polish=value==0;return true; }
+uint8_t ws43bLanguage(){ return language; }
+bool saveWs43bLanguage(uint8_t value){ if(value>2)return false; language=value;polish=value==0;return true; }
 bool advancedDisplay=false,modeWriteOk=true;unsigned modeWrites=0;uint32_t modeRevision=0;
 bool ws43bAdvancedDisplay(){return advancedDisplay;}
 uint32_t ws43bDisplayModeRevision(){return modeRevision;}
@@ -399,8 +401,9 @@ int main() {
  rawTap(100,115);assert(page==Page::Settings && writes==writesBeforeCategories);
  const auto beforeLanguage=writes;
  tap(600,300);assert(page==Page::GeneralSettings);
- tap(450,175);assert(!polish && writes==beforeLanguage);
- tap(450,175);assert(polish && writes==beforeLanguage);
+ tap(450,175);assert(!polish && language==1 && writes==beforeLanguage);
+ tap(450,175);assert(!polish && language==2 && writes==beforeLanguage);
+ tap(450,175);assert(polish && language==0 && writes==beforeLanguage);
  page=Page::Settings;rawTap(710,100);assert(page==Page::Settings);
  handleWs43bMonitorTouch(710,100,true);now+=2999;handleWs43bMonitorTouch(710,100,false);assert(page==Page::Settings);
  handleWs43bMonitorTouch(710,100,true);now+=3000;cancelWs43bMonitorTouch();handleWs43bMonitorTouch(710,100,false);assert(page==Page::Settings);

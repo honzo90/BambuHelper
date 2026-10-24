@@ -31,7 +31,7 @@ struct PrinterSlot {struct {uint8_t gaugeSlots[GAUGE_SLOT_COUNT]{};}config;Bambu
 struct {uint8_t displayIndex=0;}rotState;
 unsigned drawn=0, notices=0;
 std::string lastNotice;
-const char* ws43bText(const char*,const char* en){return en;}
+const char* ws43bText(const char*,const char* en,const char* = nullptr){return en;}
 void small(const char* text,int,int,int){++notices;lastNotice=text;}
 void drawGaugeTile(uint8_t,const BambuState&,uint8_t,int,int,int,int,bool,bool){++drawn;}
 '''
