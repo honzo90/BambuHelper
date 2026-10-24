@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BambuHelper WS43B</title>
+    <style>
+      :root {
+        --navy: #0b1724;
+        --navy-2: #122333;
+        --mint: #7ee8b8;
+        --mint-dark: #2f8f68;
+        --text: #e8f3f8;
+        --muted: #9fb1c2;
+        --danger: #ff6b6b;
+        --border: #24384a;
+        --focus: #8ff3c8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--navy);
+        color: var(--text);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        line-height: 1.45;
+      }
+
+      main {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 24px 18px 40px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 18px;
+        margin-bottom: 22px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 1.5rem;
+        letter-spacing: 0.02em;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: var(--mint-dark);
+        color: #04110b;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+
+      .lead {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+
+      .panel {
+        background: var(--navy-2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px;
+        margin-bottom: 18px;
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 1.1rem;
+      }
+
+      .notice {
+        border: 1px solid var(--mint-dark);
+        background: #102b22;
+        color: #d8f7e6;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin: 12px 0;
+      }
+
+      .warning {
+        border: 1px solid #8a3b3b;
+        background: #2b1414;
+        color: #ffd8d8;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin: 12px 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li {
+        margin-bottom: 8px;
+      }
+
+      .controls {
+        display: grid;
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--mint);
+      }
+
+      button {
+        border: 1px solid var(--mint-dark);
+        background: var(--mint);
+        color: #04110b;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        background: #3a4a56;
+        color: #c8d4dd;
+        border-color: var(--border);
+        cursor: not-allowed;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      a:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .status {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #0f1d28;
+        color: var(--muted);
+      }
+
+      .status.ok {
+        border-color: var(--mint-dark);
+        color: #d8f7e6;
+        background: #102b22;
+      }
+
+      .status.error {
+        border-color: #8a3b3b;
+        color: #ffd8d8;
+        background: #2b1414;
+      }
+
+      .installer {
+        margin-top: 16px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #0f1d28;
+        min-height: 48px;
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .links a {
+        color: var(--mint);
+        text-decoration: none;
+        border: 1px solid var(--mint-dark);
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      .links a:hover {
+        background: #102b22;
+      }
+
+      footer {
+        margin-top: 24px;
+        border-top: 1px solid var(--border);
+        padding-top: 16px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 320px) {
+        main {
+          padding: 16px 12px 28px;
+        }
+
+        h1 {
+          font-size: 1.25rem;
+        }
+
+        .panel {
+          padding: 14px;
+        }
+
+        button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>BambuHelper WS43B</h1>
+        <div class="badge">v0.9 / Beta 2 (firmware v4.0.0-beta.2)</div>
+        <p class="lead">
+          Monitor druku i suszenia AMS dla panelu Waveshare ESP32-S3-Touch-LCD-4.3B
+          (800x480, 16MB flash).
+        </p>
+      </header>
+
+      <section class="panel">
+        <h2>Kroki</h2>
+        <ul>
+          <li>Użyj Chrome/Edge na komputerze i połączenia USB danych.</li>
+          <li>Potwierdź dokładny model: Waveshare ESP32-S3-Touch-LCD-4.3B.</li>
+          <li>Przygotuj instalację, następnie zainstaluj.</li>
+          <li>Po instalacji skonfiguruj Wi-Fi przez sieć panelu; dane tej sieci pojawią się na LCD.</li>
+          <li>Późniejsze aktualizacje wykonaj przez WebUI/Beta.</li>
+        </ul>
+
+        <div class="notice">
+          Pierwsza instalacja USUWA ustawienia Wi-Fi, drukarki i poprzedni firmware.
+          Dla już działającego panelu zalecane OTA w jego WebUI.
+        </div>
+
+        <div class="warning">
+          Instalator USB jest testowy i wymaga Chrome lub Edge na komputerze.
+          Na iPhonie możesz przeczytać instrukcję, ale instalację wykonaj na komputerze.
+          Po wgraniu sprawdź obraz, dotyk i połączenie Wi-Fi.
+        </div>
+
+        <div class="controls">
+          <label for="confirm-model">
+            Potwierdzam dokładny model 4.3B i zgodę na usunięcie ustawień
+          </label>
+          <input id="confirm-model" type="checkbox" aria-describedby="confirm-help" />
+          <div id="confirm-help">Inne modele płytek nie są obsługiwane przez ten instalator.</div>
+
+          <button id="prepare-button" type="button" disabled>
+            Przygotuj instalację
+          </button>
+
+          <div id="status" class="status" aria-live="polite">
+            Potwierdź model płytki i usunięcie ustawień, aby przygotować instalację.
+          </div>
+
+          <div id="installer-container" class="installer" aria-live="polite"></div>
+
+          <div class="links">
+            <a href="https://github.com/honzo90/BambuHelper" rel="noopener noreferrer">Kod źródłowy</a>
+            <a href="https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0-beta.2" rel="noopener noreferrer">Beta 2 — opis wydania</a>
+            <a href="https://github.com/honzo90/BambuHelper/issues/1" rel="noopener noreferrer">Znany problem ekranu</a>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        Fork projektu <a href="https://github.com/Keralots/BambuHelper" rel="noopener noreferrer">BambuHelper autorstwa Keralots</a>.
+      </footer>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
