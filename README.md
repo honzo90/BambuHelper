@@ -1,25 +1,28 @@
-# BambuHelper — Waveshare 4.3B development branch
+# BambuHelper — Waveshare 4.3B
 
 **English** | [Polski](README.pl.md) | [Deutsch](README.de.md)
 
 A desktop Bambu Lab printer monitor for the **Waveshare ESP32-S3-Touch-LCD-4.3B**:
 an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish,
-English or German interface, and clock/weather views. German is available from
-`v4.0.0-beta.3`.
+English or German interface, and clock/weather views.
 
-**Device feedback — 24 October 2026:** the project owner confirmed that
-[Beta 3](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0-beta.3)
-with the German panel menu and WebUI works on their WS43B. This confirms that
-version and interface on one device; the screen-off / touch-wake issue remains open.
+**Current stable release: [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0).**
+It includes the display-artifact fix introduced in Beta 5 for settings saves,
+including weather/night-mode changes. The release uses an SDK rebuilt with XIP
+from PSRAM and a requested RGB pixel clock of **12 MHz**. All Beta 5 features and
+the **PL / EN / DE** interfaces are retained. The startup branding remains v0.9;
+the firmware version shown in device information is **v4.0.0**.
+
+**Device feedback:** the project owner confirmed that Beta 5 works and the
+physical display is stable. v4.0.0 rebuilds the same code with only the firmware
+version changed; the renumbered binary has not been tested separately on hardware.
+Long-term operation and recovery still need verification. The earlier
+[dark-screen / touch-wake issue](https://github.com/honzo90/BambuHelper/issues/1)
+remains open for observation.
 
 This fork builds on [BambuHelper by Keralots and contributors](https://github.com/Keralots/BambuHelper).
 The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
 `main` retains the upstream project history.
-
-> **Development status:** a dark-screen / touch-wake failure has been observed
-> and remains unresolved. Its cause is unverified; full print-cycle acceptance
-> is pending. The features below describe the published implementation, not a
-> claim of stable hardware operation.
 
 ## Layout examples
 
@@ -60,47 +63,66 @@ Click an image for its native resolution. [Preview provenance and source hashes]
 | **Polish / English / German** | A saved language choice shared by the on-device interface and web configuration portal. German is available from `v4.0.0-beta.3`. |
 | **Optional weather** | Open-Meteo weather data, sunrise/sunset information and night scheduling. Weather and location lookup require Internet access. |
 | **Web configuration and diagnostics** | WiFi/printer/display settings, inherited control and OTA code, plus `/monitor/status` and framebuffer-capture tools for development. |
-| **Build and test tooling** | A separate Arduino CLI build, a pinned cache64 SDK workflow, host regression tests, synthetic MQTT fixtures, visual assets and font generators. |
+| **Build and test tooling** | A separate Arduino CLI build, a pinned SDK workflow (cache64_xip for v4.0.0), host regression tests, synthetic MQTT fixtures, visual assets and font generators. |
 
 The MQTT, cloud integration, web portal and other board implementations come
 from upstream; this fork extends them for the Waveshare 4.3B. The profile uses
 `BAMBU_MONITOR_ONLY=0`: chamber-light and smart-plug control paths are included,
 so this is not a passive-only firmware profile.
 
-## Building and validation
+## Installation and updates
 
-Start with **[Waveshare build and test notes](WAVESHARE.md)**. The 4.3B profile is
-[`boards/ws_lcd_43b.ini`](boards/ws_lcd_43b.ini), built with **Arduino ESP32 3.3.11**
-and the **cache64** SDK through
-[`bringup/waveshare43b/integration/build.py`](bringup/waveshare43b/integration/build.py).
-It is a separate Arduino CLI profile, not a PlatformIO environment.
+### Update an existing panel online
 
-The published source baseline passed a fresh-clone firmware build on macOS on
-**18 October 2026**. The recorded host-test results and exact build scope are in
-[WAVESHARE.md](WAVESHARE.md#host-tests). Build success and host tests do not
-resolve the LCD/touch issue or establish complete hardware acceptance.
+In the panel WebUI, select **Stable → Check for updates** and install **v4.0.0**.
+Users of v3.9.1 and v4.0.0-alpha.1 can use their existing update-check function;
+versions without a channel selector check stable releases. The Beta channel
+also offers v4.0.0 as newer than Beta 5.
+
+For manual OTA, download
+[`BambuHelper-ws_lcd_43b-v4.0.0-ota.bin`](https://github.com/honzo90/BambuHelper/releases/download/v4.0.0/BambuHelper-ws_lcd_43b-v4.0.0-ota.bin)
+and upload it through the WebUI firmware-update page. This is also an option if
+the online updater does not offer the release.
+
+OTA requires the existing WS43B partition layout with **two 3 MiB slots**.
+The OTA file contains only the application and cannot perform a first installation.
+[Release notes and sources](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0)
+· [Checksums](https://github.com/honzo90/BambuHelper/releases/download/v4.0.0/SHA256SUMS).
+
+### First installation over USB
 
 **Browser USB installer — WS43B Beta 2:** open
 [honzo90.github.io/BambuHelper](https://honzo90.github.io/BambuHelper/) in desktop
 Chrome or Edge. It is only for **Waveshare ESP32-S3-Touch-LCD-4.3B** and first
 installation: it erases flash, including saved settings and previous firmware.
 The page checks the factory image before enabling installation. This browser
-USB installation workflow still needs physical hardware acceptance.
+USB installation workflow still needs physical hardware acceptance. After
+installing Beta 2 and configuring WiFi, use **Stable → Check for updates** in the
+panel WebUI to install **v4.0.0**.
 
-**OTA updates for existing WS43B installations:** use the panel WebUI. On Beta 1
-or Beta 2, select **Beta → Check for updates** to install `v4.0.0-beta.3`,
-including the German interface. This also applies after first installation with
-the Beta 2 browser USB installer. On Alpha, upload
-`BambuHelper-ws_lcd_43b-v4.0.0-beta.3-ota.bin` through manual OTA once. Packages,
-source commits and build metadata are at
-[GitHub Releases](https://github.com/honzo90/BambuHelper/releases).
-OTA requires the existing WS43B partition layout with two 3 MiB slots; an
-application-only OTA image cannot perform a first installation.
-
-The inherited upstream web flasher does not support this 4.3B port. The
-[dark-screen / touch-wake issue](https://github.com/honzo90/BambuHelper/issues/1)
-remains open. Other boards, printer models and multi-printer configurations
+The inherited upstream web flasher does not support this 4.3B port.
+Other boards, printer models and multi-printer configurations
 have not all been validated as part of this fork.
+
+## Building and validation
+
+The **v4.0.0 release** uses **Arduino ESP32 3.3.11**, **ESP-IDF 5.5.5**, the rebuilt
+**cache64_xip** SDK and **12 MHz** requested RGB PCLK. Use the
+[tagged v4.0.0 sources](https://github.com/honzo90/BambuHelper/tree/v4.0.0) and
+[BUILD-INFO.json](https://github.com/honzo90/BambuHelper/releases/download/v4.0.0/BUILD-INFO.json)
+for the exact source commit, SDK provenance, configuration and validation results.
+Reproduction requires the separately prepared XIP SDK, its matching manifest
+and SHA-256, `WS43B_SDK_PROFILE=cache64_xip` and `WS43B_RGB_PCLK_HZ=12000000`.
+The default cache64 build does not reproduce this release.
+
+For general development, start with **[Waveshare build and test notes](WAVESHARE.md)**,
+[`boards/ws_lcd_43b.ini`](boards/ws_lcd_43b.ini) and
+[`bringup/waveshare43b/integration/build.py`](bringup/waveshare43b/integration/build.py).
+This is a separate Arduino CLI build, not a PlatformIO environment.
+
+The v4.0.0 build and image checks passed, as did **48 update-selection cases**
+across eight source/language combinations. Physical confirmation and its limits
+are described above; build and host-test results do not replace hardware testing.
 
 ## Source map
 
