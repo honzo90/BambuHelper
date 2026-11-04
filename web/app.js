@@ -2481,6 +2481,26 @@ function setupWs43bPortal(){
     var el = document.getElementById(pair[0]); if (el) el.value = pair[1];
   });
   ['rotsplit','rotsplitf'].forEach(function(id){var el=document.getElementById(id);if(el)el.checked=false;});
+  // Settings read only by renderers the 4.3B never runs (legacy clock face,
+  // split view, card style, status-bar door). Hidden but NOT disabled: they
+  // are still submitted, so saving other fields never resets their values.
+  var WS43B_UNUSED_SETTINGS = ['clk_size','clk_dsize','clk_hidedate','clkinfo','timem','hidelp',
+    'clr_eta','clr_fin','clr_pname','clr_dorc','clr_doro','dor_lbl'];
+  WS43B_UNUSED_SETTINGS.forEach(function(id){
+    var el = document.getElementById(id); if (!el) return;
+    var row = el.closest('.door-color-row, .accent-color-row, .field, .check-row');
+    if (row) { row.hidden = true; row.style.display = 'none'; }
+  });
+  // Drop cards left with nothing to change.
+  document.querySelectorAll('#sec-clock .card, #sec-printscreen .card').forEach(function(card){
+    var controls = card.querySelectorAll('input:not([type=hidden]), select, textarea');
+    // Only look inside the card: the inactive section itself is hidden too.
+    var visible = Array.prototype.some.call(controls, function(el){
+      for (var n = el; n && n !== card; n = n.parentElement) { if (n.hidden || n.style.display === 'none') return false; }
+      return true;
+    });
+    if (controls.length && !visible) { card.hidden = true; card.style.display = 'none'; }
+  });
   // Upstream moved orientation into a separate card; its only control is
   // unsupported by the fixed landscape panel, so hide the empty card as well.
   var orientation = document.getElementById('rotation');
