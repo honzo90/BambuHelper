@@ -45,7 +45,8 @@ constexpr uint16_t WARN = 0xF5CB, RED = 0xF38F;
 uint16_t BG = ws43b_style::background, ACCENT = ws43b_style::mint, TRACK = ws43b_style::border;
 uint32_t lastFrame = 0;
 bool painted = false;
-enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset, NightSettings };
+enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset, NightSettings, NightHourPicker };
+bool pickingNightStart = true;
 Page page = Page::Dashboard;
 uint32_t navigationActivity = 0;
 uint8_t selectedAms = 0;
@@ -67,7 +68,7 @@ unsigned liveAms(const BambuMonitorTelemetry &m) {
 }
 bool navigationShown(uint32_t now) {
   return ws43b_view::navigationVisible(now, navigationActivity,
-      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings || page == Page::NightSettings);
+      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings || page == Page::NightSettings || page == Page::NightHourPicker);
 }
 bool touchHeld = false, touchMoved = false, touchNeedsRelease = false;
 uint16_t pressX = 0, pressY = 0;
@@ -288,7 +289,7 @@ void footer(const BambuMonitorTelemetry &, uint32_t now) {
   const char *names[]={ws43bText("Wydruk","Print","Druck"),"AMS",ws43bText("Szczegóły","Details","Details"),ws43bText("Ustawienia","Settings","Einstellungen")};
   const ws43b_assets::Asset icons[]={ws43b_assets::Asset::Print,ws43b_assets::Asset::AMS,ws43b_assets::Asset::Details,ws43b_assets::Asset::Settings};
   for(int i=0;i<4;++i) {
-    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::NightSettings || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
+    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::NightSettings || page==Page::NightHourPicker || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
     const int x=16+i*194;
     if(active) {
       tft.fillRoundRect(x,440,184,36,9,activeBg);
@@ -1101,6 +1102,23 @@ void nightSettingsScreen() {
   settingRow(ws43bText("Bez dotyku","No touch","Ohne Berührung"),text,366);
   small(settingsNotice,44,420,708);
 }
+
+// One-tap hour choice: 6 x 4 grid. The other end of the night is shown but
+// cannot be chosen (equal hours would disable the night).
+void nightHourPickerScreen() {
+  button(ws43bText("< Noc","< Night","< Nacht"),44,98,140,36,false);
+  dashText(pickingNightStart?ws43bText("Początek nocy","Night starts","Nacht beginnt"):ws43bText("Koniec nocy","Night ends","Nacht endet"),214,102,520,24,INK);
+  const uint8_t current=pickingNightStart?dpSettings.nightStartHour:dpSettings.nightEndHour;
+  const uint8_t other=pickingNightStart?dpSettings.nightEndHour:dpSettings.nightStartHour;
+  for(uint8_t h=0;h<24;++h) {
+    const int x=44+(h%6)*120,y=148+(h/6)*68;
+    const bool selected=h==current,blocked=h==other;
+    tft.fillRoundRect(x,y,108,56,9,CARD);
+    tft.drawRoundRect(x,y,108,56,9,selected?ACCENT:TRACK);
+    char text[8];snprintf(text,sizeof(text),"%02u:00",unsigned(h));
+    dashText(text,x+27,y+16,80,18,selected?ACCENT:blocked?TRACK:INK);
+  }
+}
 #if WS43B_FULL_WEBUI
 bool gaugeDataFresh(uint8_t type, const BambuState &state, uint32_t now) {
   const auto &m = state.monitor;
@@ -1716,6 +1734,18 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     else if(pressY>=283&&pressY<331){page=Page::NightSettings;settingsNotice=nullptr;painted=false;return;}
     else return;
     settingsNotice=saveWs43bWeather(c)?ws43bText("Zapisano ustawienia.","Settings saved.","Einstellungen gespeichert."):ws43bText("Wybierz miejscowosc w WebUI.","Choose location in WebUI.","Ort in der WebUI wählen.");
+  } else if(page==Page::NightHourPicker) {
+    if(pressX>=44&&pressX<184&&pressY>=98&&pressY<134){page=Page::NightSettings;painted=false;return;}
+    if(pressX<44||pressX>=764||pressY<148||pressY>=420)return;
+    const int cx=(pressX-44)/120,cy=(pressY-148)/68;
+    if((pressX-44)%120>=108||(pressY-148)%68>=56||cx>5||cy>3)return;
+    const uint8_t hour=uint8_t(cy*6+cx);
+    uint8_t &target=pickingNightStart?dpSettings.nightStartHour:dpSettings.nightEndHour;
+    const uint8_t other=pickingNightStart?dpSettings.nightEndHour:dpSettings.nightStartHour;
+    if(hour==other)return;
+    target=hour;saveSettings();
+    settingsNotice=ws43bText("Zapisano ustawienia nocy.","Night settings saved.","Nachteinstellungen gespeichert.");
+    page=Page::NightSettings;
   } else if(page==Page::NightSettings) {
     if(pressX>=44&&pressX<294&&pressY>=98&&pressY<134){page=Page::WeatherSettings;settingsNotice=nullptr;painted=false;return;}
     if(pressX<44||pressX>=752||pressY<142||pressY>=414||(pressY-142)%56>=48)return;
@@ -1728,7 +1758,9 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
       if(row==0)dpSettings.nightModeEnabled=!dpSettings.nightModeEnabled;
       else if(row==1||row==2) {
         int step=0;
-        if(pressX>=590&&pressX<668)step=-1; else if(pressX>=668)step=1; else return;
+        if(pressX>=590&&pressX<668)step=-1; else if(pressX>=668)step=1;
+        else if(pressX>=398){pickingNightStart=row==1;page=Page::NightHourPicker;settingsNotice=nullptr;painted=false;return;}
+        else return;
         uint8_t &hour=row==1?dpSettings.nightStartHour:dpSettings.nightEndHour;
         const uint8_t other=row==1?dpSettings.nightEndHour:dpSettings.nightStartHour;
         hour=uint8_t((hour+24+step)%24);
@@ -2163,6 +2195,7 @@ void renderWs43bMonitor(bool force) {
     else if (page == Page::ClockSettings) clockSettingsScreen();
     else if (page == Page::WeatherSettings) weatherSettingsScreen();
     else if (page == Page::NightSettings) nightSettingsScreen();
+    else if (page == Page::NightHourPicker) nightHourPickerScreen();
     else if(page==Page::Appearance)appearanceSettingsScreen();
     else if(page==Page::GeneralSettings)generalSettingsScreen();
     else if(page==Page::WebQr)webQrScreen();

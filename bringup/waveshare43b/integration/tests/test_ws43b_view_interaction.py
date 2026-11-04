@@ -406,7 +406,15 @@ int main() {
  rawTap(700,222);assert(dpSettings.nightStartHour==0);
  rawTap(620,222);rawTap(620,222);assert(dpSettings.nightStartHour==22);
  rawTap(620,278);assert(dpSettings.nightEndHour==6);
- rawTap(500,278);assert(dpSettings.nightEndHour==6); // value text is not a button
+ // Tapping the hour opens a 24-hour grid; one tap picks and returns.
+ rawTap(500,278);assert(page==Page::NightHourPicker && !pickingNightStart);
+ rawTap(694,176);assert(page==Page::NightSettings && dpSettings.nightEndHour==5 && settingsNotice);
+ rawTap(450,222);assert(page==Page::NightHourPicker && pickingNightStart);
+ rawTap(694,176);assert(page==Page::NightHourPicker && dpSettings.nightStartHour==22); // end hour is blocked
+ rawTap(158,176);assert(page==Page::NightHourPicker && dpSettings.nightStartHour==22); // gap between cells
+ rawTap(100,115);assert(page==Page::NightSettings && dpSettings.nightStartHour==22); // back, nothing saved
+ page=Page::NightHourPicker;pickingNightStart=false;rawTap(44+0*120+50,148+1*68+28);
+ assert(page==Page::NightSettings && dpSettings.nightEndHour==6);
  dpSettings.nightEndHour=23;rawTap(700,278);assert(dpSettings.nightEndHour==23 || dpSettings.nightEndHour==0);
  assert(dpSettings.nightEndHour!=dpSettings.nightStartHour);
  dpSettings.nightEndHour=6;

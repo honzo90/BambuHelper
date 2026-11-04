@@ -29,7 +29,7 @@ class RepaintIntegration(unittest.TestCase):
 #include <vector>
 using ws43b_repaint::Mask;using ws43b_repaint::Region;using ws43b_repaint::regionBit;
 constexpr unsigned MAX_ACTIVE_PRINTERS=2;
-enum class Page { Dashboard,Details,Clock,Settings,ClockSettings,Gauges,Ams,WeatherSettings,Appearance,GeneralSettings,WebQr,System,FactoryReset,NightSettings };
+enum class Page { Dashboard,Details,Clock,Settings,ClockSettings,Gauges,Ams,WeatherSettings,Appearance,GeneralSettings,WebQr,System,FactoryReset,NightSettings,NightHourPicker };
 Page page=Page::Dashboard;
 uint32_t currentMs=1000,lastFrame=0,nightActivity=0,language=0;
 uint32_t millis(){return currentMs;}
@@ -144,7 +144,7 @@ void amsView(const BambuMonitorTelemetry &,bool,uint32_t,bool,Mask mask){++bodyC
 void dashboardScreen(const BambuMonitorTelemetry &,bool,uint32_t,Mask mask){++bodyCount;bodyMask=mask;}
 void detailsScreen(const BambuMonitorTelemetry &,bool,uint32_t){++detailCount;}
 void gaugesScreen(const Printer &,bool,uint32_t){++bodyCount;}
-void clockSettingsScreen(){}void weatherSettingsScreen(){}void nightSettingsScreen(){}void appearanceSettingsScreen(){}
+void clockSettingsScreen(){}void weatherSettingsScreen(){}void nightSettingsScreen(){}void nightHourPickerScreen(){}void appearanceSettingsScreen(){}
 void generalSettingsScreen(){}void webQrScreen(){}void systemSettingsScreen(){}
 void factoryResetScreen(uint32_t){}void settingsScreen(){}
 namespace ws43b_boot {
