@@ -1357,6 +1357,10 @@ int flipCellX[ws43b_clock_flip::kTextMax]={},flipCellW[ws43b_clock_flip::kTextMa
 bool flipGlyphsReady=false;
 // Last finished flip: frames drawn and wall time, for /monitor/status.
 uint16_t flipFrames=0,lastFlipFrames=0;uint32_t lastFlipMs=0;
+}  // namespace (public accessors for /monitor/status)
+uint16_t ws43bLastFlipFrames(){return lastFlipFrames;}
+uint32_t ws43bLastFlipMs(){return lastFlipMs;}
+namespace {
 void releaseFlipGlyphs() {
   for(auto &row:flipGlyph)for(auto &sprite:row)sprite.deleteSprite();
   flipGlyphsReady=false;
@@ -2378,8 +2382,4 @@ void renderWs43bMonitor(bool force) {
   tft.endWrite();
   ws43b::endRenderDiagnostics(true);
 }
-
-// Public accessors (outside the file-local namespace).
-uint16_t ws43bLastFlipFrames(){return lastFlipFrames;}
-uint32_t ws43bLastFlipMs(){return lastFlipMs;}
 #endif
