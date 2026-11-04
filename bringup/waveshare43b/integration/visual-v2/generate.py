@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Encode checked RGBA into bounded, transparent-skip RGB565 rows.
+"""Encode checked Chromium RGBA into bounded, transparent-skip RGB565 rows.
 
-The local rasterizers supply SVG viewport pixels; renderer versions are recorded
-per asset. Source SVG/PNG, raster RGBA and generator hashes accompany the output.
+No image manipulation: rasterize.cjs supplies exact approved SVG viewport pixels.
+Add asset metadata to assets.json, rerun rasterize.cjs, then this standard-library
+generator. Source SVG/PNG, raster RGBA and generator hashes accompany the output.
 """
 from pathlib import Path
 import hashlib
@@ -105,10 +106,10 @@ def main():
                 'pixel_order':'RGB565 host value after little-endian byte decode; alpha is straight/unpremultiplied',
                 'material_rule':'g-r >= 8, g-b >= 7, g >= 1.08*r, g >= 1.08*b; only opted-in source assets',
                 'recolor_rule':'source RGB565 maximum channel modulates requested RGB565 tint; nonmaterial pixels unchanged',
-                'svg_meet_note':'SVG icons use xMidYMid meet at their declared sprite size. Spool uses editable vector artwork; hero components retain their original atlas geometry.',
+                'svg_meet_note':'Spool uses SVG image 1280x1280 even though original PNG dimensions are 1254x1254, matching approved HTML.',
                 'assets':records,'total_encoded_and_offsets_bytes':total,
                 'generated_header':str(OUTPUT.relative_to(ROOT)),'generated_header_sha256':sha(OUTPUT),
-                'pipeline_sha256':{p.name:sha(p) for p in [HERE/'assets.json',HERE/'generate.py',HERE/'rasterize.cjs',HERE/'rasterize_icons.cjs',HERE/'rasterizer.json']}}
+                'pipeline_sha256':{p.name:sha(p) for p in [HERE/'assets.json',HERE/'generate.py',HERE/'rasterize.cjs',HERE/'rasterizer.json']}}
     (HERE / 'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print(json.dumps({'assets':len(assets),'encoded_and_offsets_bytes':total,'output':str(OUTPUT)}))
 

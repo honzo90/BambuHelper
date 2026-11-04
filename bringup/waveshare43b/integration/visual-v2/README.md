@@ -1,57 +1,56 @@
 # Native Wydruk assets
 
-The assets in this directory are compiled into the Waveshare 4.3B firmware.
-`assets.json` declares each source viewport and its fixed destination canvas.
-`manifest.json` records source, raster, pipeline and generated-header hashes.
-The host previews are design checks, not physical LCD scanout evidence.
+The original seven SVGs in `raw/icons/` and `raw/scene-atlas.png` are byte-for-byte copies from the approved
+`design-previews/2026-10-14-wydruk-native-v2/assets/` reference. `scene-components.png`
+is the separate generated model/plate/head atlas supplied for this implementation
+(original image filename `exec-126e2f2d-f514-4b72-b86f-74d138ff6acf.png`). The component
+generation prompt is maintained alongside this pipeline by the integration owner.
 
-## Dashboard icon revision — 2026-10-25
+`assets.json` describes each source viewport and target size. Chromium renders
+SVG `xMidYMid meet` directly into the exact destination canvas. Thermal icons use
+42×46 canvases, containing a centred 42×42 SVG image; navigation icons use 33×33.
+The spool uses the approved SVG viewport `(735,60,460,540)` in a 64×69 canvas.
+Its original PNG is 1254×1254, but the reference HTML explicitly presents that
+image as 1280×1280. This scaling is retained. The new component atlas is 1448×1086.
 
-Nozzle, Bed and Chamber now use simpler SVG silhouettes with consistent edge
-weights and cool neutral surfaces. The spool is an editable SVG with a clear
-filament band and neutral flanges, replacing the small photographic atlas crop.
-The other 17 assets and their rasters are unchanged, including the hero scene.
-The original artwork is traceable to `source_reference` in the manifest.
+The shared controls added on 2026-10-16 (`Clock`, `Weather`, `Network`, `Check`,
+`Pause`, `Alert`, `EmptySlot`, `UnknownData`, `Printer`, `Fan`) extend the same SVG
+system with cool metallic gradients, a small extruded edge and transparent
+backgrounds. Each uses a 48×48 drawing viewport rasterized directly to 33×33.
+They do not replace or modify the original icons or scene components.
 
-The thermal canvases remain 42×46, with a centred 48-unit SVG viewBox. Spool
-remains 64×69. Asset enum order, layout coordinates, alpha composition and the
-native decoder are unchanged. The revisions therefore reach all existing uses
-of these four assets, including dashboard cards, detail views and animations.
+No raw art is recoloured or altered by the pipeline. The encoded material mask
+selects green source pixels in Print, Spool, Model, Check, Pause and Alert only. The native decoder
+optionally multiplies the requested tint by source brightness for those pixels;
+all other pixels, including gray/metal flanges, retain their original RGB565.
+Disabling tint reproduces the approved source colours without hue conversion.
 
-The material mask selects green source pixels only in assets that opt into
-`green_material`. Spool flanges are neutral and stay visible for black or white
-filament; the band and inner sectors use the actual requested filament colour.
-Unknown and empty telemetry continue to use the existing state-specific icons.
-
-## Rebuild the four dashboard icons
-
-With locally installed `sharp` (no network or browser required), from the repo:
+From the BambuHelper root, with an installed local Chromium/Playwright:
 
 ```sh
-NODE_PATH=/path/to/node_modules node bringup/waveshare43b/integration/visual-v2/rasterize_icons.cjs
+NODE_PATH=/path/to/node_modules node bringup/waveshare43b/integration/visual-v2/rasterize.cjs --browser=/path/to/chromium
 python3 -B bringup/waveshare43b/integration/visual-v2/generate.py
 python3 -B -m unittest discover -s bringup/waveshare43b/integration/tests -p 'test_visual_assets.py' -v
 ```
 
-The selective rasterizer updates only Nozzle, Bed, Chamber and Spool. It records
-sharp/librsvg versions per asset in `rasterizer.json`; unchanged records retain
-their original Chromium provenance. SVG `xMidYMid meet` renders directly into
-the declared canvas. No asset is rescaled or recoloured by the RGB565 encoder.
+The rasterizer blocks HTTP(S) requests and uses only supplied local bytes. The
+generator requires only Python's standard library. It emits
+`include/ws43b_visual_assets_data.h` and `manifest.json` with source, raster,
+pipeline and output hashes. Record the complete directory as build provenance;
+the firmware only compiles the two generated/public include headers.
 
-`rasterize.cjs` remains the original full-atlas Chromium rasterizer. It can
-rebuild every source via local Chromium/Playwright when a full raster refresh
-is intended; rerun `generate.py` afterwards to regenerate provenance.
-The Model, Plate and Head atlas remains 1448×1086 with its declared viewports.
+The row format is little-endian 16-bit skip, 15-bit count plus material bit,
+followed by count RGB565+alpha8 pixels. Transparent pixels are omitted. Offsets
+delimit each row. The portable decoder validates all bounds before emitting any
+pixels, preserves straight alpha and uses a 64-pixel/128-byte stack buffer.
+It supports images up to 256×1024 and never allocates. The sink receives native,
+unswapped RGB565 values, suitable for LovyanGFX's typed `rgb565_t` image overload.
 
-## Embedded format and budgets
-
-Rows contain little-endian 16-bit skip, 15-bit count plus material bit, then
-RGB565+alpha8 pixels. Transparent pixels are omitted. Row offsets delimit each
-row. The portable decoder validates bounds, preserves straight alpha and uses
-a 64-pixel/128-byte stack buffer without heap allocation. It supports images
-up to 256×1024 and emits native RGB565 values for LovyanGFX.
-
-The first eight sprites retain a 65 KiB allowance, scene components 100 KiB,
-and additional controls 32 KiB; the combined ceiling remains 165 KiB. Current
-encoded sizes are recorded in `manifest.json`. Tests cover provenance, row
-coding, mask separation, alpha, clipping, tint colours and malformed input.
+The eight reference assets occupy 28,225 encoded bytes including row offsets;
+the three scene components occupy 92,629. These measurements exclude small
+descriptors and compiled decoder code. Host tests cover encoding fidelity,
+provenance, malformed rows, alpha, all primary/neutral tint colours and chunk
+limits under ASan/UBSan. They do not certify physical LCD scanout.
+The original eight-asset allowance remains 65 KiB; scene components retain
+100 KiB, additional shared controls have 32 KiB, and the combined encoded budget
+remains 165 KiB. Actual sizes and source/raster hashes are in `manifest.json`.

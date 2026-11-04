@@ -4,18 +4,18 @@
   "pixel_order": "RGB565 host value after little-endian byte decode; alpha is straight/unpremultiplied",
   "material_rule": "g-r >= 8, g-b >= 7, g >= 1.08*r, g >= 1.08*b; only opted-in source assets",
   "recolor_rule": "source RGB565 maximum channel modulates requested RGB565 tint; nonmaterial pixels unchanged",
-  "svg_meet_note": "SVG icons use xMidYMid meet at their declared sprite size. Spool uses editable vector artwork; hero components retain their original atlas geometry.",
+  "svg_meet_note": "Spool uses SVG image 1280x1280 even though original PNG dimensions are 1254x1254, matching approved HTML.",
   "assets": [
     {
       "name": "Nozzle",
       "source": "raw/icons/nozzle.svg",
       "width": 42,
       "height": 46,
-      "source_sha256": "0c2cbcd4696fcb040e8133b765cbd8751674b631f780ffd4a6a7a4c816ed0911",
+      "source_sha256": "d61bbd23f9d7314bd7bb31d47988c79b40dbd2b06a80d0f97b29ed14b5a79f7b",
       "source_pixel_dimensions": null,
-      "rgba_sha256": "7113c8d5f826f81d93bc5f6c3ddd8a266d5b54678ebef43ab681fe828bd9f17b",
-      "png_sha256": "b86be646ec2b4e37e5c3aaf3a72d9a30ad8e056c23235eb4dbdd58b9976220f5",
-      "encoded_bytes": 2352,
+      "rgba_sha256": "90b28408d1cc0afa064ed4b56699b5b455cfe41e44f0191313402355b76e94e7",
+      "png_sha256": "ce2715a40a1c2e71f8f761953d6b1925ff3cc0b7e235481cc105b7e496508fcd",
+      "encoded_bytes": 2234,
       "row_offset_bytes": 188,
       "material_pixels": 0
     },
@@ -24,11 +24,11 @@
       "source": "raw/icons/bed.svg",
       "width": 42,
       "height": 46,
-      "source_sha256": "6f19cd17076db67e136e68eafcf99a367714c8a66dba56cf7ee76aaad57c8760",
+      "source_sha256": "1f98b3595f820adf5008e5d573171b710f0f3c7f14479c6d6078fe8708b865a5",
       "source_pixel_dimensions": null,
-      "rgba_sha256": "a869974a76b90348a0715cdb36646b9600026a54e95f2075cfa12b05af30b9b4",
-      "png_sha256": "e7aa0f7185824b719243313fe713d8cc8f783d408fd2970115c5278736c06d19",
-      "encoded_bytes": 2669,
+      "rgba_sha256": "4a73f57b0f2901aad35d47125b7487e390a09515783eae83375692cacaedb93a",
+      "png_sha256": "12bec0bf3ebb33fef8b04ab08e95f9616c9d319266f72909ad98cb611f5aa936",
+      "encoded_bytes": 2776,
       "row_offset_bytes": 188,
       "material_pixels": 0
     },
@@ -37,11 +37,11 @@
       "source": "raw/icons/chamber.svg",
       "width": 42,
       "height": 46,
-      "source_sha256": "a40cbc3dbfcac0bca6f878dc8e8a020523c6d261f49c086efdf7e215fce87fca",
+      "source_sha256": "eefbd1780deb1d95e6a123289f9aa06aaf21696fa148f90ef9067a43c87f6851",
       "source_pixel_dimensions": null,
-      "rgba_sha256": "caf5da1c105fe0d85397c59267a782e7bf41d4bd1977ede133415f3f60b6c5d3",
-      "png_sha256": "5c272f114d5aee6ef4b4df2acf7c2accdf5b7f1b3cc8fc4829d6008b410fca83",
-      "encoded_bytes": 3206,
+      "rgba_sha256": "939b23e661b99f5079dd3f0ed91f31284b2aa61d2272421bb90a571d53043b15",
+      "png_sha256": "83067d51e6fc8ae9cff91e1435711c18aa7953826c0b30e223caf9d1a8088344",
+      "encoded_bytes": 3105,
       "row_offset_bytes": 188,
       "material_pixels": 0
     },
@@ -118,7 +118,7 @@
         1254
       ],
       "rgba_sha256": "f537086da35f5d42c88676b187a007e7f9a4596aaf2c28236e8e213bf1114a47",
-      "png_sha256": "087a0490b98c1ff0cf1fed910e8740eae088ff157f646e77cabbb434e221642a",
+      "png_sha256": "2a3fe2ca2e1280fff50b54b65e14f6799ea0d44ede0fb6707bd86dc5328e8ff6",
       "encoded_bytes": 10270,
       "row_offset_bytes": 280,
       "material_pixels": 1293
@@ -330,14 +330,13 @@
       "material_pixels": 0
     }
   ],
-  "total_encoded_and_offsets_bytes": 146484,
+  "total_encoded_and_offsets_bytes": 146372,
   "generated_header": "include/ws43b_visual_assets_data.h",
-  "generated_header_sha256": "11a15e5ffd968ca39b1224771c3ed5953ad87a31ebb54e4274a5190cdaad1148",
+  "generated_header_sha256": "7e762031e48a90df10679535d36e78d9b407836bbd0256fe1b59d3eef2b3f49c",
   "pipeline_sha256": {
     "assets.json": "bd59e5d0f17dcc34fcd205c06bea8aa2934d32a419b0aed59e3d6937302e0ebf",
-    "generate.py": "44559dd74f3e8bde68620d90d4fa051810d4d7c62b6d4d6df073ff8c403d2b90",
+    "generate.py": "f94de4aa72057a19718f65d174e8142aa1f581e66f51c6f56fb0c6ba968d4d41",
     "rasterize.cjs": "c65c76391fff4f2abf5f4fab3658e421224fdda4213a149b63a5e086988f3321",
-    "rasterize_icons.cjs": "545a949f0c928a34bb67a390cba670ab64f8f48839658ce5001cba0f706e6969",
-    "rasterizer.json": "06348bf30dab869127bf5a4b59a2972e7fff5922e59bf16465ccf24cc804ab46"
+    "rasterizer.json": "4fc4b9694bce5970b6d627d50d92300d201545d929f8b22c55800c91b23ee479"
   }
 }
