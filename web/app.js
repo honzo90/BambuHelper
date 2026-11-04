@@ -2027,7 +2027,7 @@ function compareWs43bVersions(a,b){
 function selectWs43bRelease(data,channel,slotB){
   if (typeof slotB !== 'number' || !Number.isSafeInteger(slotB) || slotB <= 0) return null;
   var list;
-  if (channel === 'beta' || channel === 'alpha'){
+  if (channel === 'beta'){
     if (!Array.isArray(data)) return null;
     list = data;
   } else if (channel === 'stable'){
@@ -2048,9 +2048,7 @@ function selectWs43bRelease(data,channel,slotB){
     if (rel.prerelease === false){
       if (rel.prerelease === false && /^v\d+\.\d+\.\d+$/.test(tag)) validTag = true;
     } else {
-      if ((channel === 'beta' || channel === 'alpha') && rel.prerelease === true && /^v\d+\.\d+\.\d+-beta\.[1-9]\d*$/.test(tag)) validTag = true;
-      // Alpha also offers early development builds; Beta never does.
-      if (channel === 'alpha' && rel.prerelease === true && /^v\d+\.\d+\.\d+-alpha\.[1-9]\d*$/.test(tag)) validTag = true;
+      if (channel === 'beta' && rel.prerelease === true && /^v\d+\.\d+\.\d+-beta\.[1-9]\d*$/.test(tag)) validTag = true;
     }
     if (!validTag) continue;
     if (!Array.isArray(rel.assets)) continue;
@@ -2096,7 +2094,7 @@ function changeWs43bOtaChannel(){
 }
 function checkWs43bUpdates(){
   var select = document.getElementById('otaChannel');
-  var channel = (select && (select.value === 'beta' || select.value === 'alpha')) ? select.value : 'stable';
+  var channel = (select && select.value === 'beta') ? 'beta' : 'stable';
   var installBtn = document.getElementById('installBtn');
   if (installBtn && installBtn.disabled) return;
   checkWs43bUpdates.channel = channel;
@@ -2106,7 +2104,7 @@ function checkWs43bUpdates(){
   res.style.color = 'var(--info)'; res.textContent = 'Checking...'; info.style.display = 'none'; _autoOtaUrl = '';
   if (installBtn) installBtn.style.display = 'none';
   var ul = document.getElementById('updateLink'); if (ul) { ul.href = ''; ul.style.display = 'none'; }
-  var url = channel !== 'stable'
+  var url = channel === 'beta'
     ? 'https://api.github.com/repos/honzo90/BambuHelper/releases?per_page=100'
     : 'https://api.github.com/repos/honzo90/BambuHelper/releases/latest';
   fetch(url)
@@ -2117,7 +2115,7 @@ function checkWs43bUpdates(){
         res.textContent = 'No stable release has been published for this channel yet.';
         return;
       }
-      if (r.status === 404 && channel !== 'stable'){
+      if (r.status === 404 && channel === 'beta'){
         res.style.color = 'var(--info)';
         res.textContent = 'No compatible release has been published for this channel yet.';
         return;
@@ -2128,7 +2126,7 @@ function checkWs43bUpdates(){
     .then(function(d){
       if (checkWs43bUpdates.requestId !== rid) return;
       if (d === undefined) return;
-      if (channel !== 'stable' && !Array.isArray(d)){
+      if (channel === 'beta' && !Array.isArray(d)){
         res.style.color = 'var(--danger)';
         res.textContent = 'Invalid GitHub release response.';
         return;

@@ -1283,10 +1283,9 @@ R"rawliteral(
         <select id="otaChannel" onchange="changeWs43bOtaChannel()">
           <option value="stable" selected>Stable</option>
           <option value="beta">Beta</option>
-          <option value="alpha">Alpha</option>
         </select>
       </div>
-      <p class="small text-dim">Beta includes test releases and may be unstable. Alpha also offers early development builds. Stable is selected when this page is reopened.</p>
+      <p class="small text-dim">Beta includes test releases and may be unstable. Stable is selected when this page is reopened.</p>
 )rawliteral"
 #endif
 R"rawliteral(

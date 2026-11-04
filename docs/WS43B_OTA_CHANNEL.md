@@ -12,21 +12,13 @@ https://api.github.com/repos/honzo90/BambuHelper/releases/latest
 Kanal stabilny = opublikowane GitHub Releases (nie draft, nie prerelease).
 GitHub `releases/latest` pomija wydania testowe (prerelease).
 
-## Kanały Beta i Alpha
+## Rodzaje wersji
 
-Od `v4.1.0-alpha.1` WebUI oferuje trzy kanały; wszystkie oprócz Stable
-odpytują `releases?per_page=100`:
-
-| Kanał | Oferowane tagi |
-|---|---|
-| Stable | `vX.Y.Z` (release, nie prerelease) |
-| Beta | Stable + `vX.Y.Z-beta.N` (prerelease) |
-| Alpha | Beta + `vX.Y.Z-alpha.N` (prerelease) – wczesne wersje rozwojowe |
-
-Panel instaluje tylko wersję nowszą od zainstalowanej. Wersje sprzed
-`v4.1.0-alpha.1` nie mają kanału Alpha: pierwszą Alphę trzeba wgrać ręcznie
-(plik OTA na stronie aktualizacji), kolejne są już oferowane online.
-Po ponownym otwarciu strony wybrany jest kanał Stable.
+| Rodzaj | Tag | Dystrybucja |
+|---|---|---|
+| Alpha | `vX.Y.Z-alpha.N` | tylko plik OTA wgrywany ręcznie w WebUI; nie jest publikowany online |
+| Beta | `vX.Y.Z-beta.N` | GitHub prerelease; kanał **Beta** oferuje go online do testów na urządzeniu |
+| Stable | `vX.Y.Z` | zwykły GitHub release; kanały **Stable** i **Beta** |
 Inne płytki korzystają z upstream `Keralots/BambuHelper`.
 
 ## Status wydania
