@@ -1307,10 +1307,13 @@ function applyDisplay(){
   var p = new URLSearchParams();
   p.append('bright', document.getElementById('bright').value);
   if (document.getElementById('nighten').checked) p.append('nighten', '1');
-  p.append('nstart', document.getElementById('nstart').value);
-  p.append('nend', document.getElementById('nend').value);
-  p.append('nsmin', document.getElementById('nsmin').value);
-  p.append('nemin', document.getElementById('nemin').value);
+  // Night times are HH:MM time inputs; the firmware stores hour and minute.
+  [['nstart','nsmin'],['nend','nemin']].forEach(function(pair){
+    var m = /^(\d{1,2}):(\d{2})/.exec(document.getElementById(pair[0]).value || '');
+    if (!m) return; // keep the stored time when the field is empty
+    p.append(pair[0], String(parseInt(m[1], 10)));
+    p.append(pair[1], String(parseInt(m[2], 10)));
+  });
   p.append('nbright', document.getElementById('nbright').value);
   p.append('ssbright', document.getElementById('ssbright').value);
   p.append('rotation', document.getElementById('rotation').value);

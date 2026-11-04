@@ -96,8 +96,8 @@ static void readDisplayFromForm() {
   if (server.hasArg("bright")) brightness = server.arg("bright").toInt();
   // Night mode
   dpSettings.nightModeEnabled = server.hasArg("nighten");
-  if (server.hasArg("nstart")) dpSettings.nightStartHour = server.arg("nstart").toInt();
-  if (server.hasArg("nend"))   dpSettings.nightEndHour = server.arg("nend").toInt();
+  if (server.hasArg("nstart")) dpSettings.nightStartHour = constrain(server.arg("nstart").toInt(), 0, 23);
+  if (server.hasArg("nend"))   dpSettings.nightEndHour = constrain(server.arg("nend").toInt(), 0, 23);
   if (server.hasArg("nsmin"))  dpSettings.nightStartMinute = constrain(server.arg("nsmin").toInt(), 0, 59);
   if (server.hasArg("nemin"))  dpSettings.nightEndMinute = constrain(server.arg("nemin").toInt(), 0, 59);
   if (server.hasArg("nbright")) dpSettings.nightBrightness = server.arg("nbright").toInt();

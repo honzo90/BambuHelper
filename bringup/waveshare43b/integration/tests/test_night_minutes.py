@@ -49,15 +49,32 @@ int main(){
         server = (ROOT / 'src/web_server.cpp').read_text()
         for arg in ('nsmin', 'nemin'):
             self.assertIn(f'server.hasArg("{arg}")', server)
-            self.assertIn(f"p.append('{arg}'", (ROOT / 'web/app.js').read_text())
-            self.assertIn(f'id="{arg}"', (ROOT / 'include/web_pages.h').read_text())
         for field in ('nightStartMinute', 'nightEndMinute'):
             self.assertIn(f'dp["{field}"] = dpSettings.{field};', server)
             # Old exports without minutes import as :00.
             self.assertRegex(server, r'dpSettings\.' + field + r' = dp\["' + field + r'"\]\.is<uint8_t>\(\).*: 0;')
+        # WebUI: free HH:MM time inputs (any minute), split into hour + minute.
+        pages = (ROOT / 'include/web_pages.h').read_text()
+        for field, var in (('nstart', 'NIGHT_START_TIME'), ('nend', 'NIGHT_END_TIME')):
+            self.assertIn(f'<input type="time" id="{field}" step="60" required value="%{var}%">', pages)
+        self.assertNotIn('NIGHT_START_OPTS', pages)
+        app = (ROOT / 'web/app.js').read_text()
+        self.assertIn("[['nstart','nsmin'],['nend','nemin']]", app)
         template = (ROOT / 'src/web_template.cpp').read_text()
-        self.assertIn('NIGHT_SMIN_OPTS', template)
-        self.assertIn('m += 5', template)
+        self.assertIn('"NIGHT_START_TIME"', template)
+
+    def test_webui_time_split(self):
+        app = (ROOT / 'web/app.js').read_text()
+        start = app.index('function applyDisplay(){')
+        block = app[app.index('// Night times are HH:MM', start):app.index('});', app.index('// Night times are HH:MM', start)) + 3]
+        script = r'''
+const assert=require('assert');const values={nstart:'22:37',nend:'06:05'};
+const document={getElementById(id){return {value:values[id]};}};const p=new URLSearchParams();
+BLOCK
+assert.equal(p.toString(),'nstart=22&nsmin=37&nend=6&nemin=5');
+values.nstart='';const q=new URLSearchParams();
+'''.replace('BLOCK', block) + block.replace('p.append', 'q.append') + "\nassert.equal(q.toString(),'nend=6&nemin=5');\n"
+        subprocess.run(['node', '-e', script], check=True, capture_output=True, text=True)
 
 
 if __name__ == '__main__':
