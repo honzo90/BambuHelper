@@ -887,7 +887,7 @@
   "Night backlight": "Hintergrundbeleuchtung nachts",
   "Manual night starts": "Manueller Nachtbeginn",
   "Manual night ends": "Manuelles Nachtende",
-  "Requires time synchronization. With solar night enabled below, manual hours are used only when solar data is unavailable.": "Erfordert Zeitsynchronisierung. Ist unten die Nacht nach Sonnenstand aktiviert, gelten die manuellen Zeiten nur, wenn keine Sonnenstandsdaten verfügbar sind.",
+  "Requires time synchronization. Night hours always follow these times; outside them, solar dimming below only dims the screen.": "Erfordert Zeitsynchronisierung. Die Nacht folgt immer diesen Zeiten; außerhalb davon dunkelt die Sonnenstand-Abdunkelung unten den Bildschirm nur ab.",
   "Weather and solar night": "Wetter und Nacht nach Sonnenstand",
   "Location and weather": "Standort und Wetter",
   "Solar night and wake-up": "Nacht nach Sonnenstand und Aufwecken",

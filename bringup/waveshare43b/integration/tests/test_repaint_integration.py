@@ -20,6 +20,7 @@ class RepaintIntegration(unittest.TestCase):
 #include "ws43b_animation_policy.h"
 #define bit(b) (1UL << (b))
 #include "ws43b_repaint_plan.h"
+#include "ws43b_dusk_policy.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -97,6 +98,7 @@ bool isWiFiConnected(){return wifi;}bool isAPMode(){return ap;}bool isAnyPrinter
 bool isPrinterConfigured(unsigned i){return configured&&i<MAX_ACTIVE_PRINTERS;}
 bool navigationShown(uint32_t){return navigation;}
 bool isNightModeActive(){return night;}
+bool ws43bSolarNight(bool &value){value=false;return false;}
 unsigned getScreenState(){return screen;}
 bool glowIsArmed(){return glowArmed;}
 bool glowConsumeCleanup(){const bool result=glowCleanup;glowCleanup=false;return result;}

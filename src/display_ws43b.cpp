@@ -26,6 +26,7 @@
 #include "ws43b_print_scene.h"
 #include "ws43b_ui_icons.h"
 #include "ws43b_boot_scene.h"
+#include "ws43b_dusk_policy.h"
 #include "ws43b_drying_scene.h"
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
@@ -1058,7 +1059,7 @@ void weatherSettingsScreen() {
   button(ws43bText("< Ustawienia","< Settings","< Einstellungen"),44,98,174,36,false);
   small(ws43bText("POGODA I DZIEŃ/NOC","WEATHER AND DAY/NIGHT","WETTER UND TAG/NACHT"),222,105,530,ACCENT);
   settingRow(ws43bText("Pokaż pogodę","Show weather","Wetter anzeigen"),c.enabled?ws43bText("Włączone","On","Ein"):ws43bText("Wyłączone","Off","Aus"),151,c.enabled);
-  settingRow(ws43bText("Tryb nocny","Night mode","Nachtmodus"),c.solar?ws43bText("Zachód / wschód słońca","Sunset / sunrise","Sonnenuntergang / -aufgang"):ws43bText("Ręczne godziny","Manual hours","Manuelle Zeiten"),217,c.solar);
+  settingRow(ws43bText("Zmrok: 50%","Dusk: 50%","Dämmerung: 50%"),c.solar?ws43bText("Od zachodu słońca","From sunset","Ab Sonnenuntergang"):ws43bText("Wyłączone","Off","Aus"),217,c.solar);
   char text[80];snprintf(text,sizeof(text),"%u s",c.nightSeconds);
   settingRow(ws43bText("Noc: bez dotyku","Night: no touch","Nachts: ohne Berührung"),text,283);
   dashText(*c.city?c.city:ws43bText("Wybierz miejscowość w WebUI","Choose location in WebUI","Ort in der WebUI wählen"),44,349,710,18,DIM);
@@ -1767,12 +1768,16 @@ void renderWs43bMonitor(bool force) {
   const bool coolingNow=observedCooling&&(ws43bAdvancedDisplay()||!activeProgress);
   if(coolingNow!=dashboardCooling){dashboardCooling=coolingNow;painted=false;}
   if(dashboardActivity.update(ws43b_view::activity(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now,coolingNow),now,coolingState.monitor.session,rotState.displayIndex))painted=false;
-  bool nightDim=false;
+  uint8_t colorPercent=100;
 #if WS43B_FULL_WEBUI
-  nightDim=isNightModeActive() && !isAPMode() && isAnyPrinterConfigured() &&
-           uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
+  {
+    bool solarNight=false;
+    const bool solarKnown=ws43bSolarNight(solarNight);
+    colorPercent=ws43b_dusk::colorPercent(!isAPMode() && isAnyPrinterConfigured(),isNightModeActive(),
+      uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u,solarKnown && solarNight);
+  }
 #endif
-  if(ws43b::setColorPercent(nightDim?30:100)) {
+  if(ws43b::setColorPercent(colorPercent)) {
     painted=false;waterCached=false;force=true;
   }
 #if WS43B_FULL_WEBUI

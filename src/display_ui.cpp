@@ -5366,10 +5366,8 @@ static bool isNightHour() {
   localtime_r(&t, &now);
   if (now.tm_year < (2020 - 1900)) return false;  // NTP not synced yet
 
-#if defined(BOARD_IS_WS43B)
-  bool solarNight=false;
-  if(ws43bSolarNight(solarNight))return solarNight;
-#endif
+  // WS43B: solar data no longer replaces these hours; between sunset and
+  // sunrise outside them the panel only dims (see eveningDimActive()).
   uint8_t h = now.tm_hour;
   uint8_t s = dpSettings.nightStartHour;
   uint8_t e = dpSettings.nightEndHour;
