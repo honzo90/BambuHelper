@@ -1355,6 +1355,10 @@ bool clockTimeText(char *out, size_t size, bool &pm) {
 lgfx::LGFX_Sprite flipGlyph[2][ws43b_clock_flip::kTextMax];  // [0] old, [1] new
 int flipCellX[ws43b_clock_flip::kTextMax]={},flipCellW[ws43b_clock_flip::kTextMax]={};
 bool flipGlyphsReady=false;
+// Last finished flip: frames drawn and wall time, for /monitor/status.
+uint16_t flipFrames=0,lastFlipFrames=0;uint32_t lastFlipMs=0;
+uint16_t ws43bLastFlipFrames(){return lastFlipFrames;}
+uint32_t ws43bLastFlipMs(){return lastFlipMs;}
 void releaseFlipGlyphs() {
   for(auto &row:flipGlyph)for(auto &sprite:row)sprite.deleteSprite();
   flipGlyphsReady=false;
@@ -1405,9 +1409,12 @@ void clockDigitsBand(const char *text, bool ampm, bool pm, uint32_t now, uint16_
     }
     tft.clearClipRect();
     clockBandDirty=true;
+    ++flipFrames;
     return;
   }
   // Static digits (also the final frame after a flip).
+  if(flipGlyphsReady){lastFlipFrames=flipFrames;lastFlipMs=uint32_t(now-clockFlip.start);}
+  flipFrames=0;
   releaseFlipGlyphs();
   tft.setClipRect(100,62,600,142);tft.fillRect(100,62,600,142,bg);
   tft.setTextSize(1);

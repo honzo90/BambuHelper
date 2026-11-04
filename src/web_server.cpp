@@ -27,6 +27,7 @@
 #include <WebServer.h>
 #if defined(BOARD_IS_WS43B)
 #include "ws43b_weather.h"
+#include "display_ws43b.h"
 #include <WiFi.h>  // core 3 no longer provides WiFi through WebServer's headers
 #include <esp_system.h>
 #include <esp_heap_caps.h>
@@ -914,6 +915,12 @@ static void handleMonitorStatus() {
   doc["display_frames"] = displayDiag.frames;
   doc["display_last_render_us"] = displayDiag.lastRenderUs;
   doc["display_max_render_us"] = displayDiag.maxRenderUs;
+  doc["display_last_copy_us"] = displayDiag.lastCopyUs;
+  doc["display_last_wait_us"] = displayDiag.lastWaitUs;
+  doc["display_last_copy_rows"] = displayDiag.lastCopyRows;
+  doc["display_presents"] = displayDiag.presents;
+  doc["clock_flip_frames"] = ws43bLastFlipFrames();
+  doc["clock_flip_ms"] = ws43bLastFlipMs();
   doc["display_legacy_fill_probes"] = displayDiag.legacyFillProbes;
   doc["display_legacy_fill_mismatches"] = displayDiag.legacyFillMismatches;
   doc["display_fill_readback_errors"] = displayDiag.fillReadbackErrors;
@@ -992,6 +999,12 @@ static void handleStatus() {
   doc["display_frames"] = displayDiag.frames;
   doc["display_last_render_us"] = displayDiag.lastRenderUs;
   doc["display_max_render_us"] = displayDiag.maxRenderUs;
+  doc["display_last_copy_us"] = displayDiag.lastCopyUs;
+  doc["display_last_wait_us"] = displayDiag.lastWaitUs;
+  doc["display_last_copy_rows"] = displayDiag.lastCopyRows;
+  doc["display_presents"] = displayDiag.presents;
+  doc["clock_flip_frames"] = ws43bLastFlipFrames();
+  doc["clock_flip_ms"] = ws43bLastFlipMs();
   doc["display_legacy_fill_probes"] = displayDiag.legacyFillProbes;
   doc["display_legacy_fill_mismatches"] = displayDiag.legacyFillMismatches;
   doc["display_fill_readback_errors"] = displayDiag.fillReadbackErrors;

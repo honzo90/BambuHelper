@@ -395,14 +395,20 @@ void Panel_WS43B::display(uint_fast16_t x, uint_fast16_t y,
   const size_t first = _pendingRows.top[_backIndex];
   const size_t rows = _pendingRows.bottom[_backIndex] - first;
   const size_t offset = first * WIDTH * sizeof(uint16_t);
+  const uint32_t copyStarted = micros();
   if (!ws43b::copyFrameChecked(back + offset, _canvas + offset, copyRow, sizeof(copyRow),
                               WIDTH * sizeof(uint16_t), rows, colorPercent))
     ws43b::fatal("FRAME_COPY_READBACK");
+  renderStats.lastCopyUs = uint32_t(micros() - copyStarted);
+  renderStats.lastCopyRows = uint32_t(rows);
   _pendingRows.copied(_backIndex);
   if (!guardsIntact()) ws43b::fatal("CANVAS_GUARD");
   if (!lcd->switchFrameBufferTo(back)) ws43b::fatal("FRAME_SWITCH");
   const uint32_t afterSwitch = completedFrames();
+  const uint32_t waitStarted = micros();
   waitForFrameRelease(afterSwitch);
+  renderStats.lastWaitUs = uint32_t(micros() - waitStarted);
+  ++renderStats.presents;
   // Neither the new front nor the previous front is written during the wait.
   _backIndex ^= 1;
   _range_mod.top = _range_mod.left = INT16_MAX;
