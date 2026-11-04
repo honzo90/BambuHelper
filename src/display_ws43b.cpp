@@ -45,7 +45,7 @@ constexpr uint16_t WARN = 0xF5CB, RED = 0xF38F;
 uint16_t BG = ws43b_style::background, ACCENT = ws43b_style::mint, TRACK = ws43b_style::border;
 uint32_t lastFrame = 0;
 bool painted = false;
-enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset };
+enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset, NightSettings };
 Page page = Page::Dashboard;
 uint32_t navigationActivity = 0;
 uint8_t selectedAms = 0;
@@ -67,7 +67,7 @@ unsigned liveAms(const BambuMonitorTelemetry &m) {
 }
 bool navigationShown(uint32_t now) {
   return ws43b_view::navigationVisible(now, navigationActivity,
-      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings);
+      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings || page == Page::NightSettings);
 }
 bool touchHeld = false, touchMoved = false, touchNeedsRelease = false;
 uint16_t pressX = 0, pressY = 0;
@@ -288,7 +288,7 @@ void footer(const BambuMonitorTelemetry &, uint32_t now) {
   const char *names[]={ws43bText("Wydruk","Print","Druck"),"AMS",ws43bText("Szczegóły","Details","Details"),ws43bText("Ustawienia","Settings","Einstellungen")};
   const ws43b_assets::Asset icons[]={ws43b_assets::Asset::Print,ws43b_assets::Asset::AMS,ws43b_assets::Asset::Details,ws43b_assets::Asset::Settings};
   for(int i=0;i<4;++i) {
-    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
+    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::NightSettings || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
     const int x=16+i*194;
     if(active) {
       tft.fillRoundRect(x,440,184,36,9,activeBg);
@@ -935,8 +935,8 @@ void settingsScreen() {
   const uint32_t elapsed=holding?uint32_t(millis()-pressMs):0;
   dashText("System",680,96,96,18,holding?INK:DIM);
   if(holding)tft.fillRect(680,121,80*(elapsed>3000?3000:elapsed)/3000,2,ACCENT);
-  const char *titles[]={ws43bText("Wygląd", "Appearance","Darstellung"),ws43bText("Zegar i ekran", "Clock and screen","Uhr und Bildschirm"),ws43bText("Pogoda i noc", "Weather and night","Wetter und Nacht"),ws43bText("Język i dane", "Language and data","Sprache und Daten")};
-  const char *hints[]={ws43bText("Motyw kolorystyczny", "Color theme","Farbdesign"),ws43bText("Czas bez dotyku i wygaszanie", "Idle timeout and sleep","Inaktivität und Ruhe"),ws43bText("Pogoda, słońce i czas nocny", "Weather, sun and night timeout","Wetter, Sonne und Nachttimer"),ws43bText("PL / EN / DE, wentylatory", "PL / EN / DE, fans","PL / EN / DE, Lüfter")};
+  const char *titles[]={ws43bText("Wygląd", "Appearance","Darstellung"),ws43bText("Zegar i ekran", "Clock and screen","Uhr und Bildschirm"),ws43bText("Pogoda i noc", "Weather and night","Wetter und Nacht"),ws43bText("Język i WebUI", "Language and WebUI","Sprache und WebUI")};
+  const char *hints[]={ws43bText("Motyw, tryb ekranu, wentylatory", "Theme, display mode, fans","Design, Anzeigemodus, Lüfter"),ws43bText("Czas bez dotyku i wygaszanie", "Idle timeout and sleep","Inaktivität und Ruhe"),ws43bText("Pogoda, zmrok i godziny nocy", "Weather, dusk and night hours","Wetter, Dämmerung und Nachtzeiten"),ws43bText("PL / EN / DE, kod QR, wersja", "PL / EN / DE, QR code, version","PL / EN / DE, QR-Code, Version")};
   for(int i=0;i<4;++i) {
     const int x=24+(i%2)*384,y=140+(i/2)*132;
     tft.fillRoundRect(x,y,368,114,12,CARD);
@@ -975,7 +975,7 @@ void appearanceSettingsScreen() {
   const char *names[]={ws43bText("Miętowy", "Mint","Minze"),ws43bText("Zielony", "Green","Grün"),ws43bText("Bursztynowy", "Amber","Bernstein")};
   const uint16_t accents[]={0x67B6,0x77B2,0xF5CB};
   for(uint8_t i=0;i<3;++i) {
-    const int y=151+66*i;
+    const int y=142+56*i;
     const bool selected=ws43bViewTheme()==i;
     // Match ordinary settings rows; these are radio choices, not submenus.
     tft.fillRoundRect(44,y,708,48,9,CARD);
@@ -990,19 +990,24 @@ void appearanceSettingsScreen() {
     tft.drawCircle(724,y+24,8,selected?ACCENT:DIM);
     if(selected)tft.fillCircle(724,y+24,4,ACCENT);
   }
-  button(ws43bText("Prosty","Simple","Einfach"),44,347,220,46,!ws43bAdvancedDisplay());
-  button(ws43bText("Zaawansowany (w budowie)","Advanced (in development)","Erweitert (in Entwicklung)"),276,347,476,46,ws43bAdvancedDisplay());
-  if(settingsNotice)small(settingsNotice,44,404,708);
-  else dashText(ws43bText("Tryb ekranu: Wydruk i wygaszacz. Alarmy w obu trybach.","Display mode: Print and screensaver. Alerts in both modes.","Anzeigemodus: Druck und Bildschirmschoner. Warnungen in beiden Modi."),44,404,708,14,DIM);
+  settingRow(ws43bText("Tryb ekranu","Display mode","Anzeigemodus"),ws43bAdvancedDisplay()?ws43bText("Zaawansowany (w budowie)","Advanced (in development)","Erweitert (in Entwicklung)"):ws43bText("Prosty","Simple","Einfach"),310);
+  settingRow(ws43bText("Wentylatory","Fans","Lüfter"),dispSettings.fanMatchPrinter?ws43bText("Co 10%","Steps of 10%","10%-Schritte"):ws43bText("Co 1%","Steps of 1%","1%-Schritte"),366);
+  if(settingsNotice)small(settingsNotice,44,420,708);
 }
 void generalSettingsScreen() {
 
   button(ws43bText("< Ustawienia", "< Settings","< Einstellungen"),44,98,174,36,false);
-  dashText(ws43bText("Język i dane", "Language and data","Sprache und Daten"),244,102,490,24,INK);
+  dashText(ws43bText("Język i WebUI", "Language and WebUI","Sprache und WebUI"),244,102,490,24,INK);
   settingRow(ws43bText("Język","Language","Sprache"),ws43bText("Polski","English","Deutsch"),151);
-  settingRow(ws43bText("Wentylatory","Fans","Lüfter"),dispSettings.fanMatchPrinter?ws43bText("Co 10%","Steps of 10%","10%-Schritte"):ws43bText("Co 1%","Steps of 1%","1%-Schritte"),217);
-  settingRow(ws43bText("Otwórz WebUI","Open WebUI","WebUI öffnen"),ws43bText("Kod QR","QR code","QR-Code"),283);
-  dashText(ws43bText("Język wspólny dla panelu i WebUI.","Language shared by panel and WebUI.","Gemeinsame Sprache für Panel und WebUI."),44,348,708,18,DIM);
+  settingRow(ws43bText("Otwórz WebUI","Open WebUI","WebUI öffnen"),ws43bText("Kod QR","QR code","QR-Code"),217);
+  dashText(ws43bText("Język wspólny dla panelu i WebUI.","Language shared by panel and WebUI.","Gemeinsame Sprache für Panel und WebUI."),44,283,708,14,DIM);
+  // Panel info: firmware, address and signal help diagnose without the WebUI.
+  small(ws43bText("O PANELU","ABOUT THIS PANEL","ÜBER DIESES PANEL"),44,316,708,ACCENT);
+  char info[96];
+  if(isWiFiConnected() && uint32_t(WiFi.localIP())!=0)
+    snprintf(info,sizeof(info),"%s  ·  %s  ·  Wi-Fi %d dBm",FW_VERSION,WiFi.localIP().toString().c_str(),int(WiFi.RSSI()));
+  else snprintf(info,sizeof(info),"%s  ·  %s",FW_VERSION,ws43bText("Brak Wi-Fi","No Wi-Fi","Kein WLAN"));
+  dashText(info,44,340,708,18,INK);
   small(settingsNotice,44,382,710);
 }
 void connectedWifiName(int x,int y,int w) {
@@ -1020,7 +1025,7 @@ void connectedWifiName(int x,int y,int w) {
   if(split<ssid.length()) dashText(ssid.substring(split).c_str(),x,y+26,w,18,INK);
 }
 void webQrScreen() {
-  button(ws43bText("< Język i dane", "< Language and data","< Sprache und Daten"),24,82,280,40,false);
+  button(ws43bText("< Język i WebUI", "< Language and WebUI","< Sprache und WebUI"),24,82,280,40,false);
   dashText(ws43bText("Otwórz WebUI", "Open WebUI","WebUI öffnen"),350,92,420,24,INK);
   const IPAddress ip=WiFi.localIP();
   if(!isWiFiConnected() || uint32_t(ip)==0) {
@@ -1051,8 +1056,15 @@ void clockSettingsScreen() {
   settingRow(ws43bText("Bez dotyku","No touch","Ohne Berührung"),buf,151);
   settingRow(ws43bText("Po czasie","On timeout","Nach Ablauf der Wartezeit"),clock.screenOff?ws43bText("Wyłącz ekran","Turn off screen","Bildschirm ausschalten"):ws43bText("Pokaż zegar","Show clock","Uhr anzeigen"),217);
   settingRow(ws43bText("Format czasu","Time format","Zeitformat"),clock.use24h?"24 h":"12 h (AM/PM)",283);
+  settingRow(ws43bText("Pong na zegarze","Pong clock","Pong-Uhr"),dispSettings.pongClock?ws43bText("Włączony","On","Ein"):ws43bText("Wyłączony","Off","Aus"),349,dispSettings.pongClock);
 
-  small(settingsNotice, 44, 382, 710);
+  small(settingsNotice, 44, 404, 710);
+}
+char nightHoursText[32];
+const char *nightSummary() {
+  if(!dpSettings.nightModeEnabled || dpSettings.nightStartHour==dpSettings.nightEndHour)return ws43bText("Wyłączona","Off","Aus");
+  snprintf(nightHoursText,sizeof(nightHoursText),"%02u:00 - %02u:00",unsigned(dpSettings.nightStartHour),unsigned(dpSettings.nightEndHour));
+  return nightHoursText;
 }
 void weatherSettingsScreen() {
   const auto c=ws43bWeatherConfig();
@@ -1060,10 +1072,34 @@ void weatherSettingsScreen() {
   small(ws43bText("POGODA I DZIEŃ/NOC","WEATHER AND DAY/NIGHT","WETTER UND TAG/NACHT"),222,105,530,ACCENT);
   settingRow(ws43bText("Pokaż pogodę","Show weather","Wetter anzeigen"),c.enabled?ws43bText("Włączone","On","Ein"):ws43bText("Wyłączone","Off","Aus"),151,c.enabled);
   settingRow(ws43bText("Zmrok: 50%","Dusk: 50%","Dämmerung: 50%"),c.solar?ws43bText("Od zachodu słońca","From sunset","Ab Sonnenuntergang"):ws43bText("Wyłączone","Off","Aus"),217,c.solar);
-  char text[80];snprintf(text,sizeof(text),"%u s",c.nightSeconds);
-  settingRow(ws43bText("Noc: bez dotyku","Night: no touch","Nachts: ohne Berührung"),text,283);
+  settingRow(ws43bText("Noc","Night","Nacht"),nightSummary(),283,dpSettings.nightModeEnabled);
   dashText(*c.city?c.city:ws43bText("Wybierz miejscowość w WebUI","Choose location in WebUI","Ort in der WebUI wählen"),44,349,710,18,DIM);
-  small(dpSettings.nightModeEnabled?settingsNotice:ws43bText("Harmonogram nocny włącz w WebUI.","Enable the night schedule in WebUI.","Nachtzeitplan in der WebUI aktivieren."),44,382,710);
+  small(settingsNotice,44,382,710);
+}
+
+// Night hours row: value plus - / + buttons on the right.
+void nightHourRow(const char *title,uint8_t hour,int y) {
+  tft.fillRoundRect(44,y,708,48,9,CARD);tft.drawRoundRect(44,y,708,48,9,TRACK);
+  dashText(title,60,y+13,320,18,INK);
+  char text[8];snprintf(text,sizeof(text),"%02u:00",unsigned(hour));
+  dashText(text,470,y+13,110,18,ACCENT);
+  for(int i=0;i<2;++i) {
+    const int x=596+i*78;
+    tft.fillRoundRect(x,y+7,66,34,8,ws43b_native::line);
+    dashText(i?"+":"-",x+28,y+13,20,18,INK);
+  }
+}
+void nightSettingsScreen() {
+  const auto c=ws43bWeatherConfig();
+  button(ws43bText("< Pogoda i noc","< Weather and night","< Wetter und Nacht"),44,98,250,36,false);
+  small(ws43bText("NOC","NIGHT","NACHT"),318,105,430,ACCENT);
+  settingRow(ws43bText("Harmonogram nocy","Night schedule","Nachtzeitplan"),dpSettings.nightModeEnabled?ws43bText("Włączony","On","Ein"):ws43bText("Wyłączony","Off","Aus"),142,dpSettings.nightModeEnabled);
+  nightHourRow(ws43bText("Początek nocy","Night starts","Nacht beginnt"),dpSettings.nightStartHour,198);
+  nightHourRow(ws43bText("Koniec nocy","Night ends","Nacht endet"),dpSettings.nightEndHour,254);
+  settingRow(ws43bText("W nocy","At night","Nachts"),dpSettings.nightBrightness==0?ws43bText("Ekran wyłączony","Screen off","Bildschirm aus"):ws43bText("Zegar 30%","Clock at 30%","Uhr mit 30%"),310);
+  char text[24];if(c.nightSeconds<60)snprintf(text,sizeof(text),"%u s",c.nightSeconds);else snprintf(text,sizeof(text),"%u min",c.nightSeconds/60);
+  settingRow(ws43bText("Bez dotyku","No touch","Ohne Berührung"),text,366);
+  small(settingsNotice,44,420,708);
 }
 #if WS43B_FULL_WEBUI
 bool gaugeDataFresh(uint8_t type, const BambuState &state, uint32_t now) {
@@ -1677,9 +1713,31 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     auto c=ws43bWeatherConfig();
     if(pressY>=151&&pressY<199)c.enabled=!c.enabled;
     else if(pressY>=217&&pressY<265)c.solar=!c.solar;
-    else if(pressY>=283&&pressY<331)c.nightSeconds=c.nightSeconds==30?60:c.nightSeconds==60?300:30;
+    else if(pressY>=283&&pressY<331){page=Page::NightSettings;settingsNotice=nullptr;painted=false;return;}
     else return;
     settingsNotice=saveWs43bWeather(c)?ws43bText("Zapisano ustawienia.","Settings saved.","Einstellungen gespeichert."):ws43bText("Wybierz miejscowosc w WebUI.","Choose location in WebUI.","Ort in der WebUI wählen.");
+  } else if(page==Page::NightSettings) {
+    if(pressX>=44&&pressX<294&&pressY>=98&&pressY<134){page=Page::WeatherSettings;settingsNotice=nullptr;painted=false;return;}
+    if(pressX<44||pressX>=752||pressY<142||pressY>=414||(pressY-142)%56>=48)return;
+    const int row=(pressY-142)/56;
+    if(row==4) {
+      auto c=ws43bWeatherConfig();
+      c.nightSeconds=c.nightSeconds==30?60:c.nightSeconds==60?300:30;
+      settingsNotice=saveWs43bWeather(c)?ws43bText("Zapisano ustawienia nocy.","Night settings saved.","Nachteinstellungen gespeichert."):ws43bText("Wybierz miejscowosc w WebUI.","Choose location in WebUI.","Ort in der WebUI wählen.");
+    } else {
+      if(row==0)dpSettings.nightModeEnabled=!dpSettings.nightModeEnabled;
+      else if(row==1||row==2) {
+        int step=0;
+        if(pressX>=590&&pressX<668)step=-1; else if(pressX>=668)step=1; else return;
+        uint8_t &hour=row==1?dpSettings.nightStartHour:dpSettings.nightEndHour;
+        const uint8_t other=row==1?dpSettings.nightEndHour:dpSettings.nightStartHour;
+        hour=uint8_t((hour+24+step)%24);
+        if(hour==other)hour=uint8_t((hour+24+step)%24); // equal hours would disable the night
+      }
+      else if(row==3)dpSettings.nightBrightness=dpSettings.nightBrightness==0?255:0;
+      saveSettings();
+      settingsNotice=ws43bText("Zapisano ustawienia nocy.","Night settings saved.","Nachteinstellungen gespeichert.");
+    }
   } else if (page == Page::ClockSettings) {
     const auto &clock = ws43bClockSettings();
     uint16_t idle = clock.idleMinutes;
@@ -1693,6 +1751,13 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
       for (unsigned i = 0; i < 5; ++i) if (idle == minutes[i]) { idle = minutes[(i + 1) % 5]; break; }
     } else if (pressY >= 217 && pressY < 265) off = !off;
     else if (pressY >= 283 && pressY < 331) use24h = !use24h;
+    else if (pressY >= 349 && pressY < 397) {
+      // Same storage as the WebUI clock section (saveSettings writes dsp_pong).
+      dispSettings.pongClock = !dispSettings.pongClock;
+      saveSettings();
+      settingsNotice = ws43bText("Zapisano ustawienia zegara.", "Clock settings saved.","Uhreinstellungen gespeichert.");
+      painted = false; return;
+    }
     else return;
     settingsNotice = saveWs43bClockSettings(idle, off, use24h) ? ws43bText("Zapisano ustawienia zegara.", "Clock settings saved.","Uhreinstellungen gespeichert.") : ws43bText("Blad zapisu. Sprobuj ponownie.", "Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
   } else if (page == Page::Settings) {
@@ -1711,13 +1776,12 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
       page=Page::Settings;settingsNotice=nullptr;painted=false;return;
     }
     if(pressX<44||pressX>=752)return;
-    if(page==Page::Appearance && pressY>=347&&pressY<393) {
-      if(pressX>=264&&pressX<276)return;
-      const bool saved=saveWs43bDisplayMode(pressX>=276);
+    if(page==Page::Appearance && pressY>=310&&pressY<358) {
+      const bool saved=saveWs43bDisplayMode(!ws43bAdvancedDisplay());
       settingsNotice=saved?ws43bText("Zapisano tryb ekranu.","Display mode saved.","Anzeigemodus gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
       painted=false;return;
     }
-    if(page==Page::GeneralSettings && pressY>=283&&pressY<331) {
+    if(page==Page::GeneralSettings && pressY>=217&&pressY<265) {
       page=Page::WebQr;painted=false;return;
     }
     if(page==Page::GeneralSettings && pressY>=151&&pressY<199) {
@@ -1725,8 +1789,8 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
       settingsNotice=saved?ws43bText("Zapisano jezyk.","Language saved.","Sprache gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
     } else {
       uint8_t theme=ws43bViewTheme();bool fanMatch=dispSettings.fanMatchPrinter;
-      if(page==Page::Appearance && pressY>=151&&pressY<331 && (pressY-151)%66<48)theme=(pressY-151)/66;
-      else if(page==Page::GeneralSettings && pressY>=217&&pressY<265)fanMatch=!fanMatch;
+      if(page==Page::Appearance && pressY>=142&&pressY<310 && (pressY-142)%56<48)theme=(pressY-142)/56;
+      else if(page==Page::Appearance && pressY>=366&&pressY<414)fanMatch=!fanMatch;
       else return;
       settingsNotice=saveWs43bViewSettings(theme,fanMatch)?ws43bText("Zapisano ustawienia panelu.","Panel settings saved.","Paneleinstellungen gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
     }
@@ -2098,6 +2162,7 @@ void renderWs43bMonitor(bool force) {
     }
     else if (page == Page::ClockSettings) clockSettingsScreen();
     else if (page == Page::WeatherSettings) weatherSettingsScreen();
+    else if (page == Page::NightSettings) nightSettingsScreen();
     else if(page==Page::Appearance)appearanceSettingsScreen();
     else if(page==Page::GeneralSettings)generalSettingsScreen();
     else if(page==Page::WebQr)webQrScreen();
