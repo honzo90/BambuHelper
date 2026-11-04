@@ -45,8 +45,18 @@ constexpr uint16_t WARN = 0xF5CB, RED = 0xF38F;
 uint16_t BG = ws43b_style::background, ACCENT = ws43b_style::mint, TRACK = ws43b_style::border;
 uint32_t lastFrame = 0;
 bool painted = false;
-enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset, NightSettings, NightHourPicker };
+enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset, NightSettings, NightHourPicker, NightMinutePicker };
 bool pickingNightStart = true;
+uint8_t pickedNightHour = 0;
+// Night start/end as minutes of the day (hour + minute settings).
+uint16_t nightMinuteOfDay(bool start) {
+  return start?uint16_t(dpSettings.nightStartHour*60+dpSettings.nightStartMinute):uint16_t(dpSettings.nightEndHour*60+dpSettings.nightEndMinute);
+}
+void setNightMinuteOfDay(bool start,uint16_t value) {
+  value%=1440;
+  (start?dpSettings.nightStartHour:dpSettings.nightEndHour)=uint8_t(value/60);
+  (start?dpSettings.nightStartMinute:dpSettings.nightEndMinute)=uint8_t(value%60);
+}
 Page page = Page::Dashboard;
 uint32_t navigationActivity = 0;
 uint8_t selectedAms = 0;
@@ -68,7 +78,7 @@ unsigned liveAms(const BambuMonitorTelemetry &m) {
 }
 bool navigationShown(uint32_t now) {
   return ws43b_view::navigationVisible(now, navigationActivity,
-      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings || page == Page::NightSettings || page == Page::NightHourPicker);
+      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings || page == Page::NightSettings || page == Page::NightHourPicker || page == Page::NightMinutePicker);
 }
 bool touchHeld = false, touchMoved = false, touchNeedsRelease = false;
 uint16_t pressX = 0, pressY = 0;
@@ -289,7 +299,7 @@ void footer(const BambuMonitorTelemetry &, uint32_t now) {
   const char *names[]={ws43bText("Wydruk","Print","Druck"),"AMS",ws43bText("Szczegóły","Details","Details"),ws43bText("Ustawienia","Settings","Einstellungen")};
   const ws43b_assets::Asset icons[]={ws43b_assets::Asset::Print,ws43b_assets::Asset::AMS,ws43b_assets::Asset::Details,ws43b_assets::Asset::Settings};
   for(int i=0;i<4;++i) {
-    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::NightSettings || page==Page::NightHourPicker || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
+    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::NightSettings || page==Page::NightHourPicker || page==Page::NightMinutePicker || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
     const int x=16+i*194;
     if(active) {
       tft.fillRoundRect(x,440,184,36,9,activeBg);
@@ -1063,8 +1073,9 @@ void clockSettingsScreen() {
 }
 char nightHoursText[32];
 const char *nightSummary() {
-  if(!dpSettings.nightModeEnabled || dpSettings.nightStartHour==dpSettings.nightEndHour)return ws43bText("Wyłączona","Off","Aus");
-  snprintf(nightHoursText,sizeof(nightHoursText),"%02u:00 - %02u:00",unsigned(dpSettings.nightStartHour),unsigned(dpSettings.nightEndHour));
+  if(!dpSettings.nightModeEnabled || nightMinuteOfDay(true)==nightMinuteOfDay(false))return ws43bText("Wyłączona","Off","Aus");
+  snprintf(nightHoursText,sizeof(nightHoursText),"%02u:%02u - %02u:%02u",unsigned(dpSettings.nightStartHour),unsigned(dpSettings.nightStartMinute),
+           unsigned(dpSettings.nightEndHour),unsigned(dpSettings.nightEndMinute));
   return nightHoursText;
 }
 void weatherSettingsScreen() {
@@ -1079,10 +1090,10 @@ void weatherSettingsScreen() {
 }
 
 // Night hours row: value plus - / + buttons on the right.
-void nightHourRow(const char *title,uint8_t hour,int y) {
+void nightHourRow(const char *title,uint16_t minuteOfDay,int y) {
   tft.fillRoundRect(44,y,708,48,9,CARD);tft.drawRoundRect(44,y,708,48,9,TRACK);
   dashText(title,60,y+13,320,18,INK);
-  char text[8];snprintf(text,sizeof(text),"%02u:00",unsigned(hour));
+  char text[8];snprintf(text,sizeof(text),"%02u:%02u",unsigned(minuteOfDay/60),unsigned(minuteOfDay%60));
   dashText(text,470,y+13,110,18,ACCENT);
   for(int i=0;i<2;++i) {
     const int x=596+i*78;
@@ -1095,28 +1106,42 @@ void nightSettingsScreen() {
   button(ws43bText("< Pogoda i noc","< Weather and night","< Wetter und Nacht"),44,98,250,36,false);
   small(ws43bText("NOC","NIGHT","NACHT"),318,105,430,ACCENT);
   settingRow(ws43bText("Harmonogram nocy","Night schedule","Nachtzeitplan"),dpSettings.nightModeEnabled?ws43bText("Włączony","On","Ein"):ws43bText("Wyłączony","Off","Aus"),142,dpSettings.nightModeEnabled);
-  nightHourRow(ws43bText("Początek nocy","Night starts","Nacht beginnt"),dpSettings.nightStartHour,198);
-  nightHourRow(ws43bText("Koniec nocy","Night ends","Nacht endet"),dpSettings.nightEndHour,254);
+  nightHourRow(ws43bText("Początek nocy","Night starts","Nacht beginnt"),nightMinuteOfDay(true),198);
+  nightHourRow(ws43bText("Koniec nocy","Night ends","Nacht endet"),nightMinuteOfDay(false),254);
   settingRow(ws43bText("W nocy","At night","Nachts"),dpSettings.nightBrightness==0?ws43bText("Ekran wyłączony","Screen off","Bildschirm aus"):ws43bText("Zegar 30%","Clock at 30%","Uhr mit 30%"),310);
   char text[24];if(c.nightSeconds<60)snprintf(text,sizeof(text),"%u s",c.nightSeconds);else snprintf(text,sizeof(text),"%u min",c.nightSeconds/60);
   settingRow(ws43bText("Bez dotyku","No touch","Ohne Berührung"),text,366);
   small(settingsNotice,44,420,708);
 }
 
-// One-tap hour choice: 6 x 4 grid. The other end of the night is shown but
-// cannot be chosen (equal hours would disable the night).
+// One-tap hour choice: 6 x 4 grid; the minute grid follows.
 void nightHourPickerScreen() {
   button(ws43bText("< Noc","< Night","< Nacht"),44,98,140,36,false);
-  dashText(pickingNightStart?ws43bText("Początek nocy","Night starts","Nacht beginnt"):ws43bText("Koniec nocy","Night ends","Nacht endet"),214,102,520,24,INK);
-  const uint8_t current=pickingNightStart?dpSettings.nightStartHour:dpSettings.nightEndHour;
-  const uint8_t other=pickingNightStart?dpSettings.nightEndHour:dpSettings.nightStartHour;
+  dashText(pickingNightStart?ws43bText("Początek nocy: godzina","Night starts: hour","Nacht beginnt: Stunde"):ws43bText("Koniec nocy: godzina","Night ends: hour","Nacht endet: Stunde"),214,102,520,24,INK);
+  const uint8_t current=uint8_t(nightMinuteOfDay(pickingNightStart)/60);
   for(uint8_t h=0;h<24;++h) {
     const int x=44+(h%6)*120,y=148+(h/6)*68;
-    const bool selected=h==current,blocked=h==other;
+    const bool selected=h==current;
     tft.fillRoundRect(x,y,108,56,9,CARD);
     tft.drawRoundRect(x,y,108,56,9,selected?ACCENT:TRACK);
-    char text[8];snprintf(text,sizeof(text),"%02u:00",unsigned(h));
-    dashText(text,x+27,y+16,80,18,selected?ACCENT:blocked?TRACK:INK);
+    char text[8];snprintf(text,sizeof(text),"%02u:__",unsigned(h));
+    dashText(text,x+27,y+16,80,18,selected?ACCENT:INK);
+  }
+}
+// Minutes in 5-minute steps: 6 x 2 grid. The other end of the night is shown
+// but cannot be chosen (equal times would disable the night).
+void nightMinutePickerScreen() {
+  button(ws43bText("< Godzina","< Hour","< Stunde"),44,98,170,36,false);
+  dashText(pickingNightStart?ws43bText("Początek nocy: minuty","Night starts: minutes","Nacht beginnt: Minuten"):ws43bText("Koniec nocy: minuty","Night ends: minutes","Nacht endet: Minuten"),244,102,500,24,INK);
+  const uint16_t current=nightMinuteOfDay(pickingNightStart),other=nightMinuteOfDay(!pickingNightStart);
+  for(uint8_t i=0;i<12;++i) {
+    const int x=44+(i%6)*120,y=168+(i/6)*80;
+    const uint16_t value=uint16_t(pickedNightHour*60+i*5);
+    const bool selected=value==current,blocked=value==other;
+    tft.fillRoundRect(x,y,108,64,9,CARD);
+    tft.drawRoundRect(x,y,108,64,9,selected?ACCENT:TRACK);
+    char text[8];snprintf(text,sizeof(text),"%02u:%02u",unsigned(pickedNightHour),unsigned(i*5));
+    dashText(text,x+27,y+20,80,18,selected?ACCENT:blocked?TRACK:INK);
   }
 }
 #if WS43B_FULL_WEBUI
@@ -1739,11 +1764,16 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     if(pressX<44||pressX>=764||pressY<148||pressY>=420)return;
     const int cx=(pressX-44)/120,cy=(pressY-148)/68;
     if((pressX-44)%120>=108||(pressY-148)%68>=56||cx>5||cy>3)return;
-    const uint8_t hour=uint8_t(cy*6+cx);
-    uint8_t &target=pickingNightStart?dpSettings.nightStartHour:dpSettings.nightEndHour;
-    const uint8_t other=pickingNightStart?dpSettings.nightEndHour:dpSettings.nightStartHour;
-    if(hour==other)return;
-    target=hour;saveSettings();
+    pickedNightHour=uint8_t(cy*6+cx);
+    page=Page::NightMinutePicker;
+  } else if(page==Page::NightMinutePicker) {
+    if(pressX>=44&&pressX<214&&pressY>=98&&pressY<134){page=Page::NightHourPicker;painted=false;return;}
+    if(pressX<44||pressX>=764||pressY<168||pressY>=312)return;
+    const int cx=(pressX-44)/120,cy=(pressY-168)/80;
+    if((pressX-44)%120>=108||(pressY-168)%80>=64||cx>5||cy>1)return;
+    const uint16_t value=uint16_t(pickedNightHour*60+(cy*6+cx)*5);
+    if(value==nightMinuteOfDay(!pickingNightStart))return;
+    setNightMinuteOfDay(pickingNightStart,value);saveSettings();
     settingsNotice=ws43bText("Zapisano ustawienia nocy.","Night settings saved.","Nachteinstellungen gespeichert.");
     page=Page::NightSettings;
   } else if(page==Page::NightSettings) {
@@ -1761,10 +1791,10 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
         if(pressX>=590&&pressX<668)step=-1; else if(pressX>=668)step=1;
         else if(pressX>=398){pickingNightStart=row==1;page=Page::NightHourPicker;settingsNotice=nullptr;painted=false;return;}
         else return;
-        uint8_t &hour=row==1?dpSettings.nightStartHour:dpSettings.nightEndHour;
-        const uint8_t other=row==1?dpSettings.nightEndHour:dpSettings.nightStartHour;
-        hour=uint8_t((hour+24+step)%24);
-        if(hour==other)hour=uint8_t((hour+24+step)%24); // equal hours would disable the night
+        const bool start=row==1;
+        uint16_t value=uint16_t((nightMinuteOfDay(start)+1440+step*5)%1440);
+        if(value==nightMinuteOfDay(!start))value=uint16_t((value+1440+step*5)%1440); // equal times would disable the night
+        setNightMinuteOfDay(start,value);
       }
       else if(row==3)dpSettings.nightBrightness=dpSettings.nightBrightness==0?255:0;
       saveSettings();
@@ -2196,6 +2226,7 @@ void renderWs43bMonitor(bool force) {
     else if (page == Page::WeatherSettings) weatherSettingsScreen();
     else if (page == Page::NightSettings) nightSettingsScreen();
     else if (page == Page::NightHourPicker) nightHourPickerScreen();
+    else if (page == Page::NightMinutePicker) nightMinutePickerScreen();
     else if(page==Page::Appearance)appearanceSettingsScreen();
     else if(page==Page::GeneralSettings)generalSettingsScreen();
     else if(page==Page::WebQr)webQrScreen();

@@ -98,6 +98,8 @@ static void readDisplayFromForm() {
   dpSettings.nightModeEnabled = server.hasArg("nighten");
   if (server.hasArg("nstart")) dpSettings.nightStartHour = server.arg("nstart").toInt();
   if (server.hasArg("nend"))   dpSettings.nightEndHour = server.arg("nend").toInt();
+  if (server.hasArg("nsmin"))  dpSettings.nightStartMinute = constrain(server.arg("nsmin").toInt(), 0, 59);
+  if (server.hasArg("nemin"))  dpSettings.nightEndMinute = constrain(server.arg("nemin").toInt(), 0, 59);
   if (server.hasArg("nbright")) dpSettings.nightBrightness = server.arg("nbright").toInt();
   if (server.hasArg("ssbright")) dpSettings.screensaverBrightness = server.arg("ssbright").toInt();
   // Native 4.3B inactivity/night policy owns its binary backlight.
@@ -2425,6 +2427,8 @@ static void handleSettingsExport() {
   dp["nightModeEnabled"] = dpSettings.nightModeEnabled;
   dp["nightStartHour"] = dpSettings.nightStartHour;
   dp["nightEndHour"] = dpSettings.nightEndHour;
+  dp["nightStartMinute"] = dpSettings.nightStartMinute;
+  dp["nightEndMinute"] = dpSettings.nightEndMinute;
   dp["nightBrightness"] = dpSettings.nightBrightness;
   dp["screensaverBrightness"] = dpSettings.screensaverBrightness;
 
@@ -2913,6 +2917,9 @@ static void handleSettingsImportFinish() {
     if (dp["nightModeEnabled"].is<bool>())      dpSettings.nightModeEnabled = dp["nightModeEnabled"].as<bool>();
     if (dp["nightStartHour"].is<uint8_t>())     dpSettings.nightStartHour = dp["nightStartHour"].as<uint8_t>();
     if (dp["nightEndHour"].is<uint8_t>())       dpSettings.nightEndHour = dp["nightEndHour"].as<uint8_t>();
+    // Older exports carry whole hours only: missing minutes mean :00.
+    dpSettings.nightStartMinute = dp["nightStartMinute"].is<uint8_t>() && dp["nightStartMinute"].as<uint8_t>() < 60 ? dp["nightStartMinute"].as<uint8_t>() : 0;
+    dpSettings.nightEndMinute = dp["nightEndMinute"].is<uint8_t>() && dp["nightEndMinute"].as<uint8_t>() < 60 ? dp["nightEndMinute"].as<uint8_t>() : 0;
     if (dp["nightBrightness"].is<uint8_t>())    dpSettings.nightBrightness = dp["nightBrightness"].as<uint8_t>();
     if (dp["screensaverBrightness"].is<uint8_t>()) dpSettings.screensaverBrightness = dp["screensaverBrightness"].as<uint8_t>();
   }

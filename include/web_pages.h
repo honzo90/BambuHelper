@@ -537,8 +537,8 @@ R"rawliteral(
     </label>
     <div id="nightFields" style="display:%NIGHTDISP%;padding:var(--sp-3);background:var(--bg-sub);border:1px solid var(--line-soft);border-radius:var(--radius-s);margin-top:var(--sp-3)">
       <div class="row">
-        <div class="field"><label for="nstart">Dim from</label><select id="nstart">%NIGHT_START_OPTS%</select></div>
-        <div class="field"><label for="nend">Dim until</label><select id="nend">%NIGHT_END_OPTS%</select></div>
+        <div class="field"><label for="nstart">Dim from</label><div class="hstack"><select id="nstart">%NIGHT_START_OPTS%</select><select id="nsmin" aria-label="Minutes">%NIGHT_SMIN_OPTS%</select></div></div>
+        <div class="field"><label for="nend">Dim until</label><div class="hstack"><select id="nend">%NIGHT_END_OPTS%</select><select id="nemin" aria-label="Minutes">%NIGHT_EMIN_OPTS%</select></div></div>
       </div>
       <div class="field" style="margin-bottom:0">
         <label class="hstack" style="justify-content:space-between" for="nbright"><span>Night brightness</span><span class="mono text-dim" id="nbrightVal">%NBRIGHT%</span></label>

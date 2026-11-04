@@ -25,7 +25,8 @@ values={'BOARD':'ws_lcd_43b','FW_VER':fw[1] if fw else 'dev','FLASHMB':'16','OTA
  'MODE_LOCAL':'selected','NET_DHCP':'selected','BRIGHT':'255','NBRIGHT':'255','SSBRIGHT':'255','USE24H':'checked','SHOWIP':'checked','CSSVER':'preview','JSVER':'preview',
  'HMS_NAV':'<button class="nav-item" type="button" data-section="errors"><span>Błędy drukarki</span></button>',
  'PRINTER_TABS':'<button class="tab-btn" id="tab1" type="button" onclick="selectPrinterTab(1)">Drukarka 2</button>',
- 'NIGHT_START_OPTS':'<option value="22">22:00</option>','NIGHT_END_OPTS':'<option value="7">07:00</option>'}
+ 'NIGHT_START_OPTS':'<option value="22">22</option>','NIGHT_END_OPTS':'<option value="6">06</option>',
+ 'NIGHT_SMIN_OPTS':'<option value="0">:00</option><option value="30" selected>:30</option>','NIGHT_EMIN_OPTS':'<option value="0" selected>:00</option><option value="5">:05</option>'}
 html=re.sub(r'%([A-Z][A-Z0-9_]*)%',lambda m:values.get(m[1],''),html)
 (out/'index.html').write_text(html)
 (out/'setup.html').write_text(loc.markup(raw[0],loc.catalog()))

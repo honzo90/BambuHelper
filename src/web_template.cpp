@@ -98,17 +98,29 @@ static bool resolvePlaceholder(const char* name, String& out) {
     out = "";
     for (uint8_t h = 0; h < 24; h++) {
       char opt[64];
-      snprintf(opt, sizeof(opt), "<option value=\"%d\"%s>%02d:00</option>",
+      snprintf(opt, sizeof(opt), "<option value=\"%d\"%s>%02d</option>",
                h, h == dpSettings.nightStartHour ? " selected" : "", h);
       out += opt;
     }
+    return true;
+  }
+  if (strcmp(name, "NIGHT_SMIN_OPTS") == 0 || strcmp(name, "NIGHT_EMIN_OPTS") == 0) {
+    const uint8_t current = name[6] == 'S' ? dpSettings.nightStartMinute : dpSettings.nightEndMinute;
+    out = "";
+    for (uint8_t m = 0; m < 60; m += 5) {
+      char opt[64];
+      snprintf(opt, sizeof(opt), "<option value=\"%d\"%s>:%02d</option>", m, m == current ? " selected" : "", m);
+      out += opt;
+    }
+    // Keep an imported off-grid minute selectable instead of silently rounding.
+    if (current % 5) { char opt[64]; snprintf(opt, sizeof(opt), "<option value=\"%d\" selected>:%02d</option>", current, current); out += opt; }
     return true;
   }
   if (strcmp(name, "NIGHT_END_OPTS") == 0) {
     out = "";
     for (uint8_t h = 0; h < 24; h++) {
       char opt[64];
-      snprintf(opt, sizeof(opt), "<option value=\"%d\"%s>%02d:00</option>",
+      snprintf(opt, sizeof(opt), "<option value=\"%d\"%s>%02d</option>",
                h, h == dpSettings.nightEndHour ? " selected" : "", h);
       out += opt;
     }

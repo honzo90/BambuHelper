@@ -81,7 +81,7 @@ constexpr uint8_t MAX_ACTIVE_PRINTERS=2;
 struct { uint8_t displayIndex=0; uint32_t lastRotateMs=0,displayHoldUntilMs=0,intervalMs=60000; } rotState;
 #endif
 unsigned settingsWrites=0;void saveSettings(){++settingsWrites;}
-struct PowerSettings{bool nightModeEnabled=false;uint8_t nightStartHour=22,nightEndHour=7,nightBrightness=0;} dpSettings;
+struct PowerSettings{bool nightModeEnabled=false;uint8_t nightStartHour=22,nightEndHour=7,nightStartMinute=0,nightEndMinute=0,nightBrightness=0;} dpSettings;
 unsigned factoryResets=0;void resetSettings(){++factoryResets;}
 bool nightBlackout=false, nightWindow=false;
 bool isNightModeActive(){return nightWindow || nightBlackout;}
@@ -267,7 +267,7 @@ int main() {
  tap(100,115); assert(page==Page::Settings);
  // All submenus return to the overview at N, then sleep at 2N.
  // The policy uses monotonic time, not incoming printer telemetry.
- for(Page submenu:{Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker}) {
+ for(Page submenu:{Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker,Page::NightMinutePicker}) {
    for(bool off:{false,true}) {
      clockSettings.idleMinutes=1;clockSettings.screenOff=off;++clockSettings.revision;
      page=submenu;automaticIdle=false;screenOff=false;backlight=255;
@@ -316,7 +316,7 @@ int main() {
  // Daytime printing returns every submenu (including manual clock) to Print,
  // then stays there for repeated idle intervals while telemetry stays fresh.
  for(const char* printing:{"RUNNING","PREPARE","PAUSE"}) {
-   for(Page submenu:{Page::Dashboard,Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker,Page::Clock}) {
+   for(Page submenu:{Page::Dashboard,Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker,Page::NightMinutePicker,Page::Clock}) {
      clockSettings.idleMinutes=1;++clockSettings.revision;
      status.set(printing,now);updateIdleView(now);page=submenu;
      now+=59999;status.set(printing,now);updateIdleView(now);assert(page==submenu);
@@ -402,22 +402,32 @@ int main() {
  rawTap(100,305);assert(page==Page::NightSettings);
  const auto nightWritesBefore=settingsWrites;
  rawTap(300,166);assert(dpSettings.nightModeEnabled && settingsWrites==nightWritesBefore+1);
- rawTap(700,222);assert(dpSettings.nightStartHour==23);
- rawTap(700,222);assert(dpSettings.nightStartHour==0);
- rawTap(620,222);rawTap(620,222);assert(dpSettings.nightStartHour==22);
- rawTap(620,278);assert(dpSettings.nightEndHour==6);
- // Tapping the hour opens a 24-hour grid; one tap picks and returns.
+ #define NIGHT(st,h,m) (dpSettings.night##st##Hour==(h) && dpSettings.night##st##Minute==(m))
+ // -/+ move by 5 minutes and wrap around midnight.
+ rawTap(700,222);assert(NIGHT(Start,22,5));
+ rawTap(620,222);rawTap(620,222);assert(NIGHT(Start,21,55));
+ rawTap(700,222);assert(NIGHT(Start,22,0));
+ rawTap(620,278);assert(NIGHT(End,6,55));
+ dpSettings.nightStartHour=23;dpSettings.nightStartMinute=55;rawTap(700,222);assert(NIGHT(Start,0,0));
+ dpSettings.nightStartHour=22;dpSettings.nightStartMinute=0;
+ // Equal start and end would disable the night: the step skips over it.
+ dpSettings.nightEndHour=22;dpSettings.nightEndMinute=5;rawTap(700,222);assert(NIGHT(Start,22,10));
+ dpSettings.nightStartMinute=0;dpSettings.nightEndHour=6;dpSettings.nightEndMinute=55;
+ // Tapping the time opens the hour grid, then the minute grid; the second tap saves.
+ const auto beforePick=settingsWrites;
  rawTap(500,278);assert(page==Page::NightHourPicker && !pickingNightStart);
- rawTap(694,176);assert(page==Page::NightSettings && dpSettings.nightEndHour==5 && settingsNotice);
+ rawTap(694,176);assert(page==Page::NightMinutePicker && pickedNightHour==5 && NIGHT(End,6,55) && settingsWrites==beforePick);
+ rawTap(94,278);assert(page==Page::NightSettings && NIGHT(End,5,30) && settingsNotice && settingsWrites==beforePick+1);
  rawTap(450,222);assert(page==Page::NightHourPicker && pickingNightStart);
- rawTap(694,176);assert(page==Page::NightHourPicker && dpSettings.nightStartHour==22); // end hour is blocked
- rawTap(158,176);assert(page==Page::NightHourPicker && dpSettings.nightStartHour==22); // gap between cells
- rawTap(100,115);assert(page==Page::NightSettings && dpSettings.nightStartHour==22); // back, nothing saved
- page=Page::NightHourPicker;pickingNightStart=false;rawTap(44+0*120+50,148+1*68+28);
- assert(page==Page::NightSettings && dpSettings.nightEndHour==6);
- dpSettings.nightEndHour=23;rawTap(700,278);assert(dpSettings.nightEndHour==23 || dpSettings.nightEndHour==0);
- assert(dpSettings.nightEndHour!=dpSettings.nightStartHour);
- dpSettings.nightEndHour=6;
+ rawTap(694,176);assert(page==Page::NightMinutePicker);
+ rawTap(94,278);assert(page==Page::NightMinutePicker && NIGHT(Start,22,0)); // equals the end time: blocked
+ rawTap(158,200);assert(page==Page::NightMinutePicker && NIGHT(Start,22,0)); // gap between cells
+ rawTap(100,115);assert(page==Page::NightHourPicker);
+ rawTap(158,176);assert(page==Page::NightHourPicker); // gap between hours
+ rawTap(100,115);assert(page==Page::NightSettings && NIGHT(Start,22,0));
+ pickingNightStart=false;page=Page::NightHourPicker;rawTap(94,244);rawTap(94,198);
+ assert(page==Page::NightSettings && NIGHT(End,6,0));
+ #undef NIGHT
  rawTap(300,334);assert(dpSettings.nightBrightness==255);
  rawTap(300,334);assert(dpSettings.nightBrightness==0);
  rawTap(300,306);assert(dpSettings.nightBrightness==0); // gap between rows
