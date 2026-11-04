@@ -29,6 +29,7 @@ namespace ws43b { bool otaDisplayActive(){return false;} }
 struct WeatherConfig {bool enabled=false,solar=false;unsigned nightSeconds=30;char city[64]={};};
 bool weatherEnabled=false;
 WeatherConfig ws43bWeatherConfig(){WeatherConfig c;c.enabled=weatherEnabled;return c;}
+bool solarNightNow=false;bool ws43bSolarNight(bool &value){value=solarNightNow;return true;}
 bool saveWs43bWeather(WeatherConfig){return true;}
 static bool polish = true;
 static uint8_t language = 0;
@@ -338,6 +339,19 @@ int main() {
  assert(page==Page::Dashboard && !screenOff);
  now+=60000;status.set("RUNNING",now);updateIdleView(now);
  assert(page==Page::Dashboard && !automaticIdle);
+ // Dusk (dark outside, outside the night hours): an idle panel goes to the
+ // screensaver even while printing, but never turns the screen off.
+ solarNightNow=true;tap(400,200);page=Page::Dashboard;status.set("RUNNING",now);updateIdleView(now);
+ now+=29000;status.set("RUNNING",now);updateIdleView(now);assert(page==Page::Dashboard && !automaticIdle);
+ now+=2000;status.set("RUNNING",now);updateIdleView(now);assert(page==Page::Clock && automaticIdle && !screenOff);
+ const bool offBefore=clockSettings.screenOff;
+ clockSettings.screenOff=true;++clockSettings.revision;now+=1000;status.set("RUNNING",now);updateIdleView(now);
+ assert(!screenOff); // "turn off" is a daytime idle action, not a dusk one
+ clockSettings.screenOff=offBefore;++clockSettings.revision;
+ tap(799,430);assert(page==Page::Dashboard && !automaticIdle);
+ solarNightNow=false;now+=1000;status.set("RUNNING",now);updateIdleView(now);
+ now+=60000;status.set("RUNNING",now);updateIdleView(now);
+ assert(page==Page::Dashboard && !automaticIdle); // daytime print stays on Print again
 #endif
  // A stale active status cannot hold the display awake indefinitely.
  now+=60001;updateIdleView(now);assert(automaticIdle && screenOff);

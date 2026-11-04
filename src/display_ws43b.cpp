@@ -116,19 +116,23 @@ void updateIdleView(uint32_t now) {
     else if (!strcmp(status.value, "FAILED")) current = 6;
     else current = 7;
   }
-  bool night=false;
+  bool night=false,dusk=false;
 #if WS43B_FULL_WEBUI
   night=isNightModeActive();
+  // Dusk (dark outside, before/after the night hours) also sends an idle
+  // panel to the screensaver - dimmed to 50% - even while printing. Only the
+  // night hours can turn the screen off.
+  bool solarNight=false;
+  dusk=!night && ws43bSolarNight(solarNight) && solarNight;
 #endif
-  if(night!=previousNight){nightActivity=now;previousNight=night;}
-  const bool nightExpired=night && uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
+  const bool dark=night||dusk;
+  if(dark!=previousNight){nightActivity=now;previousNight=dark;}
+  const bool darkExpired=dark && uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
   bool daytimePrint = current == 3 || current == 4 || current == 5 ||
                       ws43b_view::waitingForJobData(state.monitor, online, now, state.printing);
-#if WS43B_FULL_WEBUI
-  daytimePrint = daytimePrint && !isNightModeActive();
-#endif
+  daytimePrint = daytimePrint && !dark;
   bool idle = idlePolicy.update(now, idleEligible(), clock.idleMinutes, clock.revision);
-  if(night)idle=nightExpired;
+  if(dark)idle=darkExpired;
   // A fresh active job keeps the overview visible by day. Do not reset the
   // inactivity timer from telemetry: expiry returns submenus/manual clock home.
   if (idle && daytimePrint) {
@@ -138,7 +142,7 @@ void updateIdleView(uint32_t now) {
       painted = false;
     }
     idle = false;
-  } else if (idle && !night && !automaticIdle && page != Page::Dashboard && page != Page::Clock) {
+  } else if (idle && !dark && !automaticIdle && page != Page::Dashboard && page != Page::Clock) {
     // Outside a daytime print, retain the two-stage submenu/idle policy.
     page = Page::Dashboard;
     idlePolicy.activity(now);
@@ -151,7 +155,7 @@ void updateIdleView(uint32_t now) {
     page = idle ? Page::Clock : Page::Dashboard;
     painted = false;
   }
-  const bool wantOff = (idle && !night && clock.screenOff)
+  const bool wantOff = (idle && !dark && clock.screenOff)
 #if WS43B_FULL_WEBUI
     || isNightBlackout()
 #endif
