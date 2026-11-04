@@ -267,7 +267,7 @@ int main() {
  tap(100,115); assert(page==Page::Settings);
  // All submenus return to the overview at N, then sleep at 2N.
  // The policy uses monotonic time, not incoming printer telemetry.
- for(Page submenu:{Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings}) {
+ for(Page submenu:{Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker}) {
    for(bool off:{false,true}) {
      clockSettings.idleMinutes=1;clockSettings.screenOff=off;++clockSettings.revision;
      page=submenu;automaticIdle=false;screenOff=false;backlight=255;
@@ -316,7 +316,7 @@ int main() {
  // Daytime printing returns every submenu (including manual clock) to Print,
  // then stays there for repeated idle intervals while telemetry stays fresh.
  for(const char* printing:{"RUNNING","PREPARE","PAUSE"}) {
-   for(Page submenu:{Page::Dashboard,Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::Clock}) {
+   for(Page submenu:{Page::Dashboard,Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker,Page::Clock}) {
      clockSettings.idleMinutes=1;++clockSettings.revision;
      status.set(printing,now);updateIdleView(now);page=submenu;
      now+=59999;status.set(printing,now);updateIdleView(now);assert(page==submenu);
