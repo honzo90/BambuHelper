@@ -36,7 +36,10 @@ def compile_preview(directory):
         '#pragma once\n#define PROGMEM\n'
         '#define pgm_read_byte(p) (*static_cast<const uint8_t *>(p))\n')
     binary = directory / 'boot_preview'
+    import re
+    version = re.search(r'-DFW_VERSION=\\?"([^"\\]+)', (ROOT / 'boards/ws_lcd_43b.ini').read_text())
     subprocess.run(['clang++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+                    '-DFW_VERSION="%s"' % (version[1] if version else 'dev'),
                     '-I', str(directory), '-I', str(ROOT / 'include'),
                     str(HERE / 'boot_preview.cpp'), '-o', str(binary)],
                    check=True, text=True, capture_output=True)

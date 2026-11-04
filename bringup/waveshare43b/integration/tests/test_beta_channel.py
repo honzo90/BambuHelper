@@ -132,6 +132,16 @@ async function main(){
    'v4.0.0-beta.01','v4.0.0-beta.1.extra','v4.0.0-beta.-1','v4.0.0-BETA.1','latest'])
   assert.equal(selectWs43bRelease([release(tag)],'beta',3145728),null,'excluded tag '+tag);
  assert.equal(selectWs43bRelease([release('v4.0.0',true)],'beta',3145728),null);
+ // Alpha: alpha + beta + stable, strict alpha tags, prerelease flag required.
+ assert.equal(selectWs43bRelease(mix,'alpha',3145728).release.tag_name,'v9.0.0-alpha.1');
+ assert.equal(selectWs43bRelease([release('v4.0.0-alpha.1'),stable],'alpha',3145728).release.tag_name,'v4.0.0');
+ assert.equal(selectWs43bRelease([release('v4.1.0-alpha.1'),release('v4.1.0-alpha.2')],'alpha',3145728).release.tag_name,'v4.1.0-alpha.2');
+ assert.equal(selectWs43bRelease([release('v4.1.0-alpha.1'),release('v4.1.0-beta.1')],'alpha',3145728).release.tag_name,'v4.1.0-beta.1');
+ for(const tag of ['v4.0.0-rc.1','v4.0.0-alpha','v4.0.0-alpha.0','v4.0.0-alpha.01','v4.0.0-ALPHA.1','v4.0.0-alpha.1.extra','v4.0.0-dev.1'])
+  assert.equal(selectWs43bRelease([release(tag)],'alpha',3145728),null,'excluded Alpha tag '+tag);
+ assert.equal(selectWs43bRelease([release('v4.0.0-alpha.1',false)],'alpha',3145728),null);
+ assert.equal(selectWs43bRelease(release('v4.0.0-alpha.1'),'alpha',3145728),null,'Alpha needs a list');
+ assert.equal(selectWs43bRelease([release('v4.0.0-alpha.1')],'gamma',3145728),null,'unknown channel');
  assert.equal(selectWs43bRelease([release('v4.0.0-beta.1',false)],'beta',3145728),null);
  for(const flag of [undefined,null,0,1,'false','true']){
   const s=release('v4.0.0',false),b=release('v4.0.0-beta.1',true);
@@ -199,6 +209,11 @@ async function main(){
  }
  reset();DEV.fw='v4.0.0-beta.10';fields.otaChannel.value='beta';checkWs43bUpdates();
  respond(0,[stable]);await flush();offered('v4.0.0');
+ reset();DEV.fw='v4.0.0';fields.otaChannel.value='alpha';checkWs43bUpdates();
+ assert.equal(checkWs43bUpdates.channel,'alpha');
+ respond(0,[stable,release('v4.1.0-alpha.1')]);await flush();offered('v4.1.0-alpha.1');
+ reset();DEV.fw='v4.0.0';fields.otaChannel.value='beta';checkWs43bUpdates();
+ respond(0,[stable,release('v4.1.0-alpha.1')]);await flush();noOffer('Beta ignores Alpha builds');
  for(const scenario of ['404','403','network','json','malformed']){
   reset();_autoOtaUrl='old-url';checkWs43bUpdates();noOffer('initial '+scenario);
   if(scenario==='network')requests[0].reject(Error('offline'));
@@ -382,10 +397,11 @@ edges().catch(e=>{console.error(e);process.exitCode=1;});
                     picker = parser.selects[0]
                     self.assertRegex(picker["attrs"].get("onchange", ""), r"\bchangeWs43bOtaChannel\s*\(")
                     options = picker["options"]
-                    self.assertEqual([o["attrs"].get("value") for o in options], ["stable", "beta"])
-                    self.assertEqual([o["text"].strip() for o in options], ["Stabilny" if language == "pl" else "Stable", "Beta"])
+                    self.assertEqual([o["attrs"].get("value") for o in options], ["stable", "beta", "alpha"])
+                    self.assertEqual([o["text"].strip() for o in options], ["Stabilny" if language == "pl" else "Stable", "Beta", "Alpha"])
                     self.assertNotIn("selected", options[1]["attrs"])
-                    hint = ("Beta zawiera wydania testowe i może działać niestabilnie. Po ponownym otwarciu strony wybrany jest kanał stabilny." if language == "pl" else "Beta includes test releases and may be unstable. Stable is selected when this page is reopened.")
+                    self.assertNotIn("selected", options[2]["attrs"])
+                    hint = ("Beta zawiera wydania testowe i może działać niestabilnie. Alpha oferuje też wczesne wersje rozwojowe. Po ponownym otwarciu strony wybrany jest kanał stabilny." if language == "pl" else "Beta includes test releases and may be unstable. Alpha also offers early development builds. Stable is selected when this page is reopened.")
                     self.assertIn(hint, result.stdout)
 
 
