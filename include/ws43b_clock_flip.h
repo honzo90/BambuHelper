@@ -7,7 +7,7 @@
 // the new one follows from above. Pure logic, host-testable.
 namespace ws43b_clock_flip {
 
-constexpr uint32_t kDurationMs = 1000;  // a calm page turn
+constexpr uint32_t kDurationMs = 1200;  // a calm page turn (~15 fps on the panel)
 constexpr uint32_t kFrameMs = 40;       // ~25 fps while flipping (panel refresh limit)
 constexpr int kTravel = 120;            // > digit height: old and new never overlap
 constexpr unsigned kTextMax = 8;

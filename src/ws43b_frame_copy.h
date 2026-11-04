@@ -11,6 +11,18 @@ inline uint16_t dimRgb565(uint16_t pixel, unsigned percent) {
   return uint16_t(((((pixel>>11)&31)*percent/100)<<11) |
                   ((((pixel>>5)&63)*percent/100)<<5) | ((pixel&31)*percent/100));
 }
+// Same result as dimRgb565() for one percent, without per-pixel divisions:
+// three small per-channel tables built once per present.
+struct DimTable {
+  uint16_t r[32], g[64], b[32];
+  explicit DimTable(unsigned percent) {
+    for (unsigned v = 0; v < 32; ++v) { r[v] = uint16_t((v * percent / 100) << 11); b[v] = uint16_t(v * percent / 100); }
+    for (unsigned v = 0; v < 64; ++v) g[v] = uint16_t((v * percent / 100) << 5);
+  }
+  uint16_t operator()(uint16_t pixel) const {
+    return uint16_t(r[(pixel >> 11) & 31] | g[(pixel >> 5) & 63] | b[pixel & 31]);
+  }
+};
 inline bool frameRangesOverlap(uintptr_t a, size_t aSize, uintptr_t b, size_t bSize) {
   return a < b + bSize && b < a + aSize;
 }
@@ -35,12 +47,12 @@ inline bool copyFrameChecked(uint8_t *destination, const uint8_t *source,
   if (frameRangesOverlap(dst, bytes, src, bytes) ||
       frameRangesOverlap(dst, bytes, tmp, scratchBytes) ||
       frameRangesOverlap(src, bytes, tmp, scratchBytes)) return false;
+  const DimTable dim(percent);
   for (size_t y = 0; y < rows; ++y) {
     memcpy(scratch, source + y * rowBytes, rowBytes);
     if(percent != 100)for(size_t x=0;x<rowBytes/4;++x) {
       const uint32_t p=scratch[x];
-      scratch[x]=uint32_t(dimRgb565(uint16_t(p),percent)) |
-                 (uint32_t(dimRgb565(uint16_t(p>>16),percent))<<16);
+      scratch[x]=uint32_t(dim(uint16_t(p))) | (uint32_t(dim(uint16_t(p>>16)))<<16);
     }
     memcpy(destination + y * rowBytes, scratch, rowBytes);
     const volatile uint32_t *readback =
