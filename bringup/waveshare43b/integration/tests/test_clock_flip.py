@@ -21,9 +21,10 @@ int main(){
  assert(oldOffset(0)==0 && oldOffset(1000)==kTravel && newOffset(0)==-kTravel && newOffset(1000)==0);
  for(unsigned p=0;p<1000;p+=50){assert(oldOffset(p)<=oldOffset(p+50));assert(newOffset(p)<=newOffset(p+50));}
  assert(oldAlpha(0)==255 && oldAlpha(700)==0 && newAlpha(250)==0 && newAlpha(1000)==255);
- // Within the ~7 frames of the clock cadence, then done.
- unsigned frames=0;for(uint32_t t=1000;f.active;t+=84){progress(f,t);++frames;}
- assert(frames>=6 && frames<=8 && !f.active);
+ // About a second at ~25 fps: enough frames for a smooth page turn.
+ assert(kDurationMs>=900 && kDurationMs<=1500 && kFrameMs<=42);
+ unsigned frames=0;for(uint32_t t=1000;f.active;t+=kFrameMs){progress(f,t);++frames;}
+ assert(frames>=22 && frames<=36 && !f.active);
  assert(progress(f,999999)==1000);
  // Same text, different length or a cancelled flip never animate.
  begin(f,"10:00","10:00",0);assert(!f.active);

@@ -7,7 +7,8 @@
 // the new one slides in from above and fades in. Pure logic, host-testable.
 namespace ws43b_clock_flip {
 
-constexpr uint32_t kDurationMs = 560;   // ~7 frames at the 84 ms clock cadence
+constexpr uint32_t kDurationMs = 1100;  // a calm page turn
+constexpr uint32_t kFrameMs = 40;       // ~25 fps while flipping (panel refresh limit)
 constexpr int kTravel = 70;             // px the digits move (band is ~140 px tall)
 constexpr unsigned kTextMax = 8;
 

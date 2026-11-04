@@ -1571,11 +1571,16 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
   }
   // Restore only moving regions; large digits stay untouched between samples
   // except while a minute change flips them.
+  // While the digits flip at ~25 fps, the rest of the saver keeps its own
+  // 84 ms cadence so each flip frame stays cheap.
+  static uint32_t lastSaverFrame=0;
   if(partial && clockBandDirty) {
     char text[ws43b_clock_flip::kTextMax];bool pm=false;
     const bool clockValid=clockTimeText(text,sizeof(text),pm);
     clockDigitsBand(clockFlip.to,clockValid&&!netSettings.use24h,pm,now,white);
+    if(uint32_t(now-lastSaverFrame)<84u){tft.setTextDatum(TL_DATUM);return;}
   }
+  lastSaverFrame=now;
   if(combined)combinedSaverCards(m,*unit,online,now,activity,partial,waiting);
   else if(preparationScene) {
     const uint16_t bg=tft.color565(3,14,23);
@@ -1992,7 +1997,9 @@ void renderWs43bMonitor(bool force) {
   if (screenOff) return;
   // Drop decorative frames while readable telemetry is waiting. Never defer
   // a new screen/touch/alert; cap the pause so a busy stream still gets shown.
-  if(ws43b_live::deferForRx(now,lastFrame,bambuMqttReceivePending(rotState.displayIndex),painted,force))return;
+  // A short digit flip keeps its frame rate; band frames are small.
+  if(!(page==Page::Clock && clockBandDirty) &&
+     ws43b_live::deferForRx(now,lastFrame,bambuMqttReceivePending(rotState.displayIndex),painted,force))return;
 #if WS43B_FULL_WEBUI
   static bool pongWasActive = false;
   const bool pongActive = page == Page::Clock && !ws43b_view::beforeFirstLayer(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now) && ws43b_view::pongAvailable(dispSettings.pongClock,dpSettings.keepDisplayOn,dpSettings.showClockAfterFinish) && dashboardActivity.state!=ws43b_view::Activity::Cleaning && dashboardActivity.state!=ws43b_view::Activity::Leveling && dashboardActivity.state!=ws43b_view::Activity::CalibrationLines && !ws43b_view::dryingUnit(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now) && saverView(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now)==ws43b_view::Saver::Print && !ws43bWeatherConfig().enabled && !coolingView(displayedPrinter().state.monitor) && (automaticIdle || getScreenState() != SCREEN_HMS);
@@ -2013,7 +2020,7 @@ void renderWs43bMonitor(bool force) {
   static uint32_t drawnDataSignature=0;
   const uint32_t dataSignature=ws43b_live::signature(coolingState.monitor,liveView(),liveAms(coolingState.monitor),isWiFiConnected()&&coolingState.connected,now);
   const bool dataDue=ws43b_live::repaintDue(now,lastFrame,dataSignature,drawnDataSignature);
-  if (painted && !force && !dataDue && uint32_t(now - lastFrame) < (page == Page::Clock ? 84u : 1000u)) {
+  if (painted && !force && !dataDue && uint32_t(now - lastFrame) < (page == Page::Clock ? (clockBandDirty ? ws43b_clock_flip::kFrameMs : 84u) : 1000u)) {
     if(startupVisible){animateStartupScreen(now);return;}
     static ws43b_animation::Cadence animationCadence;
     bool animateWeather=page!=Page::Clock && weatherHeaderVisible && !(page==Page::Dashboard && dashboardCooling) && !isAPMode() && isAnyPrinterConfigured();

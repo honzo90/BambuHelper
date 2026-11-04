@@ -224,7 +224,12 @@ int main(){
  ++clockMinute;tick();assert(clockCount==1&&lastClockPartial&&!probes&&clockFlip.active&&clockBandDirty);
  {char expected[8];snprintf(expected,sizeof expected,"10:%02u",clockMinute);assert(strcmp(clockFlip.from,clockFlip.to)&&!strcmp(clockFlip.to,expected));}
  tick();assert(clockCount==1&&lastClockPartial&&!probes); // band frames keep coming
+ // While flipping, frames come every ~40 ms and incoming MQTT does not defer them.
+ currentMs+=45;resetOps();renderWs43bMonitor(false);assert(clockCount==1&&lastClockPartial);
+ rxPending=true;currentMs+=45;resetOps();renderWs43bMonitor(false);assert(clockCount==1&&lastClockPartial);
+ rxPending=false;
  clockBandDirty=false;clockFlip.active=false;              // (the band draws in clockScreen)
+ currentMs+=45;resetOps();renderWs43bMonitor(false);assert(!clockCount); // normal 84 ms cadence again
  tick();assert(!clockCount||lastClockPartial); // never a full redraw for the minute
  advancedDisplay=true;++displayModeRevision;tick();assert(clockCount==1&&!lastClockPartial);
  advancedDisplay=false;++displayModeRevision;tick();assert(clockCount==1&&!lastClockPartial);
