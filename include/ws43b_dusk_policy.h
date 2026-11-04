@@ -15,19 +15,18 @@ inline uint8_t colorPercent(bool ready,bool nightHours,bool idleTimedOut,bool so
   return solarNight?50:100;
 }
 
-// Smooth transitions: dim slowly, brighten quickly so a touch feels instant.
+// Dimming fades smoothly; brightening (a touch) is immediate. A stepped
+// brighten collided with the touch repaint (navigation reveal) and stuttered.
 constexpr uint8_t kFadeDownStep=5;      // percent per step
 constexpr uint32_t kFadeDownMs=120;     // 100 -> 50 in about 1.2 s
-constexpr uint8_t kFadeUpStep=10;
-constexpr uint32_t kFadeUpMs=50;        // 50 -> 100 in about 0.25 s
 
 // Next shown level on the way from `shown` to `target`; never overshoots.
 inline uint8_t fadeStep(uint8_t shown,uint8_t target) {
-  if(shown<target)return uint8_t(target-shown<=kFadeUpStep?target:shown+kFadeUpStep);
+  if(shown<target)return target;
   if(shown>target)return uint8_t(shown-target<=kFadeDownStep?target:shown-kFadeDownStep);
   return shown;
 }
 inline uint32_t fadeIntervalMs(uint8_t shown,uint8_t target) {
-  return shown<target?kFadeUpMs:kFadeDownMs;
+  return shown<target?0:kFadeDownMs;
 }
 }
