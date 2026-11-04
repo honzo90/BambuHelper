@@ -274,7 +274,7 @@ R"MONITOR(<section><h2>Wygląd panelu</h2><form id="display" action="/monitor/di
 <p><button disabled>Zapisz ustawienia panelu</button></p></form></section>
 <section><h2>Tryb wyświetlania</h2><form id="displayMode" action="/monitor/display-mode" method="post">
 <label>Wydruk i wygaszacz<select name="mode"><option value="simple">Prosty</option><option value="advanced">Zaawansowany (w budowie)</option></select></label>
-<small>Jeden wybór dla ekranu Wydruk i wygaszacza. Prosty pokazuje procent MQTT i ważne ostrzeżenia. Zaawansowany dodaje szczegóły etapów. Ustawienia zegara pozostają bez zmian.</small>
+<small>Jedno ustawienie dla wydruku i wygaszacza. Prosty pokazuje procent MQTT i ważne ostrzeżenia. Zaawansowany dodaje szczegóły etapów. Ustawienia zegara pozostają bez zmian.</small>
 <p><button disabled>Zapisz tryb wyświetlania</button></p></form></section>
 <section><h2>Zegar i wygaszanie</h2><form id="clock" action="/monitor/clock" method="post">
 <label>Czas bez dotykania ekranu<select name="idle_minutes"><option value="0">Wyłączone</option><option value="1">1 minuta</option><option value="5">5 minut</option><option value="15">15 minut</option><option value="30">30 minut</option></select></label>

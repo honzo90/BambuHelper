@@ -62,7 +62,7 @@ def inputs():
     paths += [HERE / 'generate_dashboard_fonts.py', HERE / 'generate_modern_fonts.py',
               ROOT / 'fonts/Inter-Regular.ttf', ROOT / 'fonts/Inter-Bold.ttf']
     visual = HERE / 'visual-v2'
-    paths += [visual / name for name in ('generate.py', 'rasterize.cjs', 'assets.json',
+    paths += [visual / name for name in ('generate.py', 'rasterize.cjs', 'rasterize_icons.cjs', 'assets.json',
                                         'rasterizer.json', 'manifest.json', 'README.md',
                                         'scene-components-prompt.txt')]
     paths += [p for p in (visual / 'raw').rglob('*')

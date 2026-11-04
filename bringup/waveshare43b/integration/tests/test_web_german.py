@@ -301,7 +301,7 @@ int main(){
         # Run original and staged German: the shared W() helper must have a
         # genuine German branch, and source localization must not corrupt it.
         expected = {
-            'Weather and solar night schedule': 'Wetter und Nachtplan nach Sonnenstand',
+            'Weather and solar night': 'Wetter und Nacht nach Sonnenstand',
             'Set up weather and night': 'Wetter und Nacht einrichten',
             'Choose the correct location from the list.': 'Wähle den richtigen Ort aus der Liste.',
             'Finish display setup': 'Anzeigeeinrichtung abschließen',
@@ -309,13 +309,15 @@ int main(){
         harness = r'''
 const assert=require('assert');
 const elements=new Map();
+const created=[];
 class Element {
- constructor(tag){this.tagName=tag;this.children=[];this.value='';this.disabled=false;this.hidden=false;this.textContent='';this.listeners={};}
+ constructor(tag){created.push(this);this.tagName=tag;this.children=[];this.value='';this.disabled=false;this.hidden=false;this.textContent='';this.listeners={};}
  set id(value){this._id=value;elements.set(value,this);}get id(){return this._id;}
  set innerHTML(value){this._html=value;for(const match of value.matchAll(/\bid="([^"]+)"/g)){const child=new Element('parsed');child.id=match[1];}}
  get innerHTML(){return this._html||'';}
  appendChild(child){this.children.push(child);return child;}
  insertBefore(child){this.children.push(child);return child;}
+ querySelector(selector){this._query=this._query||{};return this._query[selector]||(this._query[selector]=new Element('parsed'));}
  replaceChildren(){this.children=[];}
  addEventListener(type,listener){this.listeners[type]=listener;}
  setAttribute(name,value){this[name]=value;}
@@ -338,8 +340,8 @@ async function fetch(url,options){
 (async()=>{
  setupWs43bWeather();
  for(let i=0;i<5;i++)await new Promise(resolve=>setImmediate(resolve));
- assert(document.getElementById('wsWeatherCard').innerHTML.includes(expected['Weather and solar night schedule']));
- const launch=host.children.find(child=>child.textContent===expected['Set up weather and night']);assert(launch);
+ assert(document.getElementById('wsWeatherCard').innerHTML.includes(expected['Weather and solar night']));
+ const launch=created.find(child=>child.textContent===expected['Set up weather and night']);assert(launch);
  assert.equal(document.getElementById('wsWeatherLocation').textContent,'Berlin');
  const query=document.getElementById('wsWeatherQuery');query.value='Berlin';
  await document.getElementById('wsWeatherSearch').onclick();

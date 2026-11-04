@@ -39,7 +39,7 @@ let fields={}, buttons=[], card=null;
 function setupWs43bDisplaySettings(){card={integrated:true};}
 function setupWs43bWeather(){}
 const document={
- getElementById(id){return fields[id] ||= {value:'test',checked:true,style:{},closest(){return {style:{}};}};},
+ getElementById(id){return fields[id] ||= {value:'test',checked:true,style:{},classList:{add(){}},closest(){return {style:{}};}};},
  querySelector(){return {after(c){card=c;}};},
  createElement(){return {};},
  querySelectorAll(){return buttons;}

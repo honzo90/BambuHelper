@@ -1,41 +1,58 @@
 {
   "browser": "155.0.8059.82",
-  "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+  "renderer": "Per-asset renderers; unchanged artwork retains original Chromium raster",
   "assets": [
     {
       "name": "Nozzle",
       "width": 42,
-      "height": 46
+      "height": 46,
+      "renderer": "librsvg SVG xMidYMid meet -> sRGB straight RGBA",
+      "sharp": "0.35.5",
+      "librsvg": "2.63.2"
     },
     {
       "name": "Bed",
       "width": 42,
-      "height": 46
+      "height": 46,
+      "renderer": "librsvg SVG xMidYMid meet -> sRGB straight RGBA",
+      "sharp": "0.35.5",
+      "librsvg": "2.63.2"
     },
     {
       "name": "Chamber",
       "width": 42,
-      "height": 46
+      "height": 46,
+      "renderer": "librsvg SVG xMidYMid meet -> sRGB straight RGBA",
+      "sharp": "0.35.5",
+      "librsvg": "2.63.2"
     },
     {
       "name": "Print",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "AMS",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Details",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Settings",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Spool",
@@ -45,67 +62,93 @@
     {
       "name": "Model",
       "width": 160,
-      "height": 132
+      "height": 132,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Plate",
       "width": 220,
-      "height": 108
+      "height": 108,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Head",
       "width": 36,
-      "height": 47
+      "height": 47,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Clock",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Weather",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Network",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Check",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Pause",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Alert",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "EmptySlot",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "UnknownData",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Printer",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     },
     {
       "name": "Fan",
       "width": 33,
-      "height": 33
+      "height": 33,
+      "renderer": "Chromium SVG xMidYMid meet -> Canvas2D sRGB unpremultiplied RGBA",
+      "browser": "155.0.8059.82"
     }
   ]
 }
