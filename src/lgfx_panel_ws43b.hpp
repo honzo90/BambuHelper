@@ -41,7 +41,11 @@ private:
   uint8_t *_canvas = nullptr;
   uint8_t *_rows[HEIGHT] = {};
   uint8_t *_scanout[2] = {};
-  ws43b::PendingFrameRows _pendingRows{HEIGHT};
+  ws43b::PendingFrameRects _pending{WIDTH, HEIGHT};
+  // The previous switch's buffer is released lazily: we wait just before the
+  // next copy writes into it, so drawing the next frame overlaps the wait.
+  uint32_t _releaseAfter = 0;
+  bool _releasePending = false;
   uint8_t _presentedPercent = 100;
   uint8_t _backIndex = 1; // IDF starts both cur_fb_index and bb_fb_index at zero.
   bool _initialized = false;
