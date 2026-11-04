@@ -55,7 +55,7 @@ def inputs():
         paths += [p for p in (ROOT / directory).rglob('*') if p.is_file()]
     paths += [ROOT / 'boards/ws_lcd_43b.ini', ROOT / 'web/app.css', ROOT / 'web/app.js',
               ROOT / 'tools/gen_web_assets.py', HERE / 'partitions.csv', Path(__file__),
-              HERE / 'cache64_sdk.py', HERE / 'fixture_profile.py', HERE / 'localize_web.py', HERE / 'locale/pl.json', HERE / 'locale/language_picker.html', HERE / 'locale/monitor_en.json', HERE / 'locale/de.json', HERE / 'locale/monitor_de.json']
+              HERE / 'cache64_sdk.py', HERE / 'cache64_xip_sdk.py', HERE / 'fixture_profile.py', HERE / 'localize_web.py', HERE / 'locale/pl.json', HERE / 'locale/language_picker.html', HERE / 'locale/monitor_en.json', HERE / 'locale/de.json', HERE / 'locale/monitor_de.json']
     # Generated headers are already covered by include/. Record their source
     # artwork, fonts and pipeline provenance too, without transient raster/cache
     # outputs or the separate design-preview working directory.
@@ -125,11 +125,18 @@ def main():
         raise SystemExit('The hardware-validated Arduino ESP32 3.3.11 core is required.')
     sdk_record = None
     sdk_manifest_hash = None
-    sdk_profile = cfg.get('sdk_profile', 'stock')
+    sdk_manifest_path = None
+    sdk_profile = os.environ.get('WS43B_SDK_PROFILE', cfg.get('sdk_profile', 'stock'))
     if sdk_profile == 'cache64':
         from cache64_sdk import verify_sdk_manifest
         sdk_record = verify_sdk_manifest()
-        sdk_manifest_hash = digest(HERE / 'sdk-cache64-manifest.json')
+        sdk_manifest_path = HERE / 'sdk-cache64-manifest.json'
+        sdk_manifest_hash = digest(sdk_manifest_path)
+    elif sdk_profile == 'cache64_xip':
+        from cache64_xip_sdk import verify_sdk_manifest, verify_link_map
+        sdk_record = verify_sdk_manifest()
+        sdk_manifest_path = Path(os.environ['WS43B_XIP_SDK_MANIFEST'])
+        sdk_manifest_hash = sdk_record['manifest_sha256']
     elif sdk_profile != 'stock':
         raise SystemExit('Unknown private SDK profile; no fallback is allowed.')
     libpaths = []
@@ -240,21 +247,26 @@ def main():
     sdk_unchanged = True
     if sdk_record:
         sdk_unchanged = (sdk_record == verify_sdk_manifest() and
-                         sdk_manifest_hash == digest(HERE / 'sdk-cache64-manifest.json'))
+                        sdk_manifest_hash == digest(sdk_manifest_path))
     sdk_link_check = None
     if result.returncode == 0 and sdk_record:
-        linkmap = (BUILD / 'BambuHelper43B.ino.map').read_text()
-        sdk_dir = Path(sdk_record['sdk_path']) / 'qio_opi'
-        sdk_link_check = {
-            'cpu_start_from_private_sdk': str(sdk_dir / 'libesp_system.a') + '(cpu_start.c.obj)' in linkmap,
-            'cache_utils_from_private_sdk': str(sdk_dir / 'libspi_flash.a') + '(cache_utils.c.obj)' in linkmap,
-        }
-        nm = TOOL_DIR / 'bin/xtensa-esp-elf-nm'
-        symbols = subprocess.check_output([str(nm), '-C', '--defined-only',
-                                          str(BUILD / 'BambuHelper43B.ino.elf')], text=True)
-        sdk_link_check['unused_cache_mode_and_wrap_discarded'] = not re.search(
-            r'\b(esp_config_data_cache_mode|esp_enable_cache_wrap)\b', symbols)
-        sdk_link_check['passed'] = all(sdk_link_check.values())
+        if sdk_profile == 'cache64_xip':
+            sdk_link_check = verify_link_map(sdk_record,
+                                            BUILD / 'BambuHelper43B.ino.map',
+                                            BUILD / 'BambuHelper43B.ino.elf')
+        else:
+            linkmap = (BUILD / 'BambuHelper43B.ino.map').read_text()
+            sdk_dir = Path(sdk_record['sdk_path']) / 'qio_opi'
+            sdk_link_check = {
+                'cpu_start_from_private_sdk': str(sdk_dir / 'libesp_system.a') + '(cpu_start.c.obj)' in linkmap,
+                'cache_utils_from_private_sdk': str(sdk_dir / 'libspi_flash.a') + '(cache_utils.c.obj)' in linkmap,
+            }
+            nm = TOOL_DIR / 'bin/xtensa-esp-elf-nm'
+            symbols = subprocess.check_output([str(nm), '-C', '--defined-only',
+                                              str(BUILD / 'BambuHelper43B.ino.elf')], text=True)
+            sdk_link_check['unused_cache_mode_and_wrap_discarded'] = not re.search(
+                r'\b(esp_config_data_cache_mode|esp_enable_cache_wrap)\b', symbols)
+            sdk_link_check['passed'] = all(sdk_link_check.values())
     i2c_check = check_i2c_link(BUILD) if result.returncode == 0 else None
     if i2c_check is not None:
         print('I2C link regression check: ' + json.dumps(i2c_check))
@@ -268,7 +280,8 @@ def main():
               'compile_log_sha256': digest(logpath), 'artifacts': {}, 'uploaded': False}
     record['private_sdk'] = ({'profile': sdk_profile, 'sdk_path': sdk_record['sdk_path'],
                               'manifest_sha256': sdk_manifest_hash, 'inputs_unchanged': sdk_unchanged,
-                              'link_check': sdk_link_check} if sdk_record else None)
+                              'link_check': sdk_link_check,
+                              'verification': sdk_record.get('verification')} if sdk_record else None)
     if result.returncode == 0 and unchanged and sdk_unchanged and i2c_check['passed'] and (not sdk_link_check or sdk_link_check['passed']):
         for name in ['BambuHelper43B.ino.bin', 'BambuHelper43B.ino.bootloader.bin', 'BambuHelper43B.ino.partitions.bin', 'boot_app0.bin']:
             artifact = BUILD / name
