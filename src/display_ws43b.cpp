@@ -27,6 +27,7 @@
 #include "ws43b_ui_icons.h"
 #include "ws43b_boot_scene.h"
 #include "ws43b_dusk_policy.h"
+#include "ws43b_clock_flip.h"
 #include "ws43b_drying_scene.h"
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
@@ -1334,6 +1335,54 @@ void saverAnimation(bool printing,bool drying,uint16_t filament,uint32_t now,uns
   }
   tft.clearClipRect();
 }
+ws43b_clock_flip::Flip clockFlip;
+char clockShown[ws43b_clock_flip::kTextMax] = {};
+// Digits band still needs frames: set when a flip starts, cleared once the
+// final static digits have been drawn after it ends.
+bool clockBandDirty = false;
+// "HH:MM" as shown on the screensaver; false while the clock is not synced.
+bool clockTimeText(char *out, size_t size, bool &pm) {
+  struct tm local{};
+  const bool valid=getLocalTime(&local,0);
+  if(valid)snprintf(out,size,"%02d:%02d",ws43b_water::hour(local.tm_hour,netSettings.use24h),local.tm_min);
+  else snprintf(out,size,"--:--");
+  pm=valid && local.tm_hour>=12;
+  return valid;
+}
+// Large digits band (y 62..204). Restores its plain background, then draws
+// either the static time or one frame of the calendar-page flip.
+void clockDigitsBand(const char *text, bool ampm, bool pm, uint32_t now, uint16_t white) {
+  using namespace ws43b_clock_flip;
+  const uint16_t bg=tft.color565(3,14,23);
+  tft.setClipRect(100,62,600,142);tft.fillRect(100,62,600,142,bg);
+  tft.setTextSize(1);
+  ::setFont(tft,FONT_NONE);
+  if(!tft.loadFont(ws43b_inter_digits))tft.setFont((const lgfx::IFont *)&fonts::FreeSans24pt7b);
+  tft.setTextDatum(MC_DATUM);
+  const unsigned p=progress(clockFlip,now);
+  const size_t len=strnlen(text,kTextMax-1);
+  int widths[kTextMax]={};int total=0;char one[2]={0,0};
+  for(size_t i=0;i<len;++i){one[0]=text[i];widths[i]=tft.textWidth(one);total+=widths[i];}
+  int x=400-total/2;
+  for(size_t i=0;i<len;++i) {
+    const int cx=x+widths[i]/2;
+    if(changed(clockFlip,i)) {
+      // Each moving character is clipped to its own cell inside the band.
+      tft.setClipRect(x,62,widths[i],142);
+      one[0]=clockFlip.from[i];tft.setTextColor(ws43b_native::mix(bg,white,oldAlpha(p)));tft.drawString(one,cx,133+oldOffset(p));
+      one[0]=text[i];tft.setTextColor(ws43b_native::mix(bg,white,newAlpha(p)));tft.drawString(one,cx,133+newOffset(p));
+      tft.setClipRect(100,62,600,142);
+    } else {
+      one[0]=text[i];tft.setTextColor(white);tft.drawString(one,cx,133);
+    }
+    x+=widths[i];
+  }
+  tft.unloadFont();
+  tft.clearClipRect();
+  if(ampm)dashText(pm?"PM":"AM",626,151,72,18,DIM);
+  clockBandDirty=clockFlip.active;
+}
+
 // The two concurrent activities have independent timers. These cards only use
 // fresh drying telemetry; cached/offline values stay in the labelled history.
 const char *saverStageCaption(const BambuMonitorTelemetry &m,bool online,uint32_t now,
@@ -1452,10 +1501,11 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
     if(timeValid)snprintf(text,sizeof(text),"%02d.%02d.%04d",local.tm_mday,local.tm_mon+1,local.tm_year+1900);
     else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time","Uhrzeit wird synchronisiert"));
     modernText(text,400,34,false,DIM);
-    if(timeValid)snprintf(text,sizeof(text),"%02d:%02d",ws43b_water::hour(local.tm_hour,netSettings.use24h),local.tm_min);
-    else snprintf(text,sizeof(text),"--:--");
-    modernText(text,400,133,true,white);
-    if(timeValid&&!netSettings.use24h)dashText(local.tm_hour<12?"AM":"PM",626,151,72,18,DIM);
+    bool pm=false;
+    const bool clockValid=clockTimeText(text,sizeof(text),pm);
+    ws43b_clock_flip::cancel(clockFlip);clockBandDirty=false;
+    snprintf(clockShown,sizeof(clockShown),"%s",text);
+    clockDigitsBand(text,clockValid&&!netSettings.use24h,pm,now,white);
     tft.drawFastHLine(260,208,280,TRACK);
     if(combined) {
       // Both cards are rendered below on full and partial frames.
@@ -1519,7 +1569,13 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
       dashText(text,32, (print||preparationScene||waiting)?391:346,736,14,dryFresh?ACCENT:WARN);
     }
   }
-  // Restore only moving regions; large digits stay untouched between samples.
+  // Restore only moving regions; large digits stay untouched between samples
+  // except while a minute change flips them.
+  if(partial && clockBandDirty) {
+    char text[ws43b_clock_flip::kTextMax];bool pm=false;
+    const bool clockValid=clockTimeText(text,sizeof(text),pm);
+    clockDigitsBand(clockFlip.to,clockValid&&!netSettings.use24h,pm,now,white);
+  }
   if(combined)combinedSaverCards(m,*unit,online,now,activity,partial,waiting);
   else if(preparationScene) {
     const uint16_t bg=tft.color565(3,14,23);
@@ -2016,7 +2072,7 @@ void renderWs43bMonitor(bool force) {
     char key[240];
     snprintf(key, sizeof(key), "p%d/r%d/%d/%u/%d/%u/%d/%d/%d/%d/%d/%d/%d/%lu",
              m.progress.valid, m.remainingMinutes.valid, valid, unsigned(m.progress.value), remaining, unsigned(m.remainingMinutes.value),
-             timeValid, clockTime.tm_year, clockTime.tm_yday, clockTime.tm_hour, clockTime.tm_min,
+             timeValid, clockTime.tm_year, clockTime.tm_yday, 0, 0, // minute: flipped, not repainted
              netSettings.use24h, int(rotState.displayIndex), (unsigned long)ws43bLanguageRevision());
     const bool cooling = saverView(m,online,now)==ws43b_view::Saver::Cooling;
     const bool coolingFresh = online && m.status.current(now) && m.bedTemp.current(now);
@@ -2041,9 +2097,21 @@ void renderWs43bMonitor(bool force) {
     snprintf(key+sessionUsed,sizeof(key)-sessionUsed,"/q%lu/%d/%d",(unsigned long)m.session,online,ws43b_view::statusCurrent(m,online,now));
     const size_t activityUsed=strlen(key);
     snprintf(key+activityUsed,sizeof(key)-activityUsed,"/v%d/m%d",int(activity),ws43bAdvancedDisplay());
-    const bool partial = reuseWater && waterCached && !strcmp(key, previousWaterKey);
+    bool partial = reuseWater && waterCached && !strcmp(key, previousWaterKey);
+    {
+      char timeText[ws43b_clock_flip::kTextMax];bool pm=false;
+      clockTimeText(timeText,sizeof(timeText),pm);
+      if(!clockShown[0])snprintf(clockShown,sizeof(clockShown),"%s",timeText);
+      else if(partial && strcmp(timeText,clockShown)) {
+        // A new minute on an otherwise unchanged screensaver: flip the digits.
+        ws43b_clock_flip::begin(clockFlip,clockShown,timeText,now);
+        snprintf(clockShown,sizeof(clockShown),"%s",timeText);
+        clockBandDirty=clockFlip.active;
+        if(!clockFlip.active)partial=false; // e.g. clock just synced: full redraw
+      }
+    }
     // No wave at endpoints or when progress is missing: preserve the static frame.
-    if (partial && !preparationScene && !dryingFresh && !(weatherConfig.enabled && !drying && !cooling) && (cooling ? !coolingFresh : (!valid || m.progress.value == 0 || m.progress.value >= 100))) return;
+    if (partial && !clockBandDirty && !preparationScene && !dryingFresh && !(weatherConfig.enabled && !drying && !cooling) && (cooling ? !coolingFresh : (!valid || m.progress.value == 0 || m.progress.value >= 100))) return;
     tft.startWrite();
     ws43b::beginRenderDiagnostics(!partial);
     tft.unloadFont();

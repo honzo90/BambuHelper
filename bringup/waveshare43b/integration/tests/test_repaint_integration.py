@@ -112,6 +112,10 @@ const char *ws43bText(const char *p,const char*,const char* = nullptr){return p;
 void updateIdleView(uint32_t){}void cancelWs43bMonitorTouch(){++cancelCount;}
 bool clockValid=true;unsigned clockMinute=15;
 bool getLocalTime(tm *t,uint32_t){*t={};t->tm_year=126;t->tm_yday=100;t->tm_mday=10;t->tm_mon=3;t->tm_hour=10;t->tm_min=clockMinute;return clockValid;}
+#include "ws43b_clock_flip.h"
+ws43b_clock_flip::Flip clockFlip;char clockShown[ws43b_clock_flip::kTextMax]={};bool clockBandDirty=false;
+bool clockTimeText(char *out,size_t size,bool &pm){tm t{};const bool ok=getLocalTime(&t,0);snprintf(out,size,"%02d:%02d",t.tm_hour,t.tm_min);pm=false;return ok;}
+void clockDigitsBand(const char *s,bool,bool,uint32_t,int){tft.text.emplace_back(s);}
 bool dashboardWeatherNight(const WeatherData &){return night;}
 ws43b_live::View liveView(){
  if(page==Page::Dashboard)return ws43b_live::View::Dashboard;
@@ -216,6 +220,12 @@ int main(){
  m.partFanRoundedPct=51;tick();assert(!tft.full&&detailCount==1);
  page=Page::Clock;painted=false;tick();assert(clockCount==1&&!lastClockPartial);
  tick();assert(clockCount==1&&lastClockPartial&&!probes);
+ // A new minute on a cached screensaver flips the digits with partial frames.
+ ++clockMinute;tick();assert(clockCount==1&&lastClockPartial&&!probes&&clockFlip.active&&clockBandDirty);
+ {char expected[8];snprintf(expected,sizeof expected,"10:%02u",clockMinute);assert(strcmp(clockFlip.from,clockFlip.to)&&!strcmp(clockFlip.to,expected));}
+ tick();assert(clockCount==1&&lastClockPartial&&!probes); // band frames keep coming
+ clockBandDirty=false;clockFlip.active=false;              // (the band draws in clockScreen)
+ tick();assert(!clockCount||lastClockPartial); // never a full redraw for the minute
  advancedDisplay=true;++displayModeRevision;tick();assert(clockCount==1&&!lastClockPartial);
  advancedDisplay=false;++displayModeRevision;tick();assert(clockCount==1&&!lastClockPartial);
  // First layer can arrive without a percentage/ETA or clock-minute change.

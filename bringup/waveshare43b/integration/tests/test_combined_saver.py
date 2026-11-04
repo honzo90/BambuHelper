@@ -57,6 +57,10 @@ struct{bool use24h=true;}netSettings;
 const char*ws43bText(const char*pl,const char*,const char* = nullptr){return pl;}
 void dashText(const char*s,int,int,int,int=18,uint16_t=INK){texts.push_back(s);}
 void modernText(const char*s,int,int,bool,uint16_t){texts.push_back(s);}
+#include "ws43b_clock_flip.h"
+ws43b_clock_flip::Flip clockFlip;char clockShown[ws43b_clock_flip::kTextMax]={};bool clockBandDirty=false;
+bool clockTimeText(char *out,size_t size,bool &pm){snprintf(out,size,"12:34");pm=true;return true;}
+void clockDigitsBand(const char*s,bool,bool,uint32_t,uint16_t){texts.push_back(s);}
 bool getLocalTime(tm*t,int){*t={};t->tm_year=126;t->tm_mday=13;t->tm_mon=9;t->tm_hour=20;return true;}
 void drawClockBackground(bool,int,uint32_t){}
 void clockWeatherIcon(const BambuMonitorTelemetry&,bool,uint32_t){}
