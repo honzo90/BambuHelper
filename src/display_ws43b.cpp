@@ -1777,8 +1777,24 @@ void renderWs43bMonitor(bool force) {
       uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u,solarKnown && solarNight);
   }
 #endif
-  if(ws43b::setColorPercent(colorPercent)) {
-    painted=false;waterCached=false;force=true;
+  {
+    // Fade between levels. Intermediate steps only re-present the finished
+    // canvas (the panel scales colours while copying it to the scanout
+    // buffer); the final step repaints once, as an instant change did before.
+    static uint8_t shownPercent=100;
+    static uint32_t lastFadeStep=0;
+    if(screenOff)shownPercent=colorPercent;
+    if(shownPercent!=colorPercent &&
+       uint32_t(now-lastFadeStep)>=ws43b_dusk::fadeIntervalMs(shownPercent,colorPercent)) {
+      lastFadeStep=now;
+      shownPercent=ws43b_dusk::fadeStep(shownPercent,colorPercent);
+      if(shownPercent!=colorPercent && ws43b::setColorPercent(shownPercent)) {
+        tft.startWrite();tft.endWrite();
+      }
+    }
+    if(shownPercent==colorPercent && ws43b::setColorPercent(colorPercent)) {
+      painted=false;waterCached=false;force=true;
+    }
   }
 #if WS43B_FULL_WEBUI
   if(glowConsumeCleanup())painted=false;

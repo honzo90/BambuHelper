@@ -27,6 +27,14 @@ int main(){
  // AP mode / no printer: never dim.
  for(int bits=0;bits<8;++bits)
   assert(colorPercent(false,bits&1,bits&2,bits&4)==100);
+ // Fades: dim in 5% steps, brighten in 10% steps, never overshoot.
+ using ws43b_dusk::fadeStep; using ws43b_dusk::fadeIntervalMs;
+ {uint8_t v=100;int steps=0;while(v!=50){uint8_t n=fadeStep(v,50);assert(n<v&&n>=50&&v-n<=5);v=n;++steps;}assert(steps==10);}
+ {uint8_t v=50;int steps=0;while(v!=100){uint8_t n=fadeStep(v,100);assert(n>v&&n<=100&&n-v<=10);v=n;++steps;}assert(steps==5);}
+ {uint8_t v=100;int steps=0;while(v!=30){v=fadeStep(v,30);++steps;}assert(steps==14);}
+ assert(fadeStep(52,50)==50 && fadeStep(97,100)==100 && fadeStep(50,50)==50);
+ assert(fadeIntervalMs(50,100)<fadeIntervalMs(100,50));
+ assert(10*fadeIntervalMs(100,50)<=1500 && 5*fadeIntervalMs(50,100)<=300);
  return 0;
 }
 '''
