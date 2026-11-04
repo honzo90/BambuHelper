@@ -14,9 +14,11 @@ using ws43b_dusk::colorPercent;
 int main(){
  // Daytime: full colors with or without the solar option.
  assert(colorPercent(true,false,false,false)==100);
- // Dark outside, before 22:00 / after 06:00: stay on at 50%.
- assert(colorPercent(true,false,false,true)==50);
+ // Dark outside, before 22:00 / after 06:00: 50% after the no-touch
+ // timeout, full colors again right after a touch.
  assert(colorPercent(true,false,true,true)==50);
+ assert(colorPercent(true,false,false,true)==100);
+ assert(colorPercent(true,false,true,false)==100);
  // Night hours: full colors until the night timeout, then the 30% clock dim,
  // regardless of solar data.
  assert(colorPercent(true,true,false,true)==100);
