@@ -3,13 +3,13 @@
 #include <string.h>
 
 // Calendar-page flip of the screensaver clock digits ("HH:MM").
-// Only characters that differ move: the old one drops down and fades out,
-// the new one slides in from above and fades in. Pure logic, host-testable.
+// Only characters that differ move: the old one slides down out of its cell,
+// the new one follows from above. Pure logic, host-testable.
 namespace ws43b_clock_flip {
 
-constexpr uint32_t kDurationMs = 1100;  // a calm page turn
+constexpr uint32_t kDurationMs = 1000;  // a calm page turn
 constexpr uint32_t kFrameMs = 40;       // ~25 fps while flipping (panel refresh limit)
-constexpr int kTravel = 70;             // px the digits move (band is ~140 px tall)
+constexpr int kTravel = 120;            // > digit height: old and new never overlap
 constexpr unsigned kTextMax = 8;
 
 struct Flip {
@@ -40,15 +40,16 @@ inline bool changed(const Flip &f, unsigned i) {
   return f.active && i < kTextMax && f.from[i] != f.to[i];
 }
 
-// Old character: accelerates downward like a falling page (ease-in).
-inline int oldOffset(unsigned p) { return int(int64_t(kTravel) * p * p / 1000000); }
-// New character: decelerates into place from above (ease-out).
-inline int newOffset(unsigned p) {
-  const unsigned q = 1000 - p;
-  return -int(int64_t(kTravel) * q * q / 1000000);
+// Smooth start and stop (cubic ease-in-out), 0..1000.
+inline unsigned ease(unsigned p) {
+  if (p >= 1000) return 1000;
+  if (p < 500) return unsigned(uint64_t(4) * p * p * p / 1000000);
+  const uint64_t q = 1000 - p;
+  return unsigned(1000 - uint64_t(4) * q * q * q / 1000000);
 }
-// Opacity 0..255: the old character fades out faster, the new one fades in.
-inline unsigned oldAlpha(unsigned p) { return p >= 700 ? 0 : 255 - p * 255 / 700; }
-inline unsigned newAlpha(unsigned p) { return p <= 250 ? 0 : (p - 250) * 255 / 750; }
+// Like a calendar page: the old digit moves down out of its cell while the new
+// one follows from above, a constant kTravel apart, so they never overlap.
+inline int oldOffset(unsigned p) { return int(int64_t(kTravel) * ease(p) / 1000); }
+inline int newOffset(unsigned p) { return oldOffset(p) - kTravel; }
 
 }  // namespace ws43b_clock_flip

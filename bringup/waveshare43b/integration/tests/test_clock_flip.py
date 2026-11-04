@@ -17,10 +17,15 @@ int main(){
  // Only differing characters move: "2" stays, "1"->"2", ":" stays, "5"->"0", "9"->"0".
  assert(!changed(f,0)&&changed(f,1)&&!changed(f,2)&&changed(f,3)&&changed(f,4));
  assert(progress(f,1000)==0);
- // Old digit drops downward, new one comes from above, both settle at 0.
+ // Old digit moves down out of the cell, the new one follows from above.
  assert(oldOffset(0)==0 && oldOffset(1000)==kTravel && newOffset(0)==-kTravel && newOffset(1000)==0);
- for(unsigned p=0;p<1000;p+=50){assert(oldOffset(p)<=oldOffset(p+50));assert(newOffset(p)<=newOffset(p+50));}
- assert(oldAlpha(0)==255 && oldAlpha(700)==0 && newAlpha(250)==0 && newAlpha(1000)==255);
+ for(unsigned p=0;p<1000;p+=10){
+  assert(oldOffset(p)<=oldOffset(p+10) && newOffset(p)<=newOffset(p+10));   // monotonic
+  assert(oldOffset(p)-newOffset(p)==kTravel);                                // never overlap
+  assert(oldOffset(p+10)-oldOffset(p)<=kTravel/20+1);                        // no jumps at 1% steps
+ }
+ assert(ease(0)==0 && ease(500)==500 && ease(1000)==1000 && ease(100)<100 && ease(900)>900); // soft start/stop
+ static_assert(kTravel>=100,"travel must exceed the ~85 px digit height");
  // About a second at ~25 fps: enough frames for a smooth page turn.
  assert(kDurationMs>=900 && kDurationMs<=1500 && kFrameMs<=42);
  unsigned frames=0;for(uint32_t t=1000;f.active;t+=kFrameMs){progress(f,t);++frames;}

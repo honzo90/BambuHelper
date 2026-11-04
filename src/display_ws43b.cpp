@@ -1349,38 +1349,80 @@ bool clockTimeText(char *out, size_t size, bool &pm) {
   pm=valid && local.tm_hour>=12;
   return valid;
 }
-// Large digits band (y 62..204). Restores its plain background, then draws
-// either the static time or one frame of the calendar-page flip.
+// Pre-rendered digits of a running flip: drawn once, then only copied per
+// frame. Antialiased text straight onto the PSRAM canvas costs ~200 ms per
+// frame; a sprite copy of a digit cell takes a few milliseconds.
+lgfx::LGFX_Sprite flipGlyph[2][ws43b_clock_flip::kTextMax];  // [0] old, [1] new
+int flipCellX[ws43b_clock_flip::kTextMax]={},flipCellW[ws43b_clock_flip::kTextMax]={};
+bool flipGlyphsReady=false;
+void releaseFlipGlyphs() {
+  for(auto &row:flipGlyph)for(auto &sprite:row)sprite.deleteSprite();
+  flipGlyphsReady=false;
+}
+bool prepareFlipGlyphs(uint16_t bg,uint16_t white) {
+  using namespace ws43b_clock_flip;
+  releaseFlipGlyphs();
+  ::setFont(tft,FONT_NONE);
+  if(!tft.loadFont(ws43b_inter_digits))return false;
+  tft.setTextSize(1);
+  const size_t len=strnlen(clockFlip.to,kTextMax-1);
+  char one[2]={0,0};int total=0;
+  for(size_t i=0;i<len;++i){one[0]=clockFlip.to[i];flipCellW[i]=tft.textWidth(one);total+=flipCellW[i];}
+  tft.unloadFont();
+  int x=400-total/2;
+  for(size_t i=0;i<len;++i){flipCellX[i]=x;x+=flipCellW[i];}
+  for(size_t i=0;i<len;++i) {
+    if(!changed(clockFlip,i))continue;
+    for(int k=0;k<2;++k) {
+      auto &sprite=flipGlyph[k][i];
+      sprite.setColorDepth(16);sprite.setPsram(true);
+      if(!sprite.createSprite(flipCellW[i],142)){releaseFlipGlyphs();return false;}
+      sprite.fillSprite(bg);
+      if(!sprite.loadFont(ws43b_inter_digits)){releaseFlipGlyphs();return false;}
+      sprite.setTextDatum(MC_DATUM);sprite.setTextColor(white,bg);
+      one[0]=k?clockFlip.to[i]:clockFlip.from[i];
+      sprite.drawString(one,flipCellW[i]/2,133-62);
+      sprite.unloadFont();
+    }
+  }
+  flipGlyphsReady=true;
+  return true;
+}
+// Large digits band (y 62..204). Static: restores the background and draws
+// the time. Flipping: only the changed digit cells are refreshed.
 void clockDigitsBand(const char *text, bool ampm, bool pm, uint32_t now, uint16_t white) {
   using namespace ws43b_clock_flip;
   const uint16_t bg=tft.color565(3,14,23);
+  const unsigned p=progress(clockFlip,now);
+  if(clockFlip.active && (flipGlyphsReady || prepareFlipGlyphs(bg,white))) {
+    const size_t len=strnlen(clockFlip.to,kTextMax-1);
+    for(size_t i=0;i<len;++i) {
+      if(!changed(clockFlip,i))continue;
+      tft.setClipRect(flipCellX[i],62,flipCellW[i],142);
+      tft.fillRect(flipCellX[i],62,flipCellW[i],142,bg);
+      flipGlyph[0][i].pushSprite(&tft,flipCellX[i],62+oldOffset(p));
+      flipGlyph[1][i].pushSprite(&tft,flipCellX[i],62+newOffset(p));
+    }
+    tft.clearClipRect();
+    clockBandDirty=true;
+    return;
+  }
+  // Static digits (also the final frame after a flip).
+  releaseFlipGlyphs();
   tft.setClipRect(100,62,600,142);tft.fillRect(100,62,600,142,bg);
   tft.setTextSize(1);
   ::setFont(tft,FONT_NONE);
   if(!tft.loadFont(ws43b_inter_digits))tft.setFont((const lgfx::IFont *)&fonts::FreeSans24pt7b);
-  tft.setTextDatum(MC_DATUM);
-  const unsigned p=progress(clockFlip,now);
+  tft.setTextDatum(MC_DATUM);tft.setTextColor(white);
   const size_t len=strnlen(text,kTextMax-1);
   int widths[kTextMax]={};int total=0;char one[2]={0,0};
   for(size_t i=0;i<len;++i){one[0]=text[i];widths[i]=tft.textWidth(one);total+=widths[i];}
   int x=400-total/2;
-  for(size_t i=0;i<len;++i) {
-    const int cx=x+widths[i]/2;
-    if(changed(clockFlip,i)) {
-      // Each moving character is clipped to its own cell inside the band.
-      tft.setClipRect(x,62,widths[i],142);
-      one[0]=clockFlip.from[i];tft.setTextColor(ws43b_native::mix(bg,white,oldAlpha(p)));tft.drawString(one,cx,133+oldOffset(p));
-      one[0]=text[i];tft.setTextColor(ws43b_native::mix(bg,white,newAlpha(p)));tft.drawString(one,cx,133+newOffset(p));
-      tft.setClipRect(100,62,600,142);
-    } else {
-      one[0]=text[i];tft.setTextColor(white);tft.drawString(one,cx,133);
-    }
-    x+=widths[i];
-  }
+  for(size_t i=0;i<len;++i){one[0]=text[i];tft.drawString(one,x+widths[i]/2,133);x+=widths[i];}
   tft.unloadFont();
   tft.clearClipRect();
   if(ampm)dashText(pm?"PM":"AM",626,151,72,18,DIM);
-  clockBandDirty=clockFlip.active;
+  clockBandDirty=false;
 }
 
 // The two concurrent activities have independent timers. These cards only use
@@ -1571,16 +1613,14 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
   }
   // Restore only moving regions; large digits stay untouched between samples
   // except while a minute change flips them.
-  // While the digits flip at ~25 fps, the rest of the saver keeps its own
-  // 84 ms cadence so each flip frame stays cheap.
-  static uint32_t lastSaverFrame=0;
+  // During the ~1 s flip only the digits are drawn: an ordinary saver frame
+  // takes ~165 ms and would stall every other flip frame.
   if(partial && clockBandDirty) {
     char text[ws43b_clock_flip::kTextMax];bool pm=false;
     const bool clockValid=clockTimeText(text,sizeof(text),pm);
     clockDigitsBand(clockFlip.to,clockValid&&!netSettings.use24h,pm,now,white);
-    if(uint32_t(now-lastSaverFrame)<84u){tft.setTextDatum(TL_DATUM);return;}
+    tft.setTextDatum(TL_DATUM);return;
   }
-  lastSaverFrame=now;
   if(combined)combinedSaverCards(m,*unit,online,now,activity,partial,waiting);
   else if(preparationScene) {
     const uint16_t bg=tft.color565(3,14,23);
