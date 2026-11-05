@@ -116,6 +116,134 @@ def runtime_cpp(source, entries):
     for a,b,text in reversed(replacements):source=source[:a]+text+source[b:]
     return '#include "ws43b_language.h"\n'+source
 
+
+COMPRESSED_PAGES = ('PAGE_HTML_1', 'PAGE_HTML_ERRORS', 'PAGE_HTML_2')
+RAW_OPEN, RAW_CLOSE = 'R"rawliteral(', ')rawliteral"'
+
+
+def compress_pages(header, names=COMPRESSED_PAGES):
+    """Replace `static const char NAME[] PROGMEM = R"rawliteral(...)..." ;` page
+    arrays by `NAME_Z` byte arrays: every raw-literal chunk becomes
+    [compressed u32][raw u32][zlib], and preprocessor lines between chunks stay
+    in place, so the compiler still selects the chunks exactly as before."""
+    import zlib
+    for name in names:
+        start_decl = 'static const char ' + name + '[] PROGMEM ='
+        start = header.find(start_decl)
+        if start < 0:
+            continue
+        pos = start + len(start_decl)
+        out = ['static const uint8_t ' + name + '_Z[] PROGMEM = {\n']
+        while True:
+            # Skip whitespace; copy preprocessor lines; stop at the final ';'.
+            while header[pos] in ' \t\r\n':
+                pos += 1
+            if header.startswith(RAW_OPEN, pos):
+                end = header.index(RAW_CLOSE, pos)
+                raw = header[pos + len(RAW_OPEN):end].encode('utf-8')
+                z = zlib.compress(raw, 9)
+                blob = len(z).to_bytes(4, 'little') + len(raw).to_bytes(4, 'little') + z
+                for i in range(0, len(blob), 24):
+                    out.append(' ' + ','.join('0x%02x' % b for b in blob[i:i + 24]) + ',\n')
+                pos = end + len(RAW_CLOSE)
+            elif header[pos] == '#':
+                eol = header.index('\n', pos)
+                out.append(header[pos:eol] + '\n')
+                pos = eol + 1
+            elif header[pos] == ';':
+                pos += 1
+                break
+            else:
+                raise ValueError('unexpected text in ' + name + ': ' + header[pos:pos + 40])
+        out.append('};\n')
+        header = header[:start] + ''.join(out) + header[pos:]
+    return header
+
+
+def readable_pages(header):
+    """Inverse view of compress_pages() for checks: each NAME_Z array becomes
+    the plain-text raw literals again (preprocessor lines kept in order)."""
+    import re
+    import zlib
+
+    def expand(match):
+        body = match.group(2)
+        out = ['static const char ' + match.group(1) + '[] PROGMEM =\n']
+        for line in body.splitlines():
+            if line.startswith('#'):
+                out.append(line + '\n')
+                continue
+            data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-f]{2})', line))
+            if data:
+                out.append(data.hex())
+        # Rebuild chunk by chunk from the concatenated hex runs between #lines.
+        text, pending = [], ''
+        for piece in out:
+            if piece.startswith('#') or piece.startswith('static'):
+                if pending:
+                    blob = bytes.fromhex(pending); pos = 0
+                    while pos < len(blob):
+                        c = int.from_bytes(blob[pos:pos + 4], 'little')
+                        text.append('R"rawliteral(' + zlib.decompress(blob[pos + 8:pos + 8 + c]).decode('utf-8') + ')rawliteral"\n')
+                        pos += 8 + c
+                    pending = ''
+                text.append(piece)
+            else:
+                pending += piece
+        if pending:
+            blob = bytes.fromhex(pending); pos = 0
+            while pos < len(blob):
+                c = int.from_bytes(blob[pos:pos + 4], 'little')
+                text.append('R"rawliteral(' + zlib.decompress(blob[pos + 8:pos + 8 + c]).decode('utf-8') + ')rawliteral"\n')
+                pos += 8 + c
+        return ''.join(text) + ';'
+
+    return re.sub(r'static const uint8_t (\w+)_Z\[\] PROGMEM = \{\n(.*?)\n\};', expand, header, flags=re.S)
+
+
+SERVE_MAIN_RAW = """  const TemplateSegment segs[] = {
+    { PAGE_HTML_1, sizeof(PAGE_HTML_1) - 1 },
+#if HAS_HMS_WEB_UI
+    { PAGE_HTML_ERRORS, sizeof(PAGE_HTML_ERRORS) - 1 },
+#endif
+    { PAGE_HTML_2, sizeof(PAGE_HTML_2) - 1 },
+  };
+  streamTemplate(segs, (uint8_t)(sizeof(segs) / sizeof(segs[0])));"""
+
+SERVE_MAIN_Z = """  // Pages are stored compressed (ws43b_page_inflate.h); inflate them into
+  // PSRAM for this request. If that fails, offer a minimal firmware upload so
+  // the panel can always be updated or rolled back from the browser.
+  size_t lengths[3] = {};
+  char *pages[3] = {};
+  pages[0] = ws43b_page::inflatePage(PAGE_HTML_1_Z, sizeof(PAGE_HTML_1_Z), lengths[0]);
+#if HAS_HMS_WEB_UI
+  pages[1] = ws43b_page::inflatePage(PAGE_HTML_ERRORS_Z, sizeof(PAGE_HTML_ERRORS_Z), lengths[1]);
+  const bool errorsOk = pages[1] != nullptr;
+#else
+  const bool errorsOk = true;
+#endif
+  pages[2] = ws43b_page::inflatePage(PAGE_HTML_2_Z, sizeof(PAGE_HTML_2_Z), lengths[2]);
+  if (!pages[0] || !errorsOk || !pages[2]) {
+    for (char *page : pages) if (page) heap_caps_free(page);
+    server.send(500, "text/html",
+      "<!doctype html><meta name=viewport content='width=device-width'><title>BambuHelper</title>"
+      "<h3>WebUI unavailable</h3><p>Upload a BambuHelper-ws_lcd_43b-*-ota.bin firmware file:</p>"
+      "<form method=post action='/ota/upload' enctype='multipart/form-data'>"
+      "<input type=file name=firmware accept='.bin'> <button>Upload and restart</button></form>"
+      "<form method=post action='/ota/rollback'><button>Start the other firmware slot</button></form>");
+    return;
+  }
+  const TemplateSegment segs[] = {
+    { pages[0], lengths[0] },
+#if HAS_HMS_WEB_UI
+    { pages[1], lengths[1] },
+#endif
+    { pages[2], lengths[2] },
+  };
+  streamTemplate(segs, (uint8_t)(sizeof(segs) / sizeof(segs[0])));
+  for (char *page : pages) if (page) heap_caps_free(page);"""
+
+
 def stage(source_dir, web_source, web_target):
     entries = catalog('pl')
     entries_de = catalog('de')
@@ -125,9 +253,9 @@ def stage(source_dir, web_source, web_target):
     # Picker in the full portal sidebar and the initial AP provisioning page.
     pages = pages.replace('<div class="sidebar-footer">', '<div class="sidebar-footer">' + picker)
     pages = pages.replace('</head><body>', '</head><body>' + picker)
-    (source_dir / 'web_pages.h').write_text(pages)
-    (source_dir / 'web_pages_pl.h').write_text(cpp(pages, entries, language='pl'))
-    (source_dir / 'web_pages_de.h').write_text(cpp(pages, entries_de, language='de'))
+    (source_dir / 'web_pages.h').write_text(compress_pages(pages))
+    (source_dir / 'web_pages_pl.h').write_text(compress_pages(cpp(pages, entries, language='pl')))
+    (source_dir / 'web_pages_de.h').write_text(compress_pages(cpp(pages, entries_de, language='de')))
 
     template = (source_dir / 'web_template.cpp').read_text()
     for lang in ('en', 'pl', 'de'):
@@ -140,6 +268,11 @@ def stage(source_dir, web_source, web_target):
             t = t.replace('"web_pages.h"', '"web_pages_pl.h"')
         elif lang == 'de':
             t = t.replace('"web_pages.h"', '"web_pages_de.h"')
+
+        if SERVE_MAIN_RAW not in t:
+            raise SystemExit('serveMainPage layout changed; update localize_web.SERVE_MAIN_RAW')
+        t = t.replace(SERVE_MAIN_RAW, SERVE_MAIN_Z)
+        t = '#include "ws43b_page_inflate.h"\n' + t
 
         for name in ('serveMainPage', 'serveApPage', 'webAssetJsVersion'):
             t = t.replace(name + '(', name + '_' + lang + '(')

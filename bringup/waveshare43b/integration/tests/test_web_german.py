@@ -123,8 +123,8 @@ class GermanWeb(unittest.TestCase):
                     self.assertEqual(re.search(r'\s*$', key)[0], re.search(r'\s*$', value)[0])
 
     def test_german_pages_keep_controls_tokens_and_protocol_identifiers(self):
-        english = (self.source / 'web_pages.h').read_text()
-        german = (self.source / 'web_pages_de.h').read_text()
+        english = loc.readable_pages((self.source / 'web_pages.h').read_text())
+        german = loc.readable_pages((self.source / 'web_pages_de.h').read_text())
         self.assertEqual(Counter(re.findall(r'%[A-Z][A-Z0-9_]*%', english)),
                          Counter(re.findall(r'%[A-Z][A-Z0-9_]*%', german)))
         en_raw = [match[0] for match in loc.CPP.finditer(english) if match[0].startswith('R"')]
