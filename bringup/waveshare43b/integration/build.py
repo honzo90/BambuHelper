@@ -221,9 +221,18 @@ def main():
     # All project headers are staged beside their source files and use quoted
     # includes. Do not pass the spaced workspace path through extra_flags;
     # Arduino handles library include paths itself.
+    # Keep local directory names out of __FILE__ strings in the image. GCC
+    # applies the last matching map, so the home-directory catch-all comes
+    # first. Quoted tokens survive Arduino CLI's recipe splitting. These maps
+    # are not recorded in the manifest: they contain the local paths.
+    prefix_maps = [(Path.home(), '/home'), (ARDUINO, '/arduino'), (REFERENCE, '/waveshare'),
+                   (ROOT, '/bambuhelper'), (BUILD, '/build')]
+    if sdk_record:
+        prefix_maps.append((Path(sdk_record['sdk_path']), '/sdk'))
+    map_flags = ' '.join('"-ffile-prefix-map=' + str(old) + '=' + new + '"' for old, new in prefix_maps)
     command = ['arduino-cli', 'compile', '--fqbn', cfg['fqbn'], '--build-path', str(BUILD),
-               '--build-property', f'compiler.cpp.extra_flags={flags}',
-               '--build-property', f'compiler.c.extra_flags={flags}',
+               '--build-property', f'compiler.cpp.extra_flags={flags} {map_flags}',
+               '--build-property', f'compiler.c.extra_flags={flags} {map_flags}',
                '--build-property', 'upload.maximum_size=' + cfg['app_limit']]
     if sdk_record:
         command += ['--build-property', 'compiler.sdk.path=' + sdk_record['sdk_path']]
@@ -267,12 +276,22 @@ def main():
             sdk_link_check['unused_cache_mode_and_wrap_discarded'] = not re.search(
                 r'\b(esp_config_data_cache_mode|esp_enable_cache_wrap)\b', symbols)
             sdk_link_check['passed'] = all(sdk_link_check.values())
+    local_paths = None
+    if result.returncode == 0:
+        image = (BUILD / 'BambuHelper43B.ino.bin').read_bytes()
+        local_paths = sorted({m.decode(errors='replace') for m in re.findall(rb'/(?:Users|private|tmp|var)/[ -~]{0,80}', image)})
+        print('Local paths in image: ' + str(len(local_paths)))
+        if local_paths:
+            print('\n'.join(local_paths[:20]))
+            raise SystemExit('Local filesystem paths found in the firmware image.')
     i2c_check = check_i2c_link(BUILD) if result.returncode == 0 else None
     if i2c_check is not None:
         print('I2C link regression check: ' + json.dumps(i2c_check))
     record = {'started': started, 'profile': 'boards/ws_lcd_43b.ini', 'compile_exit_code': result.returncode,
               'requested_pclk_hz': int(pclk_hz), 'memory_diagnostics': memory_diag == '1', 'connection_diagnostics': connect_diag == '1', 'fixture': fixture_record,
               'inputs_unchanged_during_build': unchanged, 'fqbn': cfg['fqbn'], 'flags': flags,
+              'local_paths_in_image': len(local_paths) if local_paths is not None else None,
+              'path_prefix_maps': len(prefix_maps),
               'core_version': cfg['core_version'], 'manufacturer_commit': REF_COMMIT,
               'source_sha256': sources, 'dependency_file_sha256': library_hashes,
               'i2c_link_check': i2c_check,
