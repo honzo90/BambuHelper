@@ -1,18 +1,18 @@
 const PINNED_INFO = {
-  version: "v4.0.0-beta.2",
-  display_version: "v0.9",
+  version: "v4.1.0",
+  display_version: "v4.1.0",
   board_variant: "ws_lcd_43b",
   chip_family: "ESP32-S3",
-  source_commit: "552375bb3e05f0f499a0add9aa9156d92679287c",
+  source_commit: "d6795d671be862ffae71de69a0d810b901453412",
   factory_file: "factory.bin",
-  factory_bytes: 2936816,
-  factory_sha256: "6e49ca8a91e1ca43ec56016dd1fc6c59fed6a020a3aab9f0531891a76259174b",
-  release_url: "https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0-beta.2",
+  factory_bytes: 2956144,
+  factory_sha256: "be4445792801b12d104070f7e26739eb5e57be49f4369babee8b0ad0a6614726",
+  release_url: "https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0",
 };
 
 const EXPECTED_MANIFEST = {
   name: "BambuHelper WS43B",
-  version: "v4.0.0-beta.2",
+  version: "v4.1.0",
   new_install_prompt_erase: false,
   new_install_improv_wait_time: 0,
 };
