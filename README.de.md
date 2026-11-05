@@ -2,6 +2,8 @@
 
 [English](README.md) | [Polski](README.pl.md) | **Deutsch**
 
+> **[▶ Im Browser über USB installieren — v4.1.0](https://honzo90.github.io/BambuHelper/)** (Chrome oder Edge am Computer, Erstinstallation; löscht das Panel) · Panel läuft schon? Update im WebUI: **Stable → Nach Updates suchen**
+
 Ein Monitor für Bambu-Lab-Drucker auf dem **Waveshare ESP32-S3-Touch-LCD-4.3B** mit kapazitivem **800×480-RGB-Touchscreen**. BambuHelper zeigt Druckfortschritt, Temperaturen und AMS-Daten sowie eine Uhr und auf Wunsch das Wetter. Die Bedienung am Panel und die Konfiguration im Browser sind auf **Deutsch, Polnisch und Englisch** verfügbar.
 
 **Aktuelle stabile Version: [v4.1.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0).** Sie bringt Nachtzeiten mit Minuten, Abdunkeln in der Dämmerung mit Bildschirmschoner, eine Uhr im Kalenderblatt-Stil, ein überarbeitetes Einstellungsmenü am Panel, eine aufgeräumte WebUI, WLAN-Diagnose, schnellere Bildschirmaktualisierung, eine um 182 KB kleinere Firmware und deutlich mehr freien internen Speicher — Details unter [Neu in v4.1.0](#neu-in-v410). Das Release behält das SDK mit XIP aus dem PSRAM, den angeforderten RGB-Pixeltakt von **12 MHz** und die Oberflächen auf **DE / PL / EN**.
@@ -50,9 +52,9 @@ Das Profil verwendet `BAMBU_MONITOR_ONLY=0` und enthält auch die Steuerung der 
 2. Verbinde das Panel mit einem USB-Kabel, das Datenübertragung unterstützt. Der Installer ist ausschließlich für das **Waveshare ESP32-S3-Touch-LCD-4.3B** vorgesehen.
 3. Bestätige das genaue Platinenmodell und das Löschen der Einstellungen. Wähle auf der derzeit polnischen Installationsseite **„Przygotuj instalację“** (Installation vorbereiten), danach **„Połącz i zainstaluj“** (Verbinden und installieren).
 4. Richte nach dem Neustart das WLAN über das Netzwerk des Panels ein. Die Verbindungsdaten erscheinen auf dem Display.
-5. Der USB-Installer installiert weiterhin **Beta 2**. Wechsle anschließend im WebUI zum Kanal **Stable**, suche nach Updates und installiere **v4.1.0**. Danach kannst du **Deutsch** im Menü oder WebUI auswählen.
+5. Der USB-Installer installiert direkt **v4.1.0**. Wähle danach **Deutsch** im Menü oder WebUI und füge den Drucker hinzu. Spätere Updates: Kanal **Stable** im WebUI.
 
-**Die erste USB-Installation löscht den Flash-Speicher einschließlich WLAN-Einstellungen, Druckerkonfiguration und bisheriger Firmware.** Die Seite prüft das Firmwareabbild, bevor sie die Installation freigibt. Der vollständige Installationsvorgang über den Browser ist noch nicht durch einen Test an einer physischen Platine bestätigt.
+**Die erste USB-Installation löscht den Flash-Speicher einschließlich WLAN-Einstellungen, Druckerkonfiguration und bisheriger Firmware.** Die Seite prüft das Firmwareabbild, bevor sie die Installation freigibt. Der Projektbetreiber hat eine vollständige Erstinstallation von v4.1.0 auf einer 4.3B-Platine bestätigt (Installation, WLAN, Druckerverbindung).
 
 ### Vorhandenes Panel per OTA aktualisieren
 

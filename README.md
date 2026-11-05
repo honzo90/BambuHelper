@@ -2,6 +2,8 @@
 
 **English** | [Polski](README.pl.md) | [Deutsch](README.de.md)
 
+> **[▶ Install in the browser over USB — v4.1.0](https://honzo90.github.io/BambuHelper/)** (desktop Chrome or Edge, first installation; erases the panel) · already running? update in the panel WebUI: **Stable → Check for updates**
+
 A desktop Bambu Lab printer monitor for the **Waveshare ESP32-S3-Touch-LCD-4.3B**:
 an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish,
 English or German interface, and clock/weather views.
@@ -109,14 +111,14 @@ The OTA file contains only the application and cannot perform a first installati
 
 ### First installation over USB
 
-**Browser USB installer — WS43B Beta 2:** open
+**Browser USB installer — WS43B v4.1.0:** open
 [honzo90.github.io/BambuHelper](https://honzo90.github.io/BambuHelper/) in desktop
 Chrome or Edge. It is only for **Waveshare ESP32-S3-Touch-LCD-4.3B** and first
 installation: it erases flash, including saved settings and previous firmware.
-The page checks the factory image before enabling installation. This browser
-USB installation workflow still needs physical hardware acceptance. After
-installing Beta 2 and configuring WiFi, use **Stable → Check for updates** in the
-panel WebUI to install **v4.1.0**.
+The page checks the factory image before enabling installation. The project
+owner confirmed a complete first installation of v4.1.0 on a 4.3B board
+(install, WiFi setup, printer connection). Later updates: **Stable → Check for
+updates** in the panel WebUI.
 
 The inherited upstream web flasher does not support this 4.3B port.
 Other boards, printer models and multi-printer configurations
