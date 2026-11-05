@@ -227,6 +227,13 @@ def verify_sdk_manifest(manifest_path=None, expected_sha256=None):
         "CONFIG_ESP32S3_DATA_CACHE_LINE_64B",
         "CONFIG_LCD_RGB_RESTART_IN_VSYNC",
     ]
+    # The 2026-10-25 profile keeps the RGB ISR out of IRAM. A rebuild may move
+    # it to IRAM only when its manifest says so explicitly; the configuration
+    # must then match the declaration exactly.
+    rgb_iram = m.get("rgb_isr_iram_safe", False)
+    _require(isinstance(rgb_iram, bool), "rgb_isr_iram_safe must be a boolean")
+    if rgb_iram:
+        enabled.append("CONFIG_LCD_RGB_ISR_IRAM_SAFE")
     for config in configs:
         for key in enabled:
             _require(config.get(key) == "1", f"required config not enabled: {key}")
@@ -236,10 +243,11 @@ def verify_sdk_manifest(manifest_path=None, expected_sha256=None):
         disabled = [
             "CONFIG_ESP32S3_DATA_CACHE_LINE_16B",
             "CONFIG_ESP32S3_DATA_CACHE_LINE_32B",
-            "CONFIG_LCD_RGB_ISR_IRAM_SAFE",
             "CONFIG_SPI_FLASH_SHARE_SPI1_BUS",
             "CONFIG_SPI_FLASH_DISABLE_SCHEDULER_IN_SUSPEND",
         ]
+        if not rgb_iram:
+            disabled.append("CONFIG_LCD_RGB_ISR_IRAM_SAFE")
         for key in disabled:
             _require(config.get(key, "0") == "0", f"forbidden config enabled: {key}")
 
