@@ -40,6 +40,11 @@
 #include <time.h>
 
 namespace {
+// getLocalTime(&t, 0) can fail spuriously on a synced clock: its loop runs
+// only while millis() has not advanced, so one interrupt between its two
+// millis() reads makes it return false. A few ms of slack removes the race;
+// a synced clock still returns on the first check.
+// All getLocalTime() calls in this file therefore pass 5 ms.
 constexpr uint16_t CARD = ws43b_style::card;
 uint16_t INK = 0xF7BE, DIM = 0x9D34, GREEN = 0x77B2;
 constexpr uint16_t WARN = 0xF5CB, RED = 0xF38F;
@@ -828,7 +833,7 @@ void dashboardScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,
     } else snprintf(buf,sizeof(buf),"--");
     v2Text(buf,32,188,190,ws43b_v2_b28,28,remaining?v2Ink():v2Dim(),false,false);
     struct tm local{};
-    if(remaining&&ws43b_view::statusCurrent(m,online,now)&&(!strcmp(m.status.value,"RUNNING")||!strcmp(m.status.value,"PREPARE"))&&getLocalTime(&local,0)) {
+    if(remaining&&ws43b_view::statusCurrent(m,online,now)&&(!strcmp(m.status.value,"RUNNING")||!strcmp(m.status.value,"PREPARE"))&&getLocalTime(&local,5)) {
       const time_t end=time(nullptr)+60u*m.remainingMinutes.value;localtime_r(&end,&local);
       snprintf(buf,sizeof(buf),ws43bText("Koniec około %02d:%02d","Ends around %02d:%02d","Ende ca. %02d:%02d"),local.tm_hour,local.tm_min);
     } else snprintf(buf,sizeof(buf),"%s",missing(m.remainingMinutes,online,now)?missing(m.remainingMinutes,online,now):statusText(m.status,online,now));
@@ -1248,7 +1253,7 @@ void coolingScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool 
   const bool fresh=online&&m.status.current(now)&&m.bedTemp.current(now);
   if(!partial) {
     drawClockBackground(false,0,now);
-    char text[80];struct tm local{};const bool synced=getLocalTime(&local,0);
+    char text[80];struct tm local{};const bool synced=getLocalTime(&local,5);
     if(synced)snprintf(text,sizeof(text),"%02d.%02d.%04d",local.tm_mday,local.tm_mon+1,local.tm_year+1900);
     else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time","Uhrzeit wird synchronisiert"));
     modernText(text,400,34,false,DIM);
@@ -1343,7 +1348,7 @@ bool clockBandDirty = false;
 // "HH:MM" as shown on the screensaver; false while the clock is not synced.
 bool clockTimeText(char *out, size_t size, bool &pm) {
   struct tm local{};
-  const bool valid=getLocalTime(&local,0);
+  const bool valid=getLocalTime(&local,5);
   if(valid)snprintf(out,size,"%02d:%02d",ws43b_water::hour(local.tm_hour,netSettings.use24h),local.tm_min);
   else snprintf(out,size,"--:--");
   pm=valid && local.tm_hour>=12;
@@ -1463,7 +1468,7 @@ void saverDryingMetrics(const MonitorAmsUnit &unit,bool online,uint32_t now,int 
 }
 void saverDryingEnd(const MonitorAmsUnit &unit,uint32_t now,int x,int y,int width) {
   char text[80];struct tm local{};
-  if(getLocalTime(&local,0)) {
+  if(getLocalTime(&local,5)) {
     const time_t end=time(nullptr)-uint32_t(now-unit.dryRemainMin.updatedMs)/1000u+time_t(unit.dryRemainMin.value)*60;
     struct tm finish{};localtime_r(&end,&finish);
     snprintf(text,sizeof text,ws43bText("Koniec około %02d:%02d%s","Ends around %02d:%02d%s","Ende gegen %02d:%02d%s"),ws43b_water::hour(finish.tm_hour,netSettings.use24h),finish.tm_min,netSettings.use24h?"":finish.tm_hour<12?" AM":" PM");
@@ -1548,7 +1553,7 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
   const uint16_t white=tft.color565(237,247,244);
   if(!partial) {
     drawClockBackground(false,0,now);
-    struct tm local{};char text[160];const bool timeValid=getLocalTime(&local,0);
+    struct tm local{};char text[160];const bool timeValid=getLocalTime(&local,5);
     if(timeValid)snprintf(text,sizeof(text),"%02d.%02d.%04d",local.tm_mday,local.tm_mon+1,local.tm_year+1900);
     else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time","Uhrzeit wird synchronisiert"));
     modernText(text,400,34,false,DIM);
@@ -2124,7 +2129,7 @@ void renderWs43bMonitor(bool force) {
     const bool preparationScene=cleaning||leveling||calibration||beforeStart;
     const bool remaining = missing(m.remainingMinutes, online, now) == nullptr;
     struct tm clockTime{};
-    const bool timeValid = getLocalTime(&clockTime, 0);
+    const bool timeValid = getLocalTime(&clockTime,5);
     char key[240];
     snprintf(key, sizeof(key), "p%d/r%d/%d/%u/%d/%u/%d/%d/%d/%d/%d/%d/%d/%lu",
              m.progress.valid, m.remainingMinutes.valid, valid, unsigned(m.progress.value), remaining, unsigned(m.remainingMinutes.value),
@@ -2156,9 +2161,11 @@ void renderWs43bMonitor(bool force) {
     bool partial = reuseWater && waterCached && !strcmp(key, previousWaterKey);
     {
       char timeText[ws43b_clock_flip::kTextMax];bool pm=false;
-      clockTimeText(timeText,sizeof(timeText),pm);
+      const bool timeValidNow=clockTimeText(timeText,sizeof(timeText),pm);
       if(!clockShown[0])snprintf(clockShown,sizeof(clockShown),"%s",timeText);
-      else if(partial && strcmp(timeText,clockShown)) {
+      // A momentarily unreadable clock must never flip the digits to "--:--":
+      // only a valid new minute starts a flip (and never from "--:--").
+      else if(partial && timeValidNow && clockShown[0]!='-' && strcmp(timeText,clockShown)) {
         // A new minute on an otherwise unchanged screensaver: flip the digits.
         ws43b_clock_flip::begin(clockFlip,clockShown,timeText,now);
         snprintf(clockShown,sizeof(clockShown),"%s",timeText);
@@ -2213,7 +2220,7 @@ void renderWs43bMonitor(bool force) {
   auto &headerKey=keys[static_cast<unsigned>(R::Header)];
   auto &primaryKey=keys[static_cast<unsigned>(R::Primary)];
   struct tm minute{};
-  const bool clockValid=getLocalTime(&minute,0);
+  const bool clockValid=getLocalTime(&minute,5);
   uint32_t clockKey=2166136261u;
   ws43b_repaint::add(clockKey,clockValid);
   if(clockValid) {
@@ -2314,14 +2321,14 @@ void renderWs43bMonitor(bool force) {
   const bool printCurrent = useful && statusCurrent && (!activePrint || ws43b_view::progressCurrent(m,online,now));
   const uint16_t dataColor=!online?RED:printCurrent?(GREEN==CLR_GREEN?v2Accent():GREEN):WARN;
   char header[80];struct tm local{};
-  if(getLocalTime(&local,0))snprintf(header,sizeof(header),"%02d:%02d",netSettings.use24h?local.tm_hour:(local.tm_hour%12?local.tm_hour%12:12),local.tm_min);
+  if(getLocalTime(&local,5))snprintf(header,sizeof(header),"%02d:%02d",netSettings.use24h?local.tm_hour:(local.tm_hour%12?local.tm_hour%12:12),local.tm_min);
   else snprintf(header,sizeof(header),"--:--");
   if(page==Page::Dashboard) {
     v2Text(slot.config.name[0]?slot.config.name:"BambuHelper",20,16,180,ws43b_v2_b25,25,v2Ink());
     tft.fillCircle(220,31,4,dataColor);
     v2Text(headerStatus,232,24,362,ws43b_v2_b14,14,!online?v2Dim():statusCurrent?v2Ink():WARN);
     tft.drawFastVLine(701,19,25,ws43b_native::line);
-    if(netSettings.use24h || !getLocalTime(&local,0))v2Text(header,705,17,76,ws43b_v2_b25,25,v2Ink(),true,false);
+    if(netSettings.use24h || !getLocalTime(&local,5))v2Text(header,705,17,76,ws43b_v2_b25,25,v2Ink(),true,false);
     else {
       snprintf(header,sizeof(header),"%02d:%02d %s",local.tm_hour%12?local.tm_hour%12:12,local.tm_min,local.tm_hour<12?"AM":"PM");
       v2Text(header,705,24,76,ws43b_v2_b14,14,v2Ink(),true,false);

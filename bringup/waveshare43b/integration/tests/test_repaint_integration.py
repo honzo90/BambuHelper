@@ -229,6 +229,12 @@ int main(){
  rxPending=true;currentMs+=45;resetOps();renderWs43bMonitor(false);assert(clockCount==1&&lastClockPartial);
  rxPending=false;
  clockBandDirty=false;clockFlip.active=false;              // (the band draws in clockScreen)
+ // A momentarily unreadable clock never flips the digits to "--:--".
+ {char before[8];snprintf(before,sizeof before,"%s",clockShown);
+  clockValid=false;currentMs+=100;resetOps();renderWs43bMonitor(false);
+  assert(!clockFlip.active && !clockBandDirty && !strcmp(clockShown,before));
+  clockValid=true;currentMs+=100;resetOps();renderWs43bMonitor(false);
+  assert(!clockFlip.active && !strcmp(clockShown,before));}
  currentMs+=45;resetOps();renderWs43bMonitor(false);assert(!clockCount); // normal 84 ms cadence again
  tick();assert(!clockCount||lastClockPartial); // never a full redraw for the minute
  advancedDisplay=true;++displayModeRevision;tick();assert(clockCount==1&&!lastClockPartial);
