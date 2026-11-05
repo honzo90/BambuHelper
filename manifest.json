@@ -1,6 +1,6 @@
 {
   "name": "BambuHelper WS43B",
-  "version": "v4.0.0-beta.2",
+  "version": "v4.1.0",
   "new_install_prompt_erase": false,
   "new_install_improv_wait_time": 0,
   "builds": [
