@@ -6,27 +6,25 @@ A desktop Bambu Lab printer monitor for the **Waveshare ESP32-S3-Touch-LCD-4.3B*
 an 800×480 RGB touchscreen dashboard with printer and AMS telemetry, a Polish,
 English or German interface, and clock/weather views.
 
-**Current stable release: [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0).**
-It includes the display-artifact fix introduced in Beta 5 for settings saves,
-including weather/night-mode changes. The release uses an SDK rebuilt with XIP
-from PSRAM and a requested RGB pixel clock of **12 MHz**. All Beta 5 features and
-the **PL / EN / DE** interfaces are retained. The startup branding remains v0.9;
-the firmware version shown in device information is **v4.0.0**.
+**Current stable release: [v4.1.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0).**
+It brings night hours with minutes, dusk dimming with the screensaver, a
+calendar-page clock, a reworked on-panel settings menu, a tidier WebUI, Wi-Fi
+failure diagnosis, faster screen updates, a 182 KB smaller firmware and much more
+free internal memory — see [What is new in v4.1.0](#what-is-new-in-v410). The
+release keeps the SDK with XIP from PSRAM and the requested RGB pixel clock of
+**12 MHz**, and the **PL / EN / DE** interfaces.
 
-**Device feedback:** the project owner confirmed that Beta 5 works and the
-physical display is stable. v4.0.0 rebuilds the same code with only the firmware
-version changed; the renumbered binary has not been tested separately on hardware.
-Long-term operation and recovery still need verification. The earlier
-[dark-screen / touch-wake issue](https://github.com/honzo90/BambuHelper/issues/1)
-remains open for observation.
+**Device feedback:** the project owner tested the v4.1.0 betas on the panel
+(dimming, night, menu, WebUI, memory stress, frame timing). v4.1.0 rebuilds the
+code of Beta 19 with only the firmware version changed. Known open items:
+occasional display artifacts during long prints (under investigation) and the
+[dark-screen / touch-wake issue](https://github.com/honzo90/BambuHelper/issues/1).
 
 This fork builds on [BambuHelper by Keralots and contributors](https://github.com/Keralots/BambuHelper).
 The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
 `main` retains the upstream project history.
 
-## Beta testing: v4.1.0-beta.19
-
-> A new firmware is **in beta testing**. The stable release stays [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0). Install the beta only if you want to test the new features; full notes: [v4.1.0-beta.19](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0-beta.19).
+## What is new in v4.1.0
 
 **What is new or different**
 - **Night hours with minutes** — set on the panel (hour grid, then minutes in 5-minute steps) or to any minute in the WebUI.
@@ -43,7 +41,7 @@ The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
 - Much more free internal memory: printer TLS buffers moved to PSRAM — after an update the panel keeps ~46–62 KB free instead of ~3 KB, even while the browser reloads the WebUI.
 - The screensaver clock no longer flashes "--:--".
 
-**Install:** WebUI → **Beta → Check for updates**. **Back to stable:** upload the [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0) OTA file under manual update. Known open items: occasional display artifacts during long prints (under investigation) and touch wake ([#1](https://github.com/honzo90/BambuHelper/issues/1)).
+**After updating from v4.0.0:** check the night hours in the **Display** section if you used "night from sunset". **Going back:** upload the [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0) OTA file manually (it ignores the night minutes).
 
 ## Layout examples
 
@@ -84,7 +82,7 @@ Click an image for its native resolution. [Preview provenance and source hashes]
 | **Polish / English / German** | A saved language choice shared by the on-device interface and web configuration portal. German is available from `v4.0.0-beta.3`. |
 | **Optional weather** | Open-Meteo weather data, sunrise/sunset information and night scheduling. Weather and location lookup require Internet access. |
 | **Web configuration and diagnostics** | WiFi/printer/display settings, inherited control and OTA code, plus `/monitor/status` and framebuffer-capture tools for development. |
-| **Build and test tooling** | A separate Arduino CLI build, a pinned SDK workflow (cache64_xip for v4.0.0), host regression tests, synthetic MQTT fixtures, visual assets and font generators. |
+| **Build and test tooling** | A separate Arduino CLI build, a pinned SDK workflow (cache64_xip for v4.1.0), host regression tests, synthetic MQTT fixtures, visual assets and font generators. |
 
 The MQTT, cloud integration, web portal and other board implementations come
 from upstream; this fork extends them for the Waveshare 4.3B. The profile uses
@@ -95,20 +93,19 @@ so this is not a passive-only firmware profile.
 
 ### Update an existing panel online
 
-In the panel WebUI, select **Stable → Check for updates** and install **v4.0.0**.
+In the panel WebUI, select **Stable → Check for updates** and install **v4.1.0**.
 Users of v3.9.1 and v4.0.0-alpha.1 can use their existing update-check function;
-versions without a channel selector check stable releases. The Beta channel
-also offers v4.0.0 as newer than Beta 5.
+versions without a channel selector check stable releases.
 
 For manual OTA, download
-[`BambuHelper-ws_lcd_43b-v4.0.0-ota.bin`](https://github.com/honzo90/BambuHelper/releases/download/v4.0.0/BambuHelper-ws_lcd_43b-v4.0.0-ota.bin)
+[`BambuHelper-ws_lcd_43b-v4.1.0-ota.bin`](https://github.com/honzo90/BambuHelper/releases/download/v4.1.0/BambuHelper-ws_lcd_43b-v4.1.0-ota.bin)
 and upload it through the WebUI firmware-update page. This is also an option if
 the online updater does not offer the release.
 
 OTA requires the existing WS43B partition layout with **two 3 MiB slots**.
 The OTA file contains only the application and cannot perform a first installation.
-[Release notes and sources](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0)
-· [Checksums](https://github.com/honzo90/BambuHelper/releases/download/v4.0.0/SHA256SUMS).
+[Release notes and sources](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0)
+· [Checksums](https://github.com/honzo90/BambuHelper/releases/download/v4.1.0/SHA256SUMS).
 
 ### First installation over USB
 
@@ -119,7 +116,7 @@ installation: it erases flash, including saved settings and previous firmware.
 The page checks the factory image before enabling installation. This browser
 USB installation workflow still needs physical hardware acceptance. After
 installing Beta 2 and configuring WiFi, use **Stable → Check for updates** in the
-panel WebUI to install **v4.0.0**.
+panel WebUI to install **v4.1.0**.
 
 The inherited upstream web flasher does not support this 4.3B port.
 Other boards, printer models and multi-printer configurations
@@ -127,10 +124,10 @@ have not all been validated as part of this fork.
 
 ## Building and validation
 
-The **v4.0.0 release** uses **Arduino ESP32 3.3.11**, **ESP-IDF 5.5.5**, the rebuilt
+The **v4.1.0 release** uses **Arduino ESP32 3.3.11**, **ESP-IDF 5.5.5**, the rebuilt
 **cache64_xip** SDK and **12 MHz** requested RGB PCLK. Use the
-[tagged v4.0.0 sources](https://github.com/honzo90/BambuHelper/tree/v4.0.0) and
-[BUILD-INFO.json](https://github.com/honzo90/BambuHelper/releases/download/v4.0.0/BUILD-INFO.json)
+[tagged v4.1.0 sources](https://github.com/honzo90/BambuHelper/tree/v4.1.0) and
+[BUILD-INFO.json](https://github.com/honzo90/BambuHelper/releases/download/v4.1.0/BUILD-INFO.json)
 for the exact source commit, SDK provenance, configuration and validation results.
 Reproduction requires the separately prepared XIP SDK, its matching manifest
 and SHA-256, `WS43B_SDK_PROFILE=cache64_xip` and `WS43B_RGB_PCLK_HZ=12000000`.
@@ -141,8 +138,8 @@ For general development, start with **[Waveshare build and test notes](WAVESHARE
 [`bringup/waveshare43b/integration/build.py`](bringup/waveshare43b/integration/build.py).
 This is a separate Arduino CLI build, not a PlatformIO environment.
 
-The v4.0.0 build and image checks passed, as did **48 update-selection cases**
-across eight source/language combinations. Physical confirmation and its limits
+The v4.1.0 build and image checks passed, as did all **223 host tests**
+(including the update-channel selection). Physical confirmation and its limits
 are described above; build and host-test results do not replace hardware testing.
 
 ## Source map
