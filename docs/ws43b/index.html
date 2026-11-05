@@ -47,6 +47,10 @@
         letter-spacing: 0.02em;
       }
 
+      .langs { margin-bottom: 8px; color: var(--muted); }
+      .langs a { color: var(--muted); }
+      .langs a[aria-current="true"] { color: var(--mint); font-weight: 700; text-decoration: none; }
+
       .badge {
         display: inline-block;
         padding: 8px 12px;
@@ -224,63 +228,46 @@
   <body>
     <main>
       <header>
+        <nav class="langs" aria-label="Language"><a href="?lang=pl" data-lang="pl" hreflang="pl">Polski</a> | <a href="?lang=en" data-lang="en" hreflang="en">English</a> | <a href="?lang=de" data-lang="de" hreflang="de">Deutsch</a></nav>
         <h1>BambuHelper WS43B</h1>
         <div class="badge">Stable v4.1.0</div>
-        <p class="lead">
-          Monitor druku i suszenia AMS dla panelu Waveshare ESP32-S3-Touch-LCD-4.3B
-          (800x480, 16MB flash).
-        </p>
+        <p class="lead" data-i18n="lead">Monitor druku i suszenia AMS dla panelu Waveshare ESP32-S3-Touch-LCD-4.3B (800x480, 16MB flash).</p>
       </header>
 
       <section class="panel">
-        <h2>Kroki</h2>
+        <h2 data-i18n="steps">Kroki</h2>
         <ul>
-          <li>Użyj Chrome/Edge na komputerze i połączenia USB danych.</li>
-          <li>Potwierdź dokładny model: Waveshare ESP32-S3-Touch-LCD-4.3B.</li>
-          <li>Przygotuj instalację, następnie zainstaluj.</li>
-          <li>Po instalacji skonfiguruj Wi-Fi przez sieć panelu; dane tej sieci pojawią się na LCD.</li>
-          <li>Późniejsze aktualizacje wykonaj w WebUI panelu: Stable → Sprawdź aktualizacje.</li>
+          <li data-i18n="s1">Użyj Chrome/Edge na komputerze i połączenia USB danych.</li>
+          <li data-i18n="s2">Potwierdź dokładny model: Waveshare ESP32-S3-Touch-LCD-4.3B.</li>
+          <li data-i18n="s3">Przygotuj instalację, następnie zainstaluj.</li>
+          <li data-i18n="s4">Po instalacji skonfiguruj Wi-Fi przez sieć panelu; dane tej sieci pojawią się na LCD.</li>
+          <li data-i18n="s5">Późniejsze aktualizacje wykonaj w WebUI panelu: Stable → Sprawdź aktualizacje.</li>
         </ul>
 
-        <div class="notice">
-          Pierwsza instalacja USUWA ustawienia Wi-Fi, drukarki i poprzedni firmware.
-          Dla już działającego panelu zalecane OTA w jego WebUI.
-        </div>
+        <div class="notice" data-i18n="notice">Pierwsza instalacja USUWA ustawienia Wi-Fi, drukarki i poprzedni firmware. Dla już działającego panelu zalecane OTA w jego WebUI.</div>
 
-        <div class="warning">
-          Instalator USB wymaga Chrome lub Edge na komputerze.
-          Na iPhonie możesz przeczytać instrukcję, ale instalację wykonaj na komputerze.
-          Po wgraniu sprawdź obraz, dotyk i połączenie Wi-Fi.
-        </div>
+        <div class="warning" data-i18n="warning">Instalator USB wymaga Chrome lub Edge na komputerze. Na iPhonie możesz przeczytać instrukcję, ale instalację wykonaj na komputerze. Po wgraniu sprawdź obraz, dotyk i połączenie Wi-Fi.</div>
 
         <div class="controls">
-          <label for="confirm-model">
-            Potwierdzam dokładny model 4.3B i zgodę na usunięcie ustawień
-          </label>
+          <label for="confirm-model" data-i18n="confirm">Potwierdzam dokładny model 4.3B i zgodę na usunięcie ustawień</label>
           <input id="confirm-model" type="checkbox" aria-describedby="confirm-help" />
-          <div id="confirm-help">Inne modele płytek nie są obsługiwane przez ten instalator.</div>
+          <div id="confirm-help" data-i18n="confirmHelp">Inne modele płytek nie są obsługiwane przez ten instalator.</div>
 
-          <button id="prepare-button" type="button" disabled>
-            Przygotuj instalację
-          </button>
+          <button id="prepare-button" type="button" disabled data-i18n="prepare">Przygotuj instalację</button>
 
-          <div id="status" class="status" aria-live="polite">
-            Potwierdź model płytki i usunięcie ustawień, aby przygotować instalację.
-          </div>
+          <div id="status" class="status" aria-live="polite"></div>
 
           <div id="installer-container" class="installer" aria-live="polite"></div>
 
           <div class="links">
-            <a href="https://github.com/honzo90/BambuHelper" rel="noopener noreferrer">Kod źródłowy</a>
-            <a href="https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0" rel="noopener noreferrer">v4.1.0 — opis wydania</a>
-            <a href="https://github.com/honzo90/BambuHelper/issues/1" rel="noopener noreferrer">Znany problem ekranu</a>
+            <a href="https://github.com/honzo90/BambuHelper" rel="noopener noreferrer" data-i18n="source">Kod źródłowy</a>
+            <a href="https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0" rel="noopener noreferrer" data-i18n="notes">v4.1.0 — opis wydania</a>
+            <a href="https://github.com/honzo90/BambuHelper/issues/1" rel="noopener noreferrer" data-i18n="issue">Znany problem ekranu</a>
           </div>
         </div>
       </section>
 
-      <footer>
-        Fork projektu <a href="https://github.com/Keralots/BambuHelper" rel="noopener noreferrer">BambuHelper autorstwa Keralots</a>.
-      </footer>
+      <footer><span data-i18n="fork">Fork projektu</span> <a href="https://github.com/Keralots/BambuHelper" rel="noopener noreferrer" data-i18n="forkBy">BambuHelper autorstwa Keralots</a>.</footer>
     </main>
 
     <script type="module" src="./app.js"></script>

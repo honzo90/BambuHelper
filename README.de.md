@@ -2,7 +2,7 @@
 
 [English](README.md) | [Polski](README.pl.md) | **Deutsch**
 
-> **[▶ Im Browser über USB installieren — v4.1.0](https://honzo90.github.io/BambuHelper/)** (Chrome oder Edge am Computer, Erstinstallation; löscht das Panel) · Panel läuft schon? Update im WebUI: **Stable → Nach Updates suchen**
+> **[▶ Im Browser über USB installieren — v4.1.0](https://honzo90.github.io/BambuHelper/?lang=de)** (Chrome oder Edge am Computer, Erstinstallation; löscht das Panel) · Panel läuft schon? Update im WebUI: **Stable → Nach Updates suchen**
 
 Ein Monitor für Bambu-Lab-Drucker auf dem **Waveshare ESP32-S3-Touch-LCD-4.3B** mit kapazitivem **800×480-RGB-Touchscreen**. BambuHelper zeigt Druckfortschritt, Temperaturen und AMS-Daten sowie eine Uhr und auf Wunsch das Wetter. Die Bedienung am Panel und die Konfiguration im Browser sind auf **Deutsch, Polnisch und Englisch** verfügbar.
 
@@ -48,9 +48,9 @@ Das Profil verwendet `BAMBU_MONITOR_ONLY=0` und enthält auch die Steuerung der 
 
 ### Erste Installation über USB
 
-1. Öffne den **[BambuHelper-Installer](https://honzo90.github.io/BambuHelper/)** in Chrome oder Edge auf einem Computer. Die USB-Installation funktioniert nicht auf dem iPhone.
+1. Öffne den **[BambuHelper-Installer](https://honzo90.github.io/BambuHelper/?lang=de)** in Chrome oder Edge auf einem Computer. Die USB-Installation funktioniert nicht auf dem iPhone.
 2. Verbinde das Panel mit einem USB-Kabel, das Datenübertragung unterstützt. Der Installer ist ausschließlich für das **Waveshare ESP32-S3-Touch-LCD-4.3B** vorgesehen.
-3. Bestätige das genaue Platinenmodell und das Löschen der Einstellungen. Wähle auf der derzeit polnischen Installationsseite **„Przygotuj instalację“** (Installation vorbereiten), danach **„Połącz i zainstaluj“** (Verbinden und installieren).
+3. Bestätige das genaue Platinenmodell und das Löschen der Einstellungen. Wähle **„Installation vorbereiten“**, danach **„Verbinden und installieren“**.
 4. Richte nach dem Neustart das WLAN über das Netzwerk des Panels ein. Die Verbindungsdaten erscheinen auf dem Display.
 5. Der USB-Installer installiert direkt **v4.1.0**. Wähle danach **Deutsch** im Menü oder WebUI und füge den Drucker hinzu. Spätere Updates: Kanal **Stable** im WebUI.
 
