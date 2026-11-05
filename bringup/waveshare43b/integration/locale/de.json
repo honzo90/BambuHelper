@@ -876,5 +876,21 @@
   "Display mode could not be saved. Please retry.": "Anzeigemodus konnte nicht gespeichert werden. Bitte erneut versuchen.",
   "Invalid display mode": "Ungültiger Anzeigemodus",
   "No stable release has been published for this channel yet.": "Für diesen Kanal wurde noch keine stabile Version veröffentlicht.",
-  "Fork release: ": "Fork-Version: "
+  "Fork release: ": "Fork-Version: ",
+  "Panel display mode": "Anzeigemodus des Panels",
+  "Choose how much detail the panel shows.": "Lege fest, wie viele Details das Panel zeigt.",
+  "Panel theme": "Paneldesign",
+  "Choose a ready-made color palette.": "Wähle eine fertige Farbpalette.",
+  "Daytime idle screen": "Ruheansicht am Tag",
+  "Choose what happens after a period without touch.": "Lege fest, was nach einer Zeit ohne Berührung passiert.",
+  "Set the display mode, colors, daytime idle screen and night behavior.": "Anzeigemodus, Farben, Ruheansicht am Tag und Nachtverhalten einstellen.",
+  "Night backlight": "Hintergrundbeleuchtung nachts",
+  "Manual night starts": "Manueller Nachtbeginn",
+  "Manual night ends": "Manuelles Nachtende",
+  "Requires time synchronization. Night hours always follow these times; outside them, solar dimming below only dims the screen.": "Erfordert Zeitsynchronisierung. Die Nacht folgt immer diesen Zeiten; außerhalb davon dunkelt die Sonnenstand-Abdunkelung unten den Bildschirm nur ab.",
+  "Weather and solar night": "Wetter und Nacht nach Sonnenstand",
+  "Location and weather": "Standort und Wetter",
+  "Solar night and wake-up": "Nacht nach Sonnenstand und Aufwecken",
+  "Unsaved changes": "Ungespeicherte Änderungen",
+  "More info": "Weitere Informationen"
 }

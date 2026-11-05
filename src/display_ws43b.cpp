@@ -26,6 +26,10 @@
 #include "ws43b_print_scene.h"
 #include "ws43b_ui_icons.h"
 #include "ws43b_boot_scene.h"
+#include "ws43b_dusk_policy.h"
+#include "ws43b_clock_flip.h"
+#include <new>
+#include <esp_heap_caps.h>
 #include "ws43b_drying_scene.h"
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
@@ -38,13 +42,29 @@
 #include <time.h>
 
 namespace {
+// getLocalTime(&t, 0) can fail spuriously on a synced clock: its loop runs
+// only while millis() has not advanced, so one interrupt between its two
+// millis() reads makes it return false. A few ms of slack removes the race;
+// a synced clock still returns on the first check.
+// All getLocalTime() calls in this file therefore pass 5 ms.
 constexpr uint16_t CARD = ws43b_style::card;
 uint16_t INK = 0xF7BE, DIM = 0x9D34, GREEN = 0x77B2;
 constexpr uint16_t WARN = 0xF5CB, RED = 0xF38F;
 uint16_t BG = ws43b_style::background, ACCENT = ws43b_style::mint, TRACK = ws43b_style::border;
 uint32_t lastFrame = 0;
 bool painted = false;
-enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset };
+enum class Page { Dashboard, Details, Clock, Settings, ClockSettings, Gauges, Ams, WeatherSettings, Appearance, GeneralSettings, WebQr, System, FactoryReset, NightSettings, NightHourPicker, NightMinutePicker };
+bool pickingNightStart = true;
+uint8_t pickedNightHour = 0;
+// Night start/end as minutes of the day (hour + minute settings).
+uint16_t nightMinuteOfDay(bool start) {
+  return start?uint16_t(dpSettings.nightStartHour*60+dpSettings.nightStartMinute):uint16_t(dpSettings.nightEndHour*60+dpSettings.nightEndMinute);
+}
+void setNightMinuteOfDay(bool start,uint16_t value) {
+  value%=1440;
+  (start?dpSettings.nightStartHour:dpSettings.nightEndHour)=uint8_t(value/60);
+  (start?dpSettings.nightStartMinute:dpSettings.nightEndMinute)=uint8_t(value%60);
+}
 Page page = Page::Dashboard;
 uint32_t navigationActivity = 0;
 uint8_t selectedAms = 0;
@@ -66,7 +86,7 @@ unsigned liveAms(const BambuMonitorTelemetry &m) {
 }
 bool navigationShown(uint32_t now) {
   return ws43b_view::navigationVisible(now, navigationActivity,
-      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings);
+      page == Page::System || page == Page::FactoryReset || page == Page::Appearance || page == Page::WebQr || page == Page::GeneralSettings || page == Page::Settings || page == Page::ClockSettings || page == Page::WeatherSettings || page == Page::NightSettings || page == Page::NightHourPicker || page == Page::NightMinutePicker);
 }
 bool touchHeld = false, touchMoved = false, touchNeedsRelease = false;
 uint16_t pressX = 0, pressY = 0;
@@ -104,19 +124,23 @@ void updateIdleView(uint32_t now) {
     else if (!strcmp(status.value, "FAILED")) current = 6;
     else current = 7;
   }
-  bool night=false;
+  bool night=false,dusk=false;
 #if WS43B_FULL_WEBUI
   night=isNightModeActive();
+  // Dusk (dark outside, before/after the night hours) also sends an idle
+  // panel to the screensaver - dimmed to 50% - even while printing. Only the
+  // night hours can turn the screen off.
+  bool solarNight=false;
+  dusk=!night && ws43bSolarNight(solarNight) && solarNight;
 #endif
-  if(night!=previousNight){nightActivity=now;previousNight=night;}
-  const bool nightExpired=night && uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
+  const bool dark=night||dusk;
+  if(dark!=previousNight){nightActivity=now;previousNight=dark;}
+  const bool darkExpired=dark && uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
   bool daytimePrint = current == 3 || current == 4 || current == 5 ||
                       ws43b_view::waitingForJobData(state.monitor, online, now, state.printing);
-#if WS43B_FULL_WEBUI
-  daytimePrint = daytimePrint && !isNightModeActive();
-#endif
+  daytimePrint = daytimePrint && !dark;
   bool idle = idlePolicy.update(now, idleEligible(), clock.idleMinutes, clock.revision);
-  if(night)idle=nightExpired;
+  if(dark)idle=darkExpired;
   // A fresh active job keeps the overview visible by day. Do not reset the
   // inactivity timer from telemetry: expiry returns submenus/manual clock home.
   if (idle && daytimePrint) {
@@ -126,7 +150,7 @@ void updateIdleView(uint32_t now) {
       painted = false;
     }
     idle = false;
-  } else if (idle && !night && !automaticIdle && page != Page::Dashboard && page != Page::Clock) {
+  } else if (idle && !dark && !automaticIdle && page != Page::Dashboard && page != Page::Clock) {
     // Outside a daytime print, retain the two-stage submenu/idle policy.
     page = Page::Dashboard;
     idlePolicy.activity(now);
@@ -139,7 +163,7 @@ void updateIdleView(uint32_t now) {
     page = idle ? Page::Clock : Page::Dashboard;
     painted = false;
   }
-  const bool wantOff = (idle && !night && clock.screenOff)
+  const bool wantOff = (idle && !dark && clock.screenOff)
 #if WS43B_FULL_WEBUI
     || isNightBlackout()
 #endif
@@ -287,7 +311,7 @@ void footer(const BambuMonitorTelemetry &, uint32_t now) {
   const char *names[]={ws43bText("Wydruk","Print","Druck"),"AMS",ws43bText("Szczegóły","Details","Details"),ws43bText("Ustawienia","Settings","Einstellungen")};
   const ws43b_assets::Asset icons[]={ws43b_assets::Asset::Print,ws43b_assets::Asset::AMS,ws43b_assets::Asset::Details,ws43b_assets::Asset::Settings};
   for(int i=0;i<4;++i) {
-    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
+    const bool active=page==pages[i] || (i==3 && (page==Page::Appearance || page==Page::GeneralSettings || page==Page::ClockSettings || page==Page::WeatherSettings || page==Page::NightSettings || page==Page::NightHourPicker || page==Page::NightMinutePicker || page==Page::WebQr || page==Page::System || page==Page::FactoryReset)) || (i==2 && page==Page::Gauges);
     const int x=16+i*194;
     if(active) {
       tft.fillRoundRect(x,440,184,36,9,activeBg);
@@ -811,7 +835,7 @@ void dashboardScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,
     } else snprintf(buf,sizeof(buf),"--");
     v2Text(buf,32,188,190,ws43b_v2_b28,28,remaining?v2Ink():v2Dim(),false,false);
     struct tm local{};
-    if(remaining&&ws43b_view::statusCurrent(m,online,now)&&(!strcmp(m.status.value,"RUNNING")||!strcmp(m.status.value,"PREPARE"))&&getLocalTime(&local,0)) {
+    if(remaining&&ws43b_view::statusCurrent(m,online,now)&&(!strcmp(m.status.value,"RUNNING")||!strcmp(m.status.value,"PREPARE"))&&getLocalTime(&local,5)) {
       const time_t end=time(nullptr)+60u*m.remainingMinutes.value;localtime_r(&end,&local);
       snprintf(buf,sizeof(buf),ws43bText("Koniec około %02d:%02d","Ends around %02d:%02d","Ende ca. %02d:%02d"),local.tm_hour,local.tm_min);
     } else snprintf(buf,sizeof(buf),"%s",missing(m.remainingMinutes,online,now)?missing(m.remainingMinutes,online,now):statusText(m.status,online,now));
@@ -934,8 +958,8 @@ void settingsScreen() {
   const uint32_t elapsed=holding?uint32_t(millis()-pressMs):0;
   dashText("System",680,96,96,18,holding?INK:DIM);
   if(holding)tft.fillRect(680,121,80*(elapsed>3000?3000:elapsed)/3000,2,ACCENT);
-  const char *titles[]={ws43bText("Wygląd", "Appearance","Darstellung"),ws43bText("Zegar i ekran", "Clock and screen","Uhr und Bildschirm"),ws43bText("Pogoda i noc", "Weather and night","Wetter und Nacht"),ws43bText("Język i dane", "Language and data","Sprache und Daten")};
-  const char *hints[]={ws43bText("Motyw kolorystyczny", "Color theme","Farbdesign"),ws43bText("Czas bez dotyku i wygaszanie", "Idle timeout and sleep","Inaktivität und Ruhe"),ws43bText("Pogoda, słońce i czas nocny", "Weather, sun and night timeout","Wetter, Sonne und Nachttimer"),ws43bText("PL / EN / DE, wentylatory", "PL / EN / DE, fans","PL / EN / DE, Lüfter")};
+  const char *titles[]={ws43bText("Wygląd", "Appearance","Darstellung"),ws43bText("Zegar i ekran", "Clock and screen","Uhr und Bildschirm"),ws43bText("Pogoda i noc", "Weather and night","Wetter und Nacht"),ws43bText("Język i WebUI", "Language and WebUI","Sprache und WebUI")};
+  const char *hints[]={ws43bText("Motyw, tryb ekranu, wentylatory", "Theme, display mode, fans","Design, Anzeigemodus, Lüfter"),ws43bText("Czas bez dotyku i wygaszanie", "Idle timeout and sleep","Inaktivität und Ruhe"),ws43bText("Pogoda, zmrok i godziny nocy", "Weather, dusk and night hours","Wetter, Dämmerung und Nachtzeiten"),ws43bText("PL / EN / DE, kod QR, wersja", "PL / EN / DE, QR code, version","PL / EN / DE, QR-Code, Version")};
   for(int i=0;i<4;++i) {
     const int x=24+(i%2)*384,y=140+(i/2)*132;
     tft.fillRoundRect(x,y,368,114,12,CARD);
@@ -974,7 +998,7 @@ void appearanceSettingsScreen() {
   const char *names[]={ws43bText("Miętowy", "Mint","Minze"),ws43bText("Zielony", "Green","Grün"),ws43bText("Bursztynowy", "Amber","Bernstein")};
   const uint16_t accents[]={0x67B6,0x77B2,0xF5CB};
   for(uint8_t i=0;i<3;++i) {
-    const int y=151+66*i;
+    const int y=142+56*i;
     const bool selected=ws43bViewTheme()==i;
     // Match ordinary settings rows; these are radio choices, not submenus.
     tft.fillRoundRect(44,y,708,48,9,CARD);
@@ -989,19 +1013,24 @@ void appearanceSettingsScreen() {
     tft.drawCircle(724,y+24,8,selected?ACCENT:DIM);
     if(selected)tft.fillCircle(724,y+24,4,ACCENT);
   }
-  button(ws43bText("Prosty","Simple","Einfach"),44,347,220,46,!ws43bAdvancedDisplay());
-  button(ws43bText("Zaawansowany (w budowie)","Advanced (in development)","Erweitert (in Entwicklung)"),276,347,476,46,ws43bAdvancedDisplay());
-  if(settingsNotice)small(settingsNotice,44,404,708);
-  else dashText(ws43bText("Tryb ekranu: Wydruk i wygaszacz. Alarmy w obu trybach.","Display mode: Print and screensaver. Alerts in both modes.","Anzeigemodus: Druck und Bildschirmschoner. Warnungen in beiden Modi."),44,404,708,14,DIM);
+  settingRow(ws43bText("Tryb ekranu","Display mode","Anzeigemodus"),ws43bAdvancedDisplay()?ws43bText("Zaawansowany (w budowie)","Advanced (in development)","Erweitert (in Entwicklung)"):ws43bText("Prosty","Simple","Einfach"),310);
+  settingRow(ws43bText("Wentylatory","Fans","Lüfter"),dispSettings.fanMatchPrinter?ws43bText("Co 10%","Steps of 10%","10%-Schritte"):ws43bText("Co 1%","Steps of 1%","1%-Schritte"),366);
+  if(settingsNotice)small(settingsNotice,44,420,708);
 }
 void generalSettingsScreen() {
 
   button(ws43bText("< Ustawienia", "< Settings","< Einstellungen"),44,98,174,36,false);
-  dashText(ws43bText("Język i dane", "Language and data","Sprache und Daten"),244,102,490,24,INK);
+  dashText(ws43bText("Język i WebUI", "Language and WebUI","Sprache und WebUI"),244,102,490,24,INK);
   settingRow(ws43bText("Język","Language","Sprache"),ws43bText("Polski","English","Deutsch"),151);
-  settingRow(ws43bText("Wentylatory","Fans","Lüfter"),dispSettings.fanMatchPrinter?ws43bText("Co 10%","Steps of 10%","10%-Schritte"):ws43bText("Co 1%","Steps of 1%","1%-Schritte"),217);
-  settingRow(ws43bText("Otwórz WebUI","Open WebUI","WebUI öffnen"),ws43bText("Kod QR","QR code","QR-Code"),283);
-  dashText(ws43bText("Język wspólny dla panelu i WebUI.","Language shared by panel and WebUI.","Gemeinsame Sprache für Panel und WebUI."),44,348,708,18,DIM);
+  settingRow(ws43bText("Otwórz WebUI","Open WebUI","WebUI öffnen"),ws43bText("Kod QR","QR code","QR-Code"),217);
+  dashText(ws43bText("Język wspólny dla panelu i WebUI.","Language shared by panel and WebUI.","Gemeinsame Sprache für Panel und WebUI."),44,283,708,14,DIM);
+  // Panel info: firmware, address and signal help diagnose without the WebUI.
+  small(ws43bText("O PANELU","ABOUT THIS PANEL","ÜBER DIESES PANEL"),44,316,708,ACCENT);
+  char info[96];
+  if(isWiFiConnected() && uint32_t(WiFi.localIP())!=0)
+    snprintf(info,sizeof(info),"%s  ·  %s  ·  Wi-Fi %d dBm",FW_VERSION,WiFi.localIP().toString().c_str(),int(WiFi.RSSI()));
+  else snprintf(info,sizeof(info),"%s  ·  %s",FW_VERSION,ws43bText("Brak Wi-Fi","No Wi-Fi","Kein WLAN"));
+  dashText(info,44,340,708,18,INK);
   small(settingsNotice,44,382,710);
 }
 void connectedWifiName(int x,int y,int w) {
@@ -1019,7 +1048,7 @@ void connectedWifiName(int x,int y,int w) {
   if(split<ssid.length()) dashText(ssid.substring(split).c_str(),x,y+26,w,18,INK);
 }
 void webQrScreen() {
-  button(ws43bText("< Język i dane", "< Language and data","< Sprache und Daten"),24,82,280,40,false);
+  button(ws43bText("< Język i WebUI", "< Language and WebUI","< Sprache und WebUI"),24,82,280,40,false);
   dashText(ws43bText("Otwórz WebUI", "Open WebUI","WebUI öffnen"),350,92,420,24,INK);
   const IPAddress ip=WiFi.localIP();
   if(!isWiFiConnected() || uint32_t(ip)==0) {
@@ -1050,19 +1079,82 @@ void clockSettingsScreen() {
   settingRow(ws43bText("Bez dotyku","No touch","Ohne Berührung"),buf,151);
   settingRow(ws43bText("Po czasie","On timeout","Nach Ablauf der Wartezeit"),clock.screenOff?ws43bText("Wyłącz ekran","Turn off screen","Bildschirm ausschalten"):ws43bText("Pokaż zegar","Show clock","Uhr anzeigen"),217);
   settingRow(ws43bText("Format czasu","Time format","Zeitformat"),clock.use24h?"24 h":"12 h (AM/PM)",283);
+  settingRow(ws43bText("Pong na zegarze","Pong clock","Pong-Uhr"),dispSettings.pongClock?ws43bText("Włączony","On","Ein"):ws43bText("Wyłączony","Off","Aus"),349,dispSettings.pongClock);
 
-  small(settingsNotice, 44, 382, 710);
+  small(settingsNotice, 44, 404, 710);
+}
+char nightHoursText[32];
+const char *nightSummary() {
+  if(!dpSettings.nightModeEnabled || nightMinuteOfDay(true)==nightMinuteOfDay(false))return ws43bText("Wyłączona","Off","Aus");
+  snprintf(nightHoursText,sizeof(nightHoursText),"%02u:%02u - %02u:%02u",unsigned(dpSettings.nightStartHour),unsigned(dpSettings.nightStartMinute),
+           unsigned(dpSettings.nightEndHour),unsigned(dpSettings.nightEndMinute));
+  return nightHoursText;
 }
 void weatherSettingsScreen() {
   const auto c=ws43bWeatherConfig();
   button(ws43bText("< Ustawienia","< Settings","< Einstellungen"),44,98,174,36,false);
   small(ws43bText("POGODA I DZIEŃ/NOC","WEATHER AND DAY/NIGHT","WETTER UND TAG/NACHT"),222,105,530,ACCENT);
   settingRow(ws43bText("Pokaż pogodę","Show weather","Wetter anzeigen"),c.enabled?ws43bText("Włączone","On","Ein"):ws43bText("Wyłączone","Off","Aus"),151,c.enabled);
-  settingRow(ws43bText("Tryb nocny","Night mode","Nachtmodus"),c.solar?ws43bText("Zachód / wschód słońca","Sunset / sunrise","Sonnenuntergang / -aufgang"):ws43bText("Ręczne godziny","Manual hours","Manuelle Zeiten"),217,c.solar);
-  char text[80];snprintf(text,sizeof(text),"%u s",c.nightSeconds);
-  settingRow(ws43bText("Noc: bez dotyku","Night: no touch","Nachts: ohne Berührung"),text,283);
+  settingRow(ws43bText("Zmrok: 50%","Dusk: 50%","Dämmerung: 50%"),c.solar?ws43bText("Od zachodu słońca","From sunset","Ab Sonnenuntergang"):ws43bText("Wyłączone","Off","Aus"),217,c.solar);
+  settingRow(ws43bText("Noc","Night","Nacht"),nightSummary(),283,dpSettings.nightModeEnabled);
   dashText(*c.city?c.city:ws43bText("Wybierz miejscowość w WebUI","Choose location in WebUI","Ort in der WebUI wählen"),44,349,710,18,DIM);
-  small(dpSettings.nightModeEnabled?settingsNotice:ws43bText("Harmonogram nocny włącz w WebUI.","Enable the night schedule in WebUI.","Nachtzeitplan in der WebUI aktivieren."),44,382,710);
+  small(settingsNotice,44,382,710);
+}
+
+// Night hours row: value plus - / + buttons on the right.
+void nightHourRow(const char *title,uint16_t minuteOfDay,int y) {
+  tft.fillRoundRect(44,y,708,48,9,CARD);tft.drawRoundRect(44,y,708,48,9,TRACK);
+  dashText(title,60,y+13,320,18,INK);
+  char text[8];snprintf(text,sizeof(text),"%02u:%02u",unsigned(minuteOfDay/60),unsigned(minuteOfDay%60));
+  dashText(text,470,y+13,110,18,ACCENT);
+  for(int i=0;i<2;++i) {
+    const int x=596+i*78;
+    tft.fillRoundRect(x,y+7,66,34,8,ws43b_native::line);
+    dashText(i?"+":"-",x+28,y+13,20,18,INK);
+  }
+}
+void nightSettingsScreen() {
+  const auto c=ws43bWeatherConfig();
+  button(ws43bText("< Pogoda i noc","< Weather and night","< Wetter und Nacht"),44,98,250,36,false);
+  small(ws43bText("NOC","NIGHT","NACHT"),318,105,430,ACCENT);
+  settingRow(ws43bText("Harmonogram nocy","Night schedule","Nachtzeitplan"),dpSettings.nightModeEnabled?ws43bText("Włączony","On","Ein"):ws43bText("Wyłączony","Off","Aus"),142,dpSettings.nightModeEnabled);
+  nightHourRow(ws43bText("Początek nocy","Night starts","Nacht beginnt"),nightMinuteOfDay(true),198);
+  nightHourRow(ws43bText("Koniec nocy","Night ends","Nacht endet"),nightMinuteOfDay(false),254);
+  settingRow(ws43bText("W nocy","At night","Nachts"),dpSettings.nightBrightness==0?ws43bText("Ekran wyłączony","Screen off","Bildschirm aus"):ws43bText("Zegar 30%","Clock at 30%","Uhr mit 30%"),310);
+  char text[24];if(c.nightSeconds<60)snprintf(text,sizeof(text),"%u s",c.nightSeconds);else snprintf(text,sizeof(text),"%u min",c.nightSeconds/60);
+  settingRow(ws43bText("Bez dotyku","No touch","Ohne Berührung"),text,366);
+  small(settingsNotice,44,420,708);
+}
+
+// One-tap hour choice: 6 x 4 grid; the minute grid follows.
+void nightHourPickerScreen() {
+  button(ws43bText("< Noc","< Night","< Nacht"),44,98,140,36,false);
+  dashText(pickingNightStart?ws43bText("Początek nocy: godzina","Night starts: hour","Nacht beginnt: Stunde"):ws43bText("Koniec nocy: godzina","Night ends: hour","Nacht endet: Stunde"),214,102,520,24,INK);
+  const uint8_t current=uint8_t(nightMinuteOfDay(pickingNightStart)/60);
+  for(uint8_t h=0;h<24;++h) {
+    const int x=44+(h%6)*120,y=148+(h/6)*68;
+    const bool selected=h==current;
+    tft.fillRoundRect(x,y,108,56,9,CARD);
+    tft.drawRoundRect(x,y,108,56,9,selected?ACCENT:TRACK);
+    char text[8];snprintf(text,sizeof(text),"%02u:__",unsigned(h));
+    dashText(text,x+27,y+16,80,18,selected?ACCENT:INK);
+  }
+}
+// Minutes in 5-minute steps: 6 x 2 grid. The other end of the night is shown
+// but cannot be chosen (equal times would disable the night).
+void nightMinutePickerScreen() {
+  button(ws43bText("< Godzina","< Hour","< Stunde"),44,98,170,36,false);
+  dashText(pickingNightStart?ws43bText("Początek nocy: minuty","Night starts: minutes","Nacht beginnt: Minuten"):ws43bText("Koniec nocy: minuty","Night ends: minutes","Nacht endet: Minuten"),244,102,500,24,INK);
+  const uint16_t current=nightMinuteOfDay(pickingNightStart),other=nightMinuteOfDay(!pickingNightStart);
+  for(uint8_t i=0;i<12;++i) {
+    const int x=44+(i%6)*120,y=168+(i/6)*80;
+    const uint16_t value=uint16_t(pickedNightHour*60+i*5);
+    const bool selected=value==current,blocked=value==other;
+    tft.fillRoundRect(x,y,108,64,9,CARD);
+    tft.drawRoundRect(x,y,108,64,9,selected?ACCENT:TRACK);
+    char text[8];snprintf(text,sizeof(text),"%02u:%02u",unsigned(pickedNightHour),unsigned(i*5));
+    dashText(text,x+27,y+20,80,18,selected?ACCENT:blocked?TRACK:INK);
+  }
 }
 #if WS43B_FULL_WEBUI
 bool gaugeDataFresh(uint8_t type, const BambuState &state, uint32_t now) {
@@ -1163,7 +1255,7 @@ void coolingScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool 
   const bool fresh=online&&m.status.current(now)&&m.bedTemp.current(now);
   if(!partial) {
     drawClockBackground(false,0,now);
-    char text[80];struct tm local{};const bool synced=getLocalTime(&local,0);
+    char text[80];struct tm local{};const bool synced=getLocalTime(&local,5);
     if(synced)snprintf(text,sizeof(text),"%02d.%02d.%04d",local.tm_mday,local.tm_mon+1,local.tm_year+1900);
     else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time","Uhrzeit wird synchronisiert"));
     modernText(text,400,34,false,DIM);
@@ -1250,6 +1342,112 @@ void saverAnimation(bool printing,bool drying,uint16_t filament,uint32_t now,uns
   }
   tft.clearClipRect();
 }
+ws43b_clock_flip::Flip clockFlip;
+char clockShown[ws43b_clock_flip::kTextMax] = {};
+// Digits band still needs frames: set when a flip starts, cleared once the
+// final static digits have been drawn after it ends.
+bool clockBandDirty = false;
+// "HH:MM" as shown on the screensaver; false while the clock is not synced.
+bool clockTimeText(char *out, size_t size, bool &pm) {
+  struct tm local{};
+  const bool valid=getLocalTime(&local,5);
+  if(valid)snprintf(out,size,"%02d:%02d",ws43b_water::hour(local.tm_hour,netSettings.use24h),local.tm_min);
+  else snprintf(out,size,"--:--");
+  pm=valid && local.tm_hour>=12;
+  return valid;
+}
+// Pre-rendered digits of a running flip: drawn once, then only copied per
+// frame. Antialiased text straight onto the PSRAM canvas costs ~200 ms per
+// frame; a sprite copy of a digit cell takes a few milliseconds.
+// Sprite objects live in PSRAM and only during a flip: as globals they kept
+// ~5.5 KB of internal RAM busy, which the TLS handshake needs at boot.
+lgfx::LGFX_Sprite *flipGlyph[2][ws43b_clock_flip::kTextMax] = {};  // [0] old, [1] new
+int flipCellX[ws43b_clock_flip::kTextMax]={},flipCellW[ws43b_clock_flip::kTextMax]={};
+bool flipGlyphsReady=false;
+// Last finished flip: frames drawn and wall time, for /monitor/status.
+uint16_t flipFrames=0,lastFlipFrames=0;uint32_t lastFlipMs=0;
+}  // namespace (public accessors for /monitor/status)
+uint16_t ws43bLastFlipFrames(){return lastFlipFrames;}
+uint32_t ws43bLastFlipMs(){return lastFlipMs;}
+namespace {
+void releaseFlipGlyphs() {
+  for(auto &row:flipGlyph)for(auto *&sprite:row) {
+    if(!sprite)continue;
+    sprite->deleteSprite();sprite->~LGFX_Sprite();heap_caps_free(sprite);sprite=nullptr;
+  }
+  flipGlyphsReady=false;
+}
+bool prepareFlipGlyphs(uint16_t bg,uint16_t white) {
+  using namespace ws43b_clock_flip;
+  releaseFlipGlyphs();
+  ::setFont(tft,FONT_NONE);
+  if(!tft.loadFont(ws43b_inter_digits))return false;
+  tft.setTextSize(1);
+  const size_t len=strnlen(clockFlip.to,kTextMax-1);
+  char one[2]={0,0};int total=0;
+  for(size_t i=0;i<len;++i){one[0]=clockFlip.to[i];flipCellW[i]=tft.textWidth(one);total+=flipCellW[i];}
+  tft.unloadFont();
+  int x=400-total/2;
+  for(size_t i=0;i<len;++i){flipCellX[i]=x;x+=flipCellW[i];}
+  for(size_t i=0;i<len;++i) {
+    if(!changed(clockFlip,i))continue;
+    for(int k=0;k<2;++k) {
+      void *memory=heap_caps_malloc(sizeof(lgfx::LGFX_Sprite),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+      if(!memory){releaseFlipGlyphs();return false;}
+      auto &sprite=*(flipGlyph[k][i]=new(memory) lgfx::LGFX_Sprite(&tft));
+      sprite.setColorDepth(16);sprite.setPsram(true);
+      if(!sprite.createSprite(flipCellW[i],142)){releaseFlipGlyphs();return false;}
+      sprite.fillSprite(bg);
+      if(!sprite.loadFont(ws43b_inter_digits)){releaseFlipGlyphs();return false;}
+      sprite.setTextDatum(MC_DATUM);sprite.setTextColor(white,bg);
+      one[0]=k?clockFlip.to[i]:clockFlip.from[i];
+      sprite.drawString(one,flipCellW[i]/2,133-62);
+      sprite.unloadFont();
+    }
+  }
+  flipGlyphsReady=true;
+  return true;
+}
+// Large digits band (y 62..204). Static: restores the background and draws
+// the time. Flipping: only the changed digit cells are refreshed.
+void clockDigitsBand(const char *text, bool ampm, bool pm, uint32_t now, uint16_t white) {
+  using namespace ws43b_clock_flip;
+  const uint16_t bg=tft.color565(3,14,23);
+  const unsigned p=progress(clockFlip,now);
+  if(clockFlip.active && (flipGlyphsReady || prepareFlipGlyphs(bg,white))) {
+    const size_t len=strnlen(clockFlip.to,kTextMax-1);
+    for(size_t i=0;i<len;++i) {
+      if(!changed(clockFlip,i))continue;
+      tft.setClipRect(flipCellX[i],62,flipCellW[i],142);
+      tft.fillRect(flipCellX[i],62,flipCellW[i],142,bg);
+      flipGlyph[0][i]->pushSprite(&tft,flipCellX[i],62+oldOffset(p));
+      flipGlyph[1][i]->pushSprite(&tft,flipCellX[i],62+newOffset(p));
+    }
+    tft.clearClipRect();
+    clockBandDirty=true;
+    ++flipFrames;
+    return;
+  }
+  // Static digits (also the final frame after a flip).
+  if(flipGlyphsReady){lastFlipFrames=flipFrames;lastFlipMs=uint32_t(now-clockFlip.start);}
+  flipFrames=0;
+  releaseFlipGlyphs();
+  tft.setClipRect(100,62,600,142);tft.fillRect(100,62,600,142,bg);
+  tft.setTextSize(1);
+  ::setFont(tft,FONT_NONE);
+  if(!tft.loadFont(ws43b_inter_digits))tft.setFont((const lgfx::IFont *)&fonts::FreeSans24pt7b);
+  tft.setTextDatum(MC_DATUM);tft.setTextColor(white);
+  const size_t len=strnlen(text,kTextMax-1);
+  int widths[kTextMax]={};int total=0;char one[2]={0,0};
+  for(size_t i=0;i<len;++i){one[0]=text[i];widths[i]=tft.textWidth(one);total+=widths[i];}
+  int x=400-total/2;
+  for(size_t i=0;i<len;++i){one[0]=text[i];tft.drawString(one,x+widths[i]/2,133);x+=widths[i];}
+  tft.unloadFont();
+  tft.clearClipRect();
+  if(ampm)dashText(pm?"PM":"AM",626,151,72,18,DIM);
+  clockBandDirty=false;
+}
+
 // The two concurrent activities have independent timers. These cards only use
 // fresh drying telemetry; cached/offline values stay in the labelled history.
 const char *saverStageCaption(const BambuMonitorTelemetry &m,bool online,uint32_t now,
@@ -1279,7 +1477,7 @@ void saverDryingMetrics(const MonitorAmsUnit &unit,bool online,uint32_t now,int 
 }
 void saverDryingEnd(const MonitorAmsUnit &unit,uint32_t now,int x,int y,int width) {
   char text[80];struct tm local{};
-  if(getLocalTime(&local,0)) {
+  if(getLocalTime(&local,5)) {
     const time_t end=time(nullptr)-uint32_t(now-unit.dryRemainMin.updatedMs)/1000u+time_t(unit.dryRemainMin.value)*60;
     struct tm finish{};localtime_r(&end,&finish);
     snprintf(text,sizeof text,ws43bText("Koniec około %02d:%02d%s","Ends around %02d:%02d%s","Ende gegen %02d:%02d%s"),ws43b_water::hour(finish.tm_hour,netSettings.use24h),finish.tm_min,netSettings.use24h?"":finish.tm_hour<12?" AM":" PM");
@@ -1364,14 +1562,15 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
   const uint16_t white=tft.color565(237,247,244);
   if(!partial) {
     drawClockBackground(false,0,now);
-    struct tm local{};char text[160];const bool timeValid=getLocalTime(&local,0);
+    struct tm local{};char text[160];const bool timeValid=getLocalTime(&local,5);
     if(timeValid)snprintf(text,sizeof(text),"%02d.%02d.%04d",local.tm_mday,local.tm_mon+1,local.tm_year+1900);
     else snprintf(text,sizeof(text),"%s",ws43bText("Synchronizacja czasu","Synchronizing time","Uhrzeit wird synchronisiert"));
     modernText(text,400,34,false,DIM);
-    if(timeValid)snprintf(text,sizeof(text),"%02d:%02d",ws43b_water::hour(local.tm_hour,netSettings.use24h),local.tm_min);
-    else snprintf(text,sizeof(text),"--:--");
-    modernText(text,400,133,true,white);
-    if(timeValid&&!netSettings.use24h)dashText(local.tm_hour<12?"AM":"PM",626,151,72,18,DIM);
+    bool pm=false;
+    const bool clockValid=clockTimeText(text,sizeof(text),pm);
+    ws43b_clock_flip::cancel(clockFlip);clockBandDirty=false;
+    snprintf(clockShown,sizeof(clockShown),"%s",text);
+    clockDigitsBand(text,clockValid&&!netSettings.use24h,pm,now,white);
     tft.drawFastHLine(260,208,280,TRACK);
     if(combined) {
       // Both cards are rendered below on full and partial frames.
@@ -1435,7 +1634,16 @@ void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool
       dashText(text,32, (print||preparationScene||waiting)?391:346,736,14,dryFresh?ACCENT:WARN);
     }
   }
-  // Restore only moving regions; large digits stay untouched between samples.
+  // Restore only moving regions; large digits stay untouched between samples
+  // except while a minute change flips them.
+  // During the ~1 s flip only the digits are drawn: an ordinary saver frame
+  // takes ~165 ms and would stall every other flip frame.
+  if(partial && clockBandDirty) {
+    char text[ws43b_clock_flip::kTextMax];bool pm=false;
+    const bool clockValid=clockTimeText(text,sizeof(text),pm);
+    clockDigitsBand(clockFlip.to,clockValid&&!netSettings.use24h,pm,now,white);
+    tft.setTextDatum(TL_DATUM);return;
+  }
   if(combined)combinedSaverCards(m,*unit,online,now,activity,partial,waiting);
   else if(preparationScene) {
     const uint16_t bg=tft.color565(3,14,23);
@@ -1676,9 +1884,50 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     auto c=ws43bWeatherConfig();
     if(pressY>=151&&pressY<199)c.enabled=!c.enabled;
     else if(pressY>=217&&pressY<265)c.solar=!c.solar;
-    else if(pressY>=283&&pressY<331)c.nightSeconds=c.nightSeconds==30?60:c.nightSeconds==60?300:30;
+    else if(pressY>=283&&pressY<331){page=Page::NightSettings;settingsNotice=nullptr;painted=false;return;}
     else return;
     settingsNotice=saveWs43bWeather(c)?ws43bText("Zapisano ustawienia.","Settings saved.","Einstellungen gespeichert."):ws43bText("Wybierz miejscowosc w WebUI.","Choose location in WebUI.","Ort in der WebUI wählen.");
+  } else if(page==Page::NightHourPicker) {
+    if(pressX>=44&&pressX<184&&pressY>=98&&pressY<134){page=Page::NightSettings;painted=false;return;}
+    if(pressX<44||pressX>=764||pressY<148||pressY>=420)return;
+    const int cx=(pressX-44)/120,cy=(pressY-148)/68;
+    if((pressX-44)%120>=108||(pressY-148)%68>=56||cx>5||cy>3)return;
+    pickedNightHour=uint8_t(cy*6+cx);
+    page=Page::NightMinutePicker;
+  } else if(page==Page::NightMinutePicker) {
+    if(pressX>=44&&pressX<214&&pressY>=98&&pressY<134){page=Page::NightHourPicker;painted=false;return;}
+    if(pressX<44||pressX>=764||pressY<168||pressY>=312)return;
+    const int cx=(pressX-44)/120,cy=(pressY-168)/80;
+    if((pressX-44)%120>=108||(pressY-168)%80>=64||cx>5||cy>1)return;
+    const uint16_t value=uint16_t(pickedNightHour*60+(cy*6+cx)*5);
+    if(value==nightMinuteOfDay(!pickingNightStart))return;
+    setNightMinuteOfDay(pickingNightStart,value);saveSettings();
+    settingsNotice=ws43bText("Zapisano ustawienia nocy.","Night settings saved.","Nachteinstellungen gespeichert.");
+    page=Page::NightSettings;
+  } else if(page==Page::NightSettings) {
+    if(pressX>=44&&pressX<294&&pressY>=98&&pressY<134){page=Page::WeatherSettings;settingsNotice=nullptr;painted=false;return;}
+    if(pressX<44||pressX>=752||pressY<142||pressY>=414||(pressY-142)%56>=48)return;
+    const int row=(pressY-142)/56;
+    if(row==4) {
+      auto c=ws43bWeatherConfig();
+      c.nightSeconds=c.nightSeconds==30?60:c.nightSeconds==60?300:30;
+      settingsNotice=saveWs43bWeather(c)?ws43bText("Zapisano ustawienia nocy.","Night settings saved.","Nachteinstellungen gespeichert."):ws43bText("Wybierz miejscowosc w WebUI.","Choose location in WebUI.","Ort in der WebUI wählen.");
+    } else {
+      if(row==0)dpSettings.nightModeEnabled=!dpSettings.nightModeEnabled;
+      else if(row==1||row==2) {
+        int step=0;
+        if(pressX>=590&&pressX<668)step=-1; else if(pressX>=668)step=1;
+        else if(pressX>=398){pickingNightStart=row==1;page=Page::NightHourPicker;settingsNotice=nullptr;painted=false;return;}
+        else return;
+        const bool start=row==1;
+        uint16_t value=uint16_t((nightMinuteOfDay(start)+1440+step*5)%1440);
+        if(value==nightMinuteOfDay(!start))value=uint16_t((value+1440+step*5)%1440); // equal times would disable the night
+        setNightMinuteOfDay(start,value);
+      }
+      else if(row==3)dpSettings.nightBrightness=dpSettings.nightBrightness==0?255:0;
+      saveSettings();
+      settingsNotice=ws43bText("Zapisano ustawienia nocy.","Night settings saved.","Nachteinstellungen gespeichert.");
+    }
   } else if (page == Page::ClockSettings) {
     const auto &clock = ws43bClockSettings();
     uint16_t idle = clock.idleMinutes;
@@ -1692,6 +1941,13 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
       for (unsigned i = 0; i < 5; ++i) if (idle == minutes[i]) { idle = minutes[(i + 1) % 5]; break; }
     } else if (pressY >= 217 && pressY < 265) off = !off;
     else if (pressY >= 283 && pressY < 331) use24h = !use24h;
+    else if (pressY >= 349 && pressY < 397) {
+      // Same storage as the WebUI clock section (saveSettings writes dsp_pong).
+      dispSettings.pongClock = !dispSettings.pongClock;
+      saveSettings();
+      settingsNotice = ws43bText("Zapisano ustawienia zegara.", "Clock settings saved.","Uhreinstellungen gespeichert.");
+      painted = false; return;
+    }
     else return;
     settingsNotice = saveWs43bClockSettings(idle, off, use24h) ? ws43bText("Zapisano ustawienia zegara.", "Clock settings saved.","Uhreinstellungen gespeichert.") : ws43bText("Blad zapisu. Sprobuj ponownie.", "Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
   } else if (page == Page::Settings) {
@@ -1710,13 +1966,12 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
       page=Page::Settings;settingsNotice=nullptr;painted=false;return;
     }
     if(pressX<44||pressX>=752)return;
-    if(page==Page::Appearance && pressY>=347&&pressY<393) {
-      if(pressX>=264&&pressX<276)return;
-      const bool saved=saveWs43bDisplayMode(pressX>=276);
+    if(page==Page::Appearance && pressY>=310&&pressY<358) {
+      const bool saved=saveWs43bDisplayMode(!ws43bAdvancedDisplay());
       settingsNotice=saved?ws43bText("Zapisano tryb ekranu.","Display mode saved.","Anzeigemodus gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
       painted=false;return;
     }
-    if(page==Page::GeneralSettings && pressY>=283&&pressY<331) {
+    if(page==Page::GeneralSettings && pressY>=217&&pressY<265) {
       page=Page::WebQr;painted=false;return;
     }
     if(page==Page::GeneralSettings && pressY>=151&&pressY<199) {
@@ -1724,8 +1979,8 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
       settingsNotice=saved?ws43bText("Zapisano jezyk.","Language saved.","Sprache gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
     } else {
       uint8_t theme=ws43bViewTheme();bool fanMatch=dispSettings.fanMatchPrinter;
-      if(page==Page::Appearance && pressY>=151&&pressY<331 && (pressY-151)%66<48)theme=(pressY-151)/66;
-      else if(page==Page::GeneralSettings && pressY>=217&&pressY<265)fanMatch=!fanMatch;
+      if(page==Page::Appearance && pressY>=142&&pressY<310 && (pressY-142)%56<48)theme=(pressY-142)/56;
+      else if(page==Page::Appearance && pressY>=366&&pressY<414)fanMatch=!fanMatch;
       else return;
       settingsNotice=saveWs43bViewSettings(theme,fanMatch)?ws43bText("Zapisano ustawienia panelu.","Panel settings saved.","Paneleinstellungen gespeichert."):ws43bText("Blad zapisu. Sprobuj ponownie.","Save failed. Please retry.","Speichern fehlgeschlagen. Bitte erneut versuchen.");
     }
@@ -1767,13 +2022,33 @@ void renderWs43bMonitor(bool force) {
   const bool coolingNow=observedCooling&&(ws43bAdvancedDisplay()||!activeProgress);
   if(coolingNow!=dashboardCooling){dashboardCooling=coolingNow;painted=false;}
   if(dashboardActivity.update(ws43b_view::activity(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now,coolingNow),now,coolingState.monitor.session,rotState.displayIndex))painted=false;
-  bool nightDim=false;
+  uint8_t colorPercent=100;
 #if WS43B_FULL_WEBUI
-  nightDim=isNightModeActive() && !isAPMode() && isAnyPrinterConfigured() &&
-           uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u;
+  {
+    bool solarNight=false;
+    const bool solarKnown=ws43bSolarNight(solarNight);
+    colorPercent=ws43b_dusk::colorPercent(!isAPMode() && isAnyPrinterConfigured(),isNightModeActive(),
+      uint32_t(now-nightActivity)>=uint32_t(ws43bWeatherConfig().nightSeconds)*1000u,solarKnown && solarNight);
+  }
 #endif
-  if(ws43b::setColorPercent(nightDim?30:100)) {
-    painted=false;waterCached=false;force=true;
+  {
+    // Fade between levels. Intermediate steps only re-present the finished
+    // canvas (the panel scales colours while copying it to the scanout
+    // buffer); the final step repaints once, as an instant change did before.
+    static uint8_t shownPercent=100;
+    static uint32_t lastFadeStep=0;
+    if(screenOff)shownPercent=colorPercent;
+    if(shownPercent!=colorPercent &&
+       uint32_t(now-lastFadeStep)>=ws43b_dusk::fadeIntervalMs(shownPercent,colorPercent)) {
+      lastFadeStep=now;
+      shownPercent=ws43b_dusk::fadeStep(shownPercent,colorPercent);
+      if(shownPercent!=colorPercent && ws43b::setColorPercent(shownPercent)) {
+        tft.startWrite();tft.endWrite();
+      }
+    }
+    if(shownPercent==colorPercent && ws43b::setColorPercent(colorPercent)) {
+      painted=false;waterCached=false;force=true;
+    }
   }
 #if WS43B_FULL_WEBUI
   if(glowConsumeCleanup())painted=false;
@@ -1785,7 +2060,9 @@ void renderWs43bMonitor(bool force) {
   if (screenOff) return;
   // Drop decorative frames while readable telemetry is waiting. Never defer
   // a new screen/touch/alert; cap the pause so a busy stream still gets shown.
-  if(ws43b_live::deferForRx(now,lastFrame,bambuMqttReceivePending(rotState.displayIndex),painted,force))return;
+  // A short digit flip keeps its frame rate; band frames are small.
+  if(!(page==Page::Clock && clockBandDirty) &&
+     ws43b_live::deferForRx(now,lastFrame,bambuMqttReceivePending(rotState.displayIndex),painted,force))return;
 #if WS43B_FULL_WEBUI
   static bool pongWasActive = false;
   const bool pongActive = page == Page::Clock && !ws43b_view::beforeFirstLayer(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now) && ws43b_view::pongAvailable(dispSettings.pongClock,dpSettings.keepDisplayOn,dpSettings.showClockAfterFinish) && dashboardActivity.state!=ws43b_view::Activity::Cleaning && dashboardActivity.state!=ws43b_view::Activity::Leveling && dashboardActivity.state!=ws43b_view::Activity::CalibrationLines && !ws43b_view::dryingUnit(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now) && saverView(coolingState.monitor,isWiFiConnected()&&coolingState.connected,now)==ws43b_view::Saver::Print && !ws43bWeatherConfig().enabled && !coolingView(displayedPrinter().state.monitor) && (automaticIdle || getScreenState() != SCREEN_HMS);
@@ -1806,7 +2083,7 @@ void renderWs43bMonitor(bool force) {
   static uint32_t drawnDataSignature=0;
   const uint32_t dataSignature=ws43b_live::signature(coolingState.monitor,liveView(),liveAms(coolingState.monitor),isWiFiConnected()&&coolingState.connected,now);
   const bool dataDue=ws43b_live::repaintDue(now,lastFrame,dataSignature,drawnDataSignature);
-  if (painted && !force && !dataDue && uint32_t(now - lastFrame) < (page == Page::Clock ? 84u : 1000u)) {
+  if (painted && !force && !dataDue && uint32_t(now - lastFrame) < (page == Page::Clock ? (clockBandDirty ? ws43b_clock_flip::kFrameMs : 84u) : 1000u)) {
     if(startupVisible){animateStartupScreen(now);return;}
     static ws43b_animation::Cadence animationCadence;
     bool animateWeather=page!=Page::Clock && weatherHeaderVisible && !(page==Page::Dashboard && dashboardCooling) && !isAPMode() && isAnyPrinterConfigured();
@@ -1861,11 +2138,11 @@ void renderWs43bMonitor(bool force) {
     const bool preparationScene=cleaning||leveling||calibration||beforeStart;
     const bool remaining = missing(m.remainingMinutes, online, now) == nullptr;
     struct tm clockTime{};
-    const bool timeValid = getLocalTime(&clockTime, 0);
+    const bool timeValid = getLocalTime(&clockTime,5);
     char key[240];
     snprintf(key, sizeof(key), "p%d/r%d/%d/%u/%d/%u/%d/%d/%d/%d/%d/%d/%d/%lu",
              m.progress.valid, m.remainingMinutes.valid, valid, unsigned(m.progress.value), remaining, unsigned(m.remainingMinutes.value),
-             timeValid, clockTime.tm_year, clockTime.tm_yday, clockTime.tm_hour, clockTime.tm_min,
+             timeValid, clockTime.tm_year, clockTime.tm_yday, 0, 0, // minute: flipped, not repainted
              netSettings.use24h, int(rotState.displayIndex), (unsigned long)ws43bLanguageRevision());
     const bool cooling = saverView(m,online,now)==ws43b_view::Saver::Cooling;
     const bool coolingFresh = online && m.status.current(now) && m.bedTemp.current(now);
@@ -1890,9 +2167,23 @@ void renderWs43bMonitor(bool force) {
     snprintf(key+sessionUsed,sizeof(key)-sessionUsed,"/q%lu/%d/%d",(unsigned long)m.session,online,ws43b_view::statusCurrent(m,online,now));
     const size_t activityUsed=strlen(key);
     snprintf(key+activityUsed,sizeof(key)-activityUsed,"/v%d/m%d",int(activity),ws43bAdvancedDisplay());
-    const bool partial = reuseWater && waterCached && !strcmp(key, previousWaterKey);
+    bool partial = reuseWater && waterCached && !strcmp(key, previousWaterKey);
+    {
+      char timeText[ws43b_clock_flip::kTextMax];bool pm=false;
+      const bool timeValidNow=clockTimeText(timeText,sizeof(timeText),pm);
+      if(!clockShown[0])snprintf(clockShown,sizeof(clockShown),"%s",timeText);
+      // A momentarily unreadable clock must never flip the digits to "--:--":
+      // only a valid new minute starts a flip (and never from "--:--").
+      else if(partial && timeValidNow && clockShown[0]!='-' && strcmp(timeText,clockShown)) {
+        // A new minute on an otherwise unchanged screensaver: flip the digits.
+        ws43b_clock_flip::begin(clockFlip,clockShown,timeText,now);
+        snprintf(clockShown,sizeof(clockShown),"%s",timeText);
+        clockBandDirty=clockFlip.active;
+        if(!clockFlip.active)partial=false; // e.g. clock just synced: full redraw
+      }
+    }
     // No wave at endpoints or when progress is missing: preserve the static frame.
-    if (partial && !preparationScene && !dryingFresh && !(weatherConfig.enabled && !drying && !cooling) && (cooling ? !coolingFresh : (!valid || m.progress.value == 0 || m.progress.value >= 100))) return;
+    if (partial && !clockBandDirty && !preparationScene && !dryingFresh && !(weatherConfig.enabled && !drying && !cooling) && (cooling ? !coolingFresh : (!valid || m.progress.value == 0 || m.progress.value >= 100))) return;
     tft.startWrite();
     ws43b::beginRenderDiagnostics(!partial);
     tft.unloadFont();
@@ -1938,7 +2229,7 @@ void renderWs43bMonitor(bool force) {
   auto &headerKey=keys[static_cast<unsigned>(R::Header)];
   auto &primaryKey=keys[static_cast<unsigned>(R::Primary)];
   struct tm minute{};
-  const bool clockValid=getLocalTime(&minute,0);
+  const bool clockValid=getLocalTime(&minute,5);
   uint32_t clockKey=2166136261u;
   ws43b_repaint::add(clockKey,clockValid);
   if(clockValid) {
@@ -2039,14 +2330,14 @@ void renderWs43bMonitor(bool force) {
   const bool printCurrent = useful && statusCurrent && (!activePrint || ws43b_view::progressCurrent(m,online,now));
   const uint16_t dataColor=!online?RED:printCurrent?(GREEN==CLR_GREEN?v2Accent():GREEN):WARN;
   char header[80];struct tm local{};
-  if(getLocalTime(&local,0))snprintf(header,sizeof(header),"%02d:%02d",netSettings.use24h?local.tm_hour:(local.tm_hour%12?local.tm_hour%12:12),local.tm_min);
+  if(getLocalTime(&local,5))snprintf(header,sizeof(header),"%02d:%02d",netSettings.use24h?local.tm_hour:(local.tm_hour%12?local.tm_hour%12:12),local.tm_min);
   else snprintf(header,sizeof(header),"--:--");
   if(page==Page::Dashboard) {
     v2Text(slot.config.name[0]?slot.config.name:"BambuHelper",20,16,180,ws43b_v2_b25,25,v2Ink());
     tft.fillCircle(220,31,4,dataColor);
     v2Text(headerStatus,232,24,362,ws43b_v2_b14,14,!online?v2Dim():statusCurrent?v2Ink():WARN);
     tft.drawFastVLine(701,19,25,ws43b_native::line);
-    if(netSettings.use24h || !getLocalTime(&local,0))v2Text(header,705,17,76,ws43b_v2_b25,25,v2Ink(),true,false);
+    if(netSettings.use24h || !getLocalTime(&local,5))v2Text(header,705,17,76,ws43b_v2_b25,25,v2Ink(),true,false);
     else {
       snprintf(header,sizeof(header),"%02d:%02d %s",local.tm_hour%12?local.tm_hour%12:12,local.tm_min,local.tm_hour<12?"AM":"PM");
       v2Text(header,705,24,76,ws43b_v2_b14,14,v2Ink(),true,false);
@@ -2077,6 +2368,9 @@ void renderWs43bMonitor(bool force) {
     }
     else if (page == Page::ClockSettings) clockSettingsScreen();
     else if (page == Page::WeatherSettings) weatherSettingsScreen();
+    else if (page == Page::NightSettings) nightSettingsScreen();
+    else if (page == Page::NightHourPicker) nightHourPickerScreen();
+    else if (page == Page::NightMinutePicker) nightMinutePickerScreen();
     else if(page==Page::Appearance)appearanceSettingsScreen();
     else if(page==Page::GeneralSettings)generalSettingsScreen();
     else if(page==Page::WebQr)webQrScreen();

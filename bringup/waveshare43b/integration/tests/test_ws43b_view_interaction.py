@@ -29,6 +29,7 @@ namespace ws43b { bool otaDisplayActive(){return false;} }
 struct WeatherConfig {bool enabled=false,solar=false;unsigned nightSeconds=30;char city[64]={};};
 bool weatherEnabled=false;
 WeatherConfig ws43bWeatherConfig(){WeatherConfig c;c.enabled=weatherEnabled;return c;}
+bool solarNightNow=false;bool ws43bSolarNight(bool &value){value=solarNightNow;return true;}
 bool saveWs43bWeather(WeatherConfig){return true;}
 static bool polish = true;
 static uint8_t language = 0;
@@ -80,7 +81,8 @@ Printer& displayedPrinter(){return printers[0];}
 constexpr uint8_t MAX_ACTIVE_PRINTERS=2;
 struct { uint8_t displayIndex=0; uint32_t lastRotateMs=0,displayHoldUntilMs=0,intervalMs=60000; } rotState;
 #endif
-void saveSettings(){}
+unsigned settingsWrites=0;void saveSettings(){++settingsWrites;}
+struct PowerSettings{bool nightModeEnabled=false;uint8_t nightStartHour=22,nightEndHour=7,nightStartMinute=0,nightEndMinute=0,nightBrightness=0;} dpSettings;
 unsigned factoryResets=0;void resetSettings(){++factoryResets;}
 bool nightBlackout=false, nightWindow=false;
 bool isNightModeActive(){return nightWindow || nightBlackout;}
@@ -208,48 +210,49 @@ int main() {
  // Global display-mode controls share the same Appearance page but do not
  // overlap theme selection or the gap between Simple and Advanced.
  assert(!advancedDisplay&&modeWrites==0);
- for(const auto p:{TapPoint{43,370},{264,370},{275,370},{752,370},{300,346},{300,393}}){
+ // Outside the row and the gaps around it (theme above, fans below) do nothing.
+ for(const auto p:{TapPoint{43,334},{752,334},{300,306},{300,362}}){
   rawTap(p.x,p.y);assert(!advancedDisplay&&modeWrites==0&&writes==1);
  }
- painted=true;rawTap(300,370);
+ painted=true;rawTap(300,334);
  assert(advancedDisplay&&modeWrites==1&&modeRevision==1&&!painted&&writes==1);
- rawTap(300,370);assert(advancedDisplay&&modeWrites==1); // Reselect is no-op.
- modeWriteOk=false;rawTap(100,370);
+ modeWriteOk=false;rawTap(300,334);
  assert(advancedDisplay&&modeWrites==2&&modeRevision==1&&settingsNotice);
- modeWriteOk=true;rawTap(100,370);
+ modeWriteOk=true;rawTap(300,334);
  assert(!advancedDisplay&&modeWrites==3&&modeRevision==2&&writes==1);
  // Drag and cancelled contact never save the display mode.
- handleWs43bMonitorTouch(300,370,true);now+=100;
- handleWs43bMonitorTouch(350,370,true);now+=100;
- handleWs43bMonitorTouch(350,370,false);assert(!advancedDisplay&&modeWrites==3);
- handleWs43bMonitorTouch(300,370,true);cancelWs43bMonitorTouch();now+=100;
- handleWs43bMonitorTouch(300,370,false);assert(!advancedDisplay&&modeWrites==3);
+ handleWs43bMonitorTouch(300,334,true);now+=100;
+ handleWs43bMonitorTouch(350,334,true);now+=100;
+ handleWs43bMonitorTouch(350,334,false);assert(!advancedDisplay&&modeWrites==3);
+ handleWs43bMonitorTouch(300,334,true);cancelWs43bMonitorTouch();now+=100;
+ handleWs43bMonitorTouch(300,334,false);assert(!advancedDisplay&&modeWrites==3);
 
  tap(100,115);tap(600,300);assert(page==Page::GeneralSettings);
  unsigned beforeQrWrites=writes;
- rawTap(500,305);assert(page==Page::WebQr && writes==beforeQrWrites);
+ rawTap(500,240);assert(page==Page::WebQr && writes==beforeQrWrites);
  rawTap(500,230);assert(page==Page::WebQr && writes==beforeQrWrites);
  rawTap(100,100);assert(page==Page::GeneralSettings && writes==beforeQrWrites);
- tap(100,240); assert(!dispSettings.fanMatchPrinter && writes==2 && persisted==0x101);
+ tap(100,305); assert(dispSettings.fanMatchPrinter && writes==beforeQrWrites); // fans left this page
  tap(100,115);tap(100,190);assert(page==Page::Appearance);
- writeOk=false; tap(560,305);
+ tap(100,390); assert(!dispSettings.fanMatchPrinter && writes==2 && persisted==0x101);
+ writeOk=false; tap(560,270);
  assert(ws43bViewTheme()==1 && !dispSettings.fanMatchPrinter);
  assert(strstr(settingsNotice,"Blad") && writes==3);
  writeOk=true;
  // Drag, very short tap, long hold and failed I2C read cannot commit settings.
- handleWs43bMonitorTouch(560,305,true); now+=100;
- handleWs43bMonitorTouch(600,305,true); now+=100;
- handleWs43bMonitorTouch(600,305,false); assert(writes==3);
- handleWs43bMonitorTouch(560,305,true); now+=10;
- handleWs43bMonitorTouch(560,305,false); assert(writes==3);
- handleWs43bMonitorTouch(560,305,true); now+=1001;
- handleWs43bMonitorTouch(560,305,false); assert(writes==3);
- handleWs43bMonitorTouch(560,305,true); cancelWs43bMonitorTouch();
- now+=100; handleWs43bMonitorTouch(560,305,true);
- handleWs43bMonitorTouch(560,305,false); assert(writes==3);
- ap=true; tap(560,305); assert(writes==3); ap=false;
+ handleWs43bMonitorTouch(560,270,true); now+=100;
+ handleWs43bMonitorTouch(600,270,true); now+=100;
+ handleWs43bMonitorTouch(600,270,false); assert(writes==3);
+ handleWs43bMonitorTouch(560,270,true); now+=10;
+ handleWs43bMonitorTouch(560,270,false); assert(writes==3);
+ handleWs43bMonitorTouch(560,270,true); now+=1001;
+ handleWs43bMonitorTouch(560,270,false); assert(writes==3);
+ handleWs43bMonitorTouch(560,270,true); cancelWs43bMonitorTouch();
+ now+=100; handleWs43bMonitorTouch(560,270,true);
+ handleWs43bMonitorTouch(560,270,false); assert(writes==3);
+ ap=true; tap(560,270); assert(writes==3); ap=false;
  handleWs43bMonitorTouch(0,0,false);
- now=UINT32_MAX-50; tap(560,305); assert(ws43bViewTheme()==2 && writes==4);
+ now=UINT32_MAX-50; tap(560,270); assert(ws43bViewTheme()==2 && writes==4);
  tap(60,458); assert(page==Page::Dashboard && writes==4);
  // Manual clock and the settings subpage use the new footer hitboxes.
  tap(330,458); assert(page==Page::Clock);
@@ -265,7 +268,7 @@ int main() {
  tap(100,115); assert(page==Page::Settings);
  // All submenus return to the overview at N, then sleep at 2N.
  // The policy uses monotonic time, not incoming printer telemetry.
- for(Page submenu:{Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings}) {
+ for(Page submenu:{Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker,Page::NightMinutePicker}) {
    for(bool off:{false,true}) {
      clockSettings.idleMinutes=1;clockSettings.screenOff=off;++clockSettings.revision;
      page=submenu;automaticIdle=false;screenOff=false;backlight=255;
@@ -314,7 +317,7 @@ int main() {
  // Daytime printing returns every submenu (including manual clock) to Print,
  // then stays there for repeated idle intervals while telemetry stays fresh.
  for(const char* printing:{"RUNNING","PREPARE","PAUSE"}) {
-   for(Page submenu:{Page::Dashboard,Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::Clock}) {
+   for(Page submenu:{Page::Dashboard,Page::Details,Page::Ams,Page::Gauges,Page::Appearance,Page::GeneralSettings,Page::Settings,Page::ClockSettings,Page::WeatherSettings,Page::NightSettings,Page::NightHourPicker,Page::NightMinutePicker,Page::Clock}) {
      clockSettings.idleMinutes=1;++clockSettings.revision;
      status.set(printing,now);updateIdleView(now);page=submenu;
      now+=59999;status.set(printing,now);updateIdleView(now);assert(page==submenu);
@@ -336,6 +339,19 @@ int main() {
  assert(page==Page::Dashboard && !screenOff);
  now+=60000;status.set("RUNNING",now);updateIdleView(now);
  assert(page==Page::Dashboard && !automaticIdle);
+ // Dusk (dark outside, outside the night hours): an idle panel goes to the
+ // screensaver even while printing, but never turns the screen off.
+ solarNightNow=true;tap(400,200);page=Page::Dashboard;status.set("RUNNING",now);updateIdleView(now);
+ now+=29000;status.set("RUNNING",now);updateIdleView(now);assert(page==Page::Dashboard && !automaticIdle);
+ now+=2000;status.set("RUNNING",now);updateIdleView(now);assert(page==Page::Clock && automaticIdle && !screenOff);
+ const bool offBefore=clockSettings.screenOff;
+ clockSettings.screenOff=true;++clockSettings.revision;now+=1000;status.set("RUNNING",now);updateIdleView(now);
+ assert(!screenOff); // "turn off" is a daytime idle action, not a dusk one
+ clockSettings.screenOff=offBefore;++clockSettings.revision;
+ tap(799,430);assert(page==Page::Dashboard && !automaticIdle);
+ solarNightNow=false;now+=1000;status.set("RUNNING",now);updateIdleView(now);
+ now+=60000;status.set("RUNNING",now);updateIdleView(now);
+ assert(page==Page::Dashboard && !automaticIdle); // daytime print stays on Print again
 #endif
  // A stale active status cannot hold the display awake indefinitely.
  now+=60001;updateIdleView(now);assert(automaticIdle && screenOff);
@@ -396,6 +412,41 @@ int main() {
  now+=6000;assert(navigationShown(now)); // Settings are pinned.
  const auto writesBeforeCategories=writes;
  rawTap(100,300);assert(page==Page::WeatherSettings && writes==writesBeforeCategories);
+ // Night page: schedule, start/end hours with -/+, night screen; back to Weather.
+ rawTap(100,305);assert(page==Page::NightSettings);
+ const auto nightWritesBefore=settingsWrites;
+ rawTap(300,166);assert(dpSettings.nightModeEnabled && settingsWrites==nightWritesBefore+1);
+ #define NIGHT(st,h,m) (dpSettings.night##st##Hour==(h) && dpSettings.night##st##Minute==(m))
+ // -/+ move by 5 minutes and wrap around midnight.
+ rawTap(700,222);assert(NIGHT(Start,22,5));
+ rawTap(620,222);rawTap(620,222);assert(NIGHT(Start,21,55));
+ rawTap(700,222);assert(NIGHT(Start,22,0));
+ rawTap(620,278);assert(NIGHT(End,6,55));
+ dpSettings.nightStartHour=23;dpSettings.nightStartMinute=55;rawTap(700,222);assert(NIGHT(Start,0,0));
+ dpSettings.nightStartHour=22;dpSettings.nightStartMinute=0;
+ // Equal start and end would disable the night: the step skips over it.
+ dpSettings.nightEndHour=22;dpSettings.nightEndMinute=5;rawTap(700,222);assert(NIGHT(Start,22,10));
+ dpSettings.nightStartMinute=0;dpSettings.nightEndHour=6;dpSettings.nightEndMinute=55;
+ // Tapping the time opens the hour grid, then the minute grid; the second tap saves.
+ const auto beforePick=settingsWrites;
+ rawTap(500,278);assert(page==Page::NightHourPicker && !pickingNightStart);
+ rawTap(694,176);assert(page==Page::NightMinutePicker && pickedNightHour==5 && NIGHT(End,6,55) && settingsWrites==beforePick);
+ rawTap(94,278);assert(page==Page::NightSettings && NIGHT(End,5,30) && settingsNotice && settingsWrites==beforePick+1);
+ rawTap(450,222);assert(page==Page::NightHourPicker && pickingNightStart);
+ rawTap(694,176);assert(page==Page::NightMinutePicker);
+ rawTap(94,278);assert(page==Page::NightMinutePicker && NIGHT(Start,22,0)); // equals the end time: blocked
+ rawTap(158,200);assert(page==Page::NightMinutePicker && NIGHT(Start,22,0)); // gap between cells
+ rawTap(100,115);assert(page==Page::NightHourPicker);
+ rawTap(158,176);assert(page==Page::NightHourPicker); // gap between hours
+ rawTap(100,115);assert(page==Page::NightSettings && NIGHT(Start,22,0));
+ pickingNightStart=false;page=Page::NightHourPicker;rawTap(94,244);rawTap(94,198);
+ assert(page==Page::NightSettings && NIGHT(End,6,0));
+ #undef NIGHT
+ rawTap(300,334);assert(dpSettings.nightBrightness==255);
+ rawTap(300,334);assert(dpSettings.nightBrightness==0);
+ rawTap(300,306);assert(dpSettings.nightBrightness==0); // gap between rows
+ assert(writes==writesBeforeCategories); // panel view settings untouched
+ rawTap(100,115);assert(page==Page::WeatherSettings);
  rawTap(100,115);assert(page==Page::Settings);
  rawTap(600,190);assert(page==Page::ClockSettings);
  rawTap(100,115);assert(page==Page::Settings && writes==writesBeforeCategories);

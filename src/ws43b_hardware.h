@@ -33,6 +33,11 @@ struct RenderDiagnostics {
   uint32_t legacyFillProbes;
   uint32_t legacyFillMismatches;
   uint32_t fillReadbackErrors;
+  // Last present (display()) split into its parts, for frame-rate analysis.
+  uint32_t lastCopyUs;     // canvas -> scanout copy incl. readback and dimming
+  uint32_t lastWaitUs;     // waiting for the panel to release the old buffer
+  uint32_t lastCopyRows;   // rows copied in that present
+  uint32_t presents;       // display() calls that switched a buffer
 };
 void beginRenderDiagnostics(bool fullRedraw = true);
 void endRenderDiagnostics(bool monitorFrame);

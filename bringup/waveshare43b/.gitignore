@@ -1,0 +1,22 @@
+/build/
+/build-v2/
+/build-v3/
+/build-v4/
+/cache/
+/local/
+__pycache__/
+*.bin
+*.log
+/integration/vendor/
+/integration/build/
+/integration/staging/
+/integration/test-output/
+/integration/cache64-inputs/
+/integration/cache64-work/
+/integration/sdk-cache64/
+/integration/sdk-cache64-manifest.json
+/integration/cache64-object-review/
+
+# Local bring-up journal and device run results (may contain LAN/device data)
+/*.md
+/*.json

@@ -199,13 +199,13 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .row.row-solo { grid-template-columns: 1fr; }
 
 /* ============ Inputs ============ */
-.section input[type="text"],
-.section input[type="password"],
-.section input[type="email"],
-.section input[type="number"],
-.section input[type="url"],
-.section select,
-.section textarea {
+:is(.section, .ws-setup-dialog) input[type="text"],
+:is(.section, .ws-setup-dialog) input[type="password"],
+:is(.section, .ws-setup-dialog) input[type="email"],
+:is(.section, .ws-setup-dialog) input[type="number"],
+:is(.section, .ws-setup-dialog) input[type="url"],
+:is(.section, .ws-setup-dialog) select,
+:is(.section, .ws-setup-dialog) textarea {
   width: 100%;
   padding: 9px 12px;
   border-radius: var(--radius-s);
@@ -216,20 +216,20 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   outline: none;
   transition: border-color var(--motion), box-shadow var(--motion);
 }
-.section input:focus, .section select:focus, .section textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.section input::placeholder, .section textarea::placeholder { color: var(--text-dim); }
-.section input.mono, .section textarea.mono { font-family: var(--mono); font-size: 12.5px; }
-.section select { appearance: none; padding-right: 28px; }
-.section textarea { font-family: var(--mono); resize: vertical; min-height: 64px; }
-.section input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; padding: 8px 0; }
-.section input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line); }
-.section input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
-.section input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--bg-elev); border: 2px solid var(--accent); margin-top: -6px; cursor: pointer; box-shadow: var(--shadow-sm); }
-.section input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--bg-elev); border: 2px solid var(--accent); cursor: pointer; }
-.section input[type="color"] { width: 36px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--bg-input); cursor: pointer; vertical-align: middle; }
-.section input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
-.section input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
-.section input[type="file"] { width: 100%; padding: 6px; background: var(--bg-input); border: 1px solid var(--line); border-radius: var(--radius-s); color: var(--text); font-size: 13px; }
+:is(.section, .ws-setup-dialog) input:focus, :is(.section, .ws-setup-dialog) select:focus, :is(.section, .ws-setup-dialog) textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+:is(.section, .ws-setup-dialog) input::placeholder, :is(.section, .ws-setup-dialog) textarea::placeholder { color: var(--text-dim); }
+:is(.section, .ws-setup-dialog) input.mono, :is(.section, .ws-setup-dialog) textarea.mono { font-family: var(--mono); font-size: 12.5px; }
+:is(.section, .ws-setup-dialog) select { appearance: none; padding-right: 28px; }
+:is(.section, .ws-setup-dialog) textarea { font-family: var(--mono); resize: vertical; min-height: 64px; }
+:is(.section, .ws-setup-dialog) input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; padding: 8px 0; }
+:is(.section, .ws-setup-dialog) input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line); }
+:is(.section, .ws-setup-dialog) input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+:is(.section, .ws-setup-dialog) input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--bg-elev); border: 2px solid var(--accent); margin-top: -6px; cursor: pointer; box-shadow: var(--shadow-sm); }
+:is(.section, .ws-setup-dialog) input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--bg-elev); border: 2px solid var(--accent); cursor: pointer; }
+:is(.section, .ws-setup-dialog) input[type="color"] { width: 36px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--bg-input); cursor: pointer; vertical-align: middle; }
+:is(.section, .ws-setup-dialog) input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+:is(.section, .ws-setup-dialog) input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
+:is(.section, .ws-setup-dialog) input[type="file"] { width: 100%; padding: 6px; background: var(--bg-input); border: 1px solid var(--line); border-radius: var(--radius-s); color: var(--text); font-size: 13px; }
 
 /* ============ Check rows ============ */
 .check-row {
@@ -548,32 +548,20 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 html[data-theme="dark"] .topbar::after { opacity: 0.5; }
 
-/* 4.3B weather controls keep their theme when moved out of .section into dialog. */
+/* The weather setup dialog reuses the portal's fields, cards and actions. */
 .ws-setup-dialog {
   width: min(620px, calc(100vw - 24px)); max-height: 88vh; max-height: 88dvh;
-  overflow-y: auto; overscroll-behavior: contain; padding: 20px;
+  overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-5);
   background: var(--bg); color: var(--text); border: 1px solid var(--line);
   border-radius: var(--radius-l); margin: auto;
 }
 .ws-setup-dialog::backdrop { background: rgba(0,0,0,.65); }
 .ws-setup-dialog h2 { margin-top: 0; font-size: 22px; }
-.ws-setup-dialog > label { display: block; margin: 16px 0; }
-.ws-setup-dialog .card { padding: 16px; margin: 16px 0; }
-.ws-weather-controls input[type="text"], .ws-weather-controls select,
-.ws-setup-dialog > label select {
-  display: block; width: 100%; min-width: 0; min-height: 44px; margin: 8px 0;
-  padding: 10px 12px; background: var(--bg-input); color: var(--text);
-  -webkit-text-fill-color: var(--text); border: 1px solid var(--line);
-  border-radius: var(--radius-s); font-size: 16px; color-scheme: light;
-}
-html[data-theme="dark"] .ws-weather-controls input,
-html[data-theme="dark"] .ws-weather-controls select,
-html[data-theme="dark"] .ws-setup-dialog select { color-scheme: dark; }
+.ws-setup-dialog > label { display: block; margin: var(--sp-4) 0; }
+.ws-setup-dialog > label select { display: block; margin-top: var(--sp-2); }
+.ws-setup-dialog .card { margin: var(--sp-4) 0; }
 .ws-weather-controls [hidden] { display: none !important; }
-.ws-weather-controls .btn, .ws-setup-dialog > .btn { min-height: 44px; white-space: normal; }
-.ws-weather-controls input[type="checkbox"] { width: 20px; height: 20px; vertical-align: middle; accent-color: var(--accent); }
 .ws-weather-controls p { overflow-wrap: anywhere; }
-.ws-weather-controls :focus-visible, .ws-setup-dialog > label select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Cards print style: settings it ignores (see applyCardsHints in app.js). */
 .go-badge { display: none; margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; vertical-align: middle; color: var(--text-dim); border: 1px solid var(--line-soft); }
@@ -605,8 +593,8 @@ body { background: radial-gradient(ellipse at 90% 0%, var(--accent-soft), transp
 .card-head p, .help-text { line-height: 1.6; }
 .card-head > div { min-width: 0; }
 .card-head, .card-head-tabs { flex-wrap: wrap; }
-.section :is(input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="url"],select) { min-height: 46px; }
-.section select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23819aa5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+:is(.section, .ws-setup-dialog) :is(input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="url"],select) { min-height: 46px; }
+:is(.section, .ws-setup-dialog) select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23819aa5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
 .btn, .tab-btn, .power-tab-btn, .seg button, .swatch { min-height: 44px; }
 .btn { gap: 8px; padding: 10px 18px; }
 .btn-sm { padding: 8px 12px; }
@@ -635,7 +623,7 @@ input[type="radio"] { accent-color: var(--accent); width: 18px; height: 18px; }
   .main { padding: 24px 16px 40px; }
   .card { padding: 20px; border-radius: 18px; }
   .section-intro h2 { font-size: 28px; }
-  .section :is(input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="url"],select,textarea), .section input.mono { font-size: 16px; }
+  :is(.section, .ws-setup-dialog) :is(input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="url"],select,textarea), .section input.mono { font-size: 16px; }
   .action-bar > .btn { flex: 1 1 150px; white-space: normal; }
   .gauge-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .seg { display: flex; flex-wrap: wrap; }
@@ -648,6 +636,59 @@ input[type="radio"] { accent-color: var(--accent); width: 18px; height: 18px; }
 
 .btn-secondary { background: var(--bg-sub); color: var(--text); border-color: var(--line); }
 .btn-secondary:hover { border-color: var(--accent); }
+
+/* Display settings use shared cards, inputs, buttons and action bars. */
+.ws-display-settings .ws-display-native-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+.ws-display-settings .ws-display-card { display: flex; flex-direction: column; min-width: 0; margin: 0; }
+.ws-display-settings .ws-display-wide { grid-column: 1 / -1; }
+.ws-display-settings .ws-display-form { display: flex; flex-direction: column; flex: 1; gap: var(--sp-4); }
+.ws-display-settings .ws-display-form > .field,
+.ws-display-settings .ws-display-form > .hint,
+.ws-display-settings .ws-display-form > .row .field { margin: 0; }
+.ws-display-settings .ws-display-form > .action-bar { margin-top: auto; }
+.ws-display-settings .hint { padding-left: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.ws-display-settings .action-bar > .btn { margin: 0; }
+#sec-display.ws-display-settings > .action-bar { margin-bottom: var(--sp-5) !important; }
+.ws-display-settings .ws-display-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); }
+.ws-display-settings .ws-display-tools > .btn { margin: 0; }
+.ws-display-settings .ws-display-tools .hint,
+.ws-display-settings .ws-display-actions .hint { margin: 0; }
+.ws-display-settings .ws-display-actions .hint { flex-basis: 100%; }
+.ws-display-settings .ws-display-tools .hint:empty,
+.ws-display-settings .ws-display-actions .hint:empty { display: none; }
+.ws-display-settings .ws-weather-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-6); }
+.ws-display-settings .ws-display-group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.ws-display-settings .ws-display-group + .ws-display-group { padding-left: var(--sp-6); border-left: 1px solid var(--line-soft); }
+.ws-display-settings .ws-display-group legend { padding: 0; margin-bottom: var(--sp-4); font-size: 14px; font-weight: 600; color: var(--text); }
+.ws-display-settings .ws-display-group > .hint { margin: var(--sp-3) 0 var(--sp-4); }
+.ws-display-settings .ws-display-group > :last-child { margin-bottom: 0; }
+.ws-display-settings .ws-weather-search { display: flex; align-items: stretch; gap: var(--sp-2); }
+.ws-display-settings .ws-weather-search input { min-width: 0; flex: 1; }
+.ws-display-settings .ws-weather-search .btn { flex-shrink: 0; margin: 0; }
+.ws-display-settings #wsWeatherResults { margin-top: var(--sp-3); }
+.ws-display-settings #wsWeatherLocation { margin: var(--sp-3) 0 0; }
+.ws-display-settings .btn { max-width: 100%; white-space: normal; }
+.ws-setup-dialog.ws-display-settings .ws-weather-groups { grid-template-columns: minmax(0, 1fr); }
+.ws-setup-dialog.ws-display-settings .ws-display-group + .ws-display-group { padding: var(--sp-4) 0 0; border-left: 0; border-top: 1px solid var(--line-soft); }
+@media (max-width: 1100px) {
+  .ws-display-settings .ws-display-native-grid,
+  .ws-display-settings .ws-weather-groups { grid-template-columns: minmax(0, 1fr); }
+  .ws-display-settings .ws-display-group + .ws-display-group { padding: var(--sp-4) 0 0; border-left: 0; border-top: 1px solid var(--line-soft); }
+}
+@media (max-width: 820px) {
+  .ws-display-settings .card-head > div { width: 100%; }
+  .ws-display-settings .card-head > .btn,
+  .ws-display-settings .ws-display-tools > .btn,
+  .ws-setup-dialog > .btn { width: 100%; }
+  .ws-display-settings #nightFields { padding: 0 !important; margin-top: var(--sp-4) !important; background: transparent !important; border: 0 !important; border-radius: 0 !important; }
+  .ws-display-settings #nightFields .row { gap: 0; }
+  .ws-display-settings .ws-weather-search { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+}
 #liveStats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
 #liveStats .stat-row { display: flex; flex-direction: column; justify-content: space-between; padding: 14px; gap: 10px; background: var(--bg-sub); border: 1px solid var(--line-soft); border-radius: 12px; }
 #liveStats .stat-val { text-align: left; font-family: var(--sans); font-size: 18px; font-weight: 650; }

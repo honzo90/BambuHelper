@@ -819,6 +819,10 @@ void loadSettings() {
   dpSettings.nightModeEnabled = prefs.getBool("dp_night", false);
   dpSettings.nightStartHour = prefs.getUChar("dp_nstart", 22);
   dpSettings.nightEndHour = prefs.getUChar("dp_nend", 7);
+  dpSettings.nightStartMinute = prefs.getUChar("dp_nsmin", 0);
+  dpSettings.nightEndMinute = prefs.getUChar("dp_nemin", 0);
+  if (dpSettings.nightStartMinute > 59) dpSettings.nightStartMinute = 0;
+  if (dpSettings.nightEndMinute > 59) dpSettings.nightEndMinute = 0;
   dpSettings.nightBrightness = prefs.getUChar("dp_nbright", 30);
   dpSettings.screensaverBrightness = prefs.getUChar("dp_ssbright", 30);
 
@@ -1147,6 +1151,8 @@ void saveSettings() {
   prefs.putBool("dp_night", dpSettings.nightModeEnabled);
   prefs.putUChar("dp_nstart", dpSettings.nightStartHour);
   prefs.putUChar("dp_nend", dpSettings.nightEndHour);
+  prefs.putUChar("dp_nsmin", dpSettings.nightStartMinute);
+  prefs.putUChar("dp_nemin", dpSettings.nightEndMinute);
   prefs.putUChar("dp_nbright", dpSettings.nightBrightness);
   prefs.putUChar("dp_ssbright", dpSettings.screensaverBrightness);
 

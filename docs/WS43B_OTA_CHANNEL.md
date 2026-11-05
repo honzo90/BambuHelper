@@ -11,6 +11,14 @@ https://api.github.com/repos/honzo90/BambuHelper/releases/latest
 
 Kanal stabilny = opublikowane GitHub Releases (nie draft, nie prerelease).
 GitHub `releases/latest` pomija wydania testowe (prerelease).
+
+## Rodzaje wersji
+
+| Rodzaj | Tag | Dystrybucja |
+|---|---|---|
+| Alpha | `vX.Y.Z-alpha.N` | tylko plik OTA wgrywany ręcznie w WebUI; nie jest publikowany online |
+| Beta | `vX.Y.Z-beta.N` | GitHub prerelease; kanał **Beta** oferuje go online do testów na urządzeniu |
+| Stable | `vX.Y.Z` | zwykły GitHub release; kanały **Stable** i **Beta** |
 Inne płytki korzystają z upstream `Keralots/BambuHelper`.
 
 ## Status wydania

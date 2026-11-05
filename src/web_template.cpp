@@ -94,24 +94,13 @@ static bool resolvePlaceholder(const char* name, String& out) {
   if (strcmp(name, "NIGHTDISP") == 0)       { out = dpSettings.nightModeEnabled ? "block" : "none"; return true; }
   if (strcmp(name, "NBRIGHT") == 0)         { out = String(dpSettings.nightBrightness); return true; }
   if (strcmp(name, "SSBRIGHT") == 0)        { out = String(dpSettings.screensaverBrightness); return true; }
-  if (strcmp(name, "NIGHT_START_OPTS") == 0) {
-    out = "";
-    for (uint8_t h = 0; h < 24; h++) {
-      char opt[64];
-      snprintf(opt, sizeof(opt), "<option value=\"%d\"%s>%02d:00</option>",
-               h, h == dpSettings.nightStartHour ? " selected" : "", h);
-      out += opt;
-    }
-    return true;
-  }
-  if (strcmp(name, "NIGHT_END_OPTS") == 0) {
-    out = "";
-    for (uint8_t h = 0; h < 24; h++) {
-      char opt[64];
-      snprintf(opt, sizeof(opt), "<option value=\"%d\"%s>%02d:00</option>",
-               h, h == dpSettings.nightEndHour ? " selected" : "", h);
-      out += opt;
-    }
+  if (strcmp(name, "NIGHT_START_TIME") == 0 || strcmp(name, "NIGHT_END_TIME") == 0) {
+    const bool start = name[6] == 'S';
+    char hhmm[8];
+    snprintf(hhmm, sizeof(hhmm), "%02u:%02u",
+             unsigned((start ? dpSettings.nightStartHour : dpSettings.nightEndHour) % 24),
+             unsigned((start ? dpSettings.nightStartMinute : dpSettings.nightEndMinute) % 60));
+    out = hhmm;
     return true;
   }
 

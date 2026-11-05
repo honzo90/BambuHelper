@@ -286,6 +286,8 @@ struct DisplayPowerSettings {
   bool nightModeEnabled;       // enable time-based dimming
   uint8_t nightStartHour;      // dim start hour (0-23)
   uint8_t nightEndHour;        // dim end hour (0-23)
+  uint8_t nightStartMinute;    // dim start minute (0-59, UI uses 5-minute steps)
+  uint8_t nightEndMinute;      // dim end minute (0-59)
   uint8_t nightBrightness;     // brightness during night (0-255)
   // Screensaver dimming (idle/clock screen)
   uint8_t screensaverBrightness; // brightness when clock/screensaver is active (0-255)

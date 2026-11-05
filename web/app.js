@@ -1307,8 +1307,13 @@ function applyDisplay(){
   var p = new URLSearchParams();
   p.append('bright', document.getElementById('bright').value);
   if (document.getElementById('nighten').checked) p.append('nighten', '1');
-  p.append('nstart', document.getElementById('nstart').value);
-  p.append('nend', document.getElementById('nend').value);
+  // Night times are HH:MM time inputs; the firmware stores hour and minute.
+  [['nstart','nsmin'],['nend','nemin']].forEach(function(pair){
+    var m = /^(\d{1,2}):(\d{2})/.exec(document.getElementById(pair[0]).value || '');
+    if (!m) return; // keep the stored time when the field is empty
+    p.append(pair[0], String(parseInt(m[1], 10)));
+    p.append(pair[1], String(parseInt(m[2], 10)));
+  });
   p.append('nbright', document.getElementById('nbright').value);
   p.append('ssbright', document.getElementById('ssbright').value);
   p.append('rotation', document.getElementById('rotation').value);
@@ -2356,24 +2361,27 @@ applyThemeMode(document.documentElement.getAttribute('data-theme') || 'dark');
 })();
 
 
-/* Native settings use the same validated endpoints as the LCD menu. */
+/* Native settings use the same validated endpoints as the LCD menu.
+   Their fields have their own save buttons, outside legacy /apply dirty tracking. */
 function ws43bDisplaySettingsMarkup(){
-  return '<div class="card-head"><div><h3>Panel theme and idle screen</h3><p>Shared with the display menu. Changes are saved on the panel.</p></div></div>' +
-    '<form id="wsDisplayModeForm"><div class="field"><label for="wsDisplayMode">Print and screensaver mode</label><select id="wsDisplayMode"><option value="simple">Simple</option><option value="advanced">Advanced (in development)</option></select></div>' +
-    '<p class="hint">One choice for Print and the screensaver. Simple shows MQTT progress and important warnings. Advanced adds stage details. Clock settings stay unchanged.</p><button type="submit" class="btn btn-primary" disabled>Save display mode</button></form>' +
-    '<form id="wsThemeForm"><div class="field"><label for="wsTheme">Panel color preset</label><select id="wsTheme"><option value="0">Navy</option><option value="1">Dark / green</option><option value="2">Dark / amber</option></select></div>' +
-    '<p class="hint">Applying a preset replaces panel colors and reloads this page. Save other changes first.</p><button type="submit" class="btn btn-secondary" disabled>Apply preset and reload</button></form>' +
-    '<form id="wsIdleForm" style="margin-top:var(--sp-4)"><div class="row"><div class="field"><label for="wsIdle">Time without touch</label><select id="wsIdle"><option value="0">Disabled</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>' +
-    '<div class="field"><label for="wsIdleAction">On timeout</label><select id="wsIdleAction"><option value="0">Show clock</option><option value="1">Turn off backlight</option></select></div></div>' +
-    '<p class="hint">Daytime printing stays on Print after timeout. Other views return to Print first. Night behavior follows the night schedule. Touch resets the timer.</p><button type="submit" class="btn btn-primary" disabled>Save idle settings</button></form>' +
-    '<button type="button" class="btn btn-ghost btn-sm" id="wsNativeReload">Reload panel settings</button><p id="wsNativeStatus" class="hint" role="status" aria-live="polite"></p>';
+  return '<div class="card ws-display-card"><div class="card-head"><div><h3>Panel display mode</h3><p>Choose how much detail the panel shows.</p></div></div>' +
+    '<form id="wsDisplayModeForm" class="ws-display-form"><div class="field"><label for="wsDisplayMode">Print and screensaver mode</label><select id="wsDisplayMode" data-nodirty><option value="simple">Simple</option><option value="advanced">Advanced (in development)</option></select></div>' +
+    '<p class="hint">One choice for Print and the screensaver. Simple shows MQTT progress and important warnings. Advanced adds stage details. Clock settings stay unchanged.</p><div class="action-bar"><button type="submit" class="btn btn-primary" disabled>Save display mode</button></div></form>' +
+    '</div><div class="card ws-display-card"><div class="card-head"><div><h3>Panel theme</h3><p>Choose a ready-made color palette.</p></div></div>' +
+    '<form id="wsThemeForm" class="ws-display-form"><div class="field"><label for="wsTheme">Panel color preset</label><select id="wsTheme" data-nodirty><option value="0">Navy</option><option value="1">Dark / green</option><option value="2">Dark / amber</option></select></div>' +
+    '<p class="hint">Applying a preset replaces panel colors and reloads this page. Save other changes first.</p><div class="action-bar"><button type="submit" class="btn btn-primary" disabled>Apply preset and reload</button></div></form></div>' +
+    '<div class="card ws-display-card ws-display-wide"><div class="card-head"><div><h3>Daytime idle screen</h3><p>Choose what happens after a period without touch.</p></div></div>' +
+    '<form id="wsIdleForm" class="ws-display-form"><div class="row"><div class="field"><label for="wsIdle">Time without touch</label><select id="wsIdle" data-nodirty><option value="0">Disabled</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>' +
+    '<div class="field"><label for="wsIdleAction">On timeout</label><select id="wsIdleAction" data-nodirty><option value="0">Show clock</option><option value="1">Turn off backlight</option></select></div></div>' +
+    '<p class="hint">Daytime printing stays on Print after timeout. Other views return to Print first. Night behavior follows the night schedule. Touch resets the timer.</p><div class="action-bar"><button type="submit" class="btn btn-primary" disabled>Save idle settings</button></div></form></div>' +
+    '<div class="ws-display-tools ws-display-wide"><button type="button" class="btn btn-ghost btn-sm" id="wsNativeReload">Reload panel settings</button><p id="wsNativeStatus" class="hint" role="status" aria-live="polite"></p></div>';
 }
 function setupWs43bDisplaySettings(){
   var intro=document.querySelector('#sec-display .section-intro');
   if(!intro || document.getElementById('wsNativeSettings')) return;
-  var card=document.createElement('div');card.id='wsNativeSettings';card.className='card';
+  var card=document.createElement('div');card.id='wsNativeSettings';card.className='ws-display-native-grid';
   card.innerHTML=ws43bDisplaySettingsMarkup();intro.after(card);
-  var summary=intro.querySelector('p');if(summary)summary.textContent='Set the panel theme, idle screen, clock and gauges.';
+  var summary=intro.querySelector('p');if(summary)summary.textContent='Set the display mode, colors, daytime idle screen and night behavior.';
   var theme=document.getElementById('wsThemeForm'),idle=document.getElementById('wsIdleForm'),mode=document.getElementById('wsDisplayModeForm');
   var themeButton=theme.querySelector('button'),idleButton=idle.querySelector('button'),modeButton=mode.querySelector('button');
   var status=document.getElementById('wsNativeStatus'),reload=document.getElementById('wsNativeReload');
@@ -2407,20 +2415,20 @@ function setupWs43bDisplaySettings(){
     event.preventDefault();if(!ready || themeButton.disabled)return;busy(true);
     var body=new URLSearchParams({theme:document.getElementById('wsTheme').value,fan_match_printer:document.getElementById('fanmp').checked?'1':'0'});
     try {await request('/monitor/display',body);location.reload();}
-    catch(e){status.textContent=e.message;busy(false);}
+    catch(e){status.textContent=e.message;showToast(status.textContent);busy(false);}
   };
   idle.onsubmit=async function(event){
     event.preventDefault();if(!ready || idleButton.disabled)return;busy(true);
     var body=new URLSearchParams({idle_minutes:document.getElementById('wsIdle').value,screen_off:document.getElementById('wsIdleAction').value,use24h:document.getElementById('use24h').checked?'1':'0'});
-    try {await request('/monitor/clock',body);status.textContent='Idle settings saved.';}
-    catch(e){status.textContent=e.message;}
+    try {await request('/monitor/clock',body);status.textContent='Idle settings saved.';showToast(status.textContent);}
+    catch(e){status.textContent=e.message;showToast(status.textContent);}
     finally{busy(false);}
   };
   mode.onsubmit=async function(event){
     event.preventDefault();if(!ready || modeButton.disabled)return;busy(true);
     var body=new URLSearchParams({mode:document.getElementById('wsDisplayMode').value});
-    try {await request('/monitor/display-mode',body);status.textContent='Display mode saved.';}
-    catch(e){status.textContent=e.message;}
+    try {await request('/monitor/display-mode',body);status.textContent='Display mode saved.';showToast(status.textContent);}
+    catch(e){status.textContent=e.message;showToast(status.textContent);}
     finally{busy(false);}
   };
   reload.onclick=load;load();
@@ -2438,14 +2446,16 @@ function setupWs43bDisplaySettings(){
     var nightCard=range.closest('.card');
     if(nightCard){
       nightCard.style.display='';
-      nightCard.querySelector('h3').textContent='Scheduled backlight';
+      nightCard.querySelector('h3').textContent='Night backlight';
       var nightLabel=nightCard.querySelector('label[for="nighten"]');if(nightLabel)nightLabel.textContent='Enable night schedule';
+      var startLabel=nightCard.querySelector('label[for="nstart"]');if(startLabel)startLabel.textContent='Manual night starts';
+      var endLabel=nightCard.querySelector('label[for="nend"]');if(endLabel)endLabel.textContent='Manual night ends';
     }
     var select=document.createElement('select');select.id=range.id;
     select.innerHTML='<option value="0">Off</option><option value="255">On</option>';
     select.value=Number(range.value)===0?'0':'255';range.replaceWith(select);
     var field=select.closest('.field'),caption=field.querySelector('label span');if(caption)caption.textContent='Backlight at night';
-    var hint=field.querySelector('.hint');if(hint)hint.textContent='Scheduled backlight: off or on. Requires time synchronization.';
+    var hint=field.querySelector('.hint');if(hint)hint.textContent='Requires time synchronization. Night hours always follow these times; outside them, solar dimming below only dims the screen.';
     var value=document.getElementById('nbrightVal');if(value)value.hidden=true;
   }
 }
@@ -2455,6 +2465,7 @@ function setupWs43bPortal(){
   if (typeof DEV === 'undefined' || DEV.board !== 'ws_lcd_43b') return;
   var notes = document.getElementById('otaReleaseNotes');
   if (notes) notes.href = 'https://github.com/honzo90/BambuHelper/releases';
+  var displaySection=document.getElementById('sec-display');if(displaySection)displaySection.classList.add('ws-display-settings');
   setupWs43bDisplaySettings();
   setupWs43bWeather();
   // Keep fields in the DOM because upstream form serializers address them
@@ -2475,6 +2486,26 @@ function setupWs43bPortal(){
     var el = document.getElementById(pair[0]); if (el) el.value = pair[1];
   });
   ['rotsplit','rotsplitf'].forEach(function(id){var el=document.getElementById(id);if(el)el.checked=false;});
+  // Settings read only by renderers the 4.3B never runs (legacy clock face,
+  // split view, card style, status-bar door). Hidden but NOT disabled: they
+  // are still submitted, so saving other fields never resets their values.
+  var WS43B_UNUSED_SETTINGS = ['clk_size','clk_dsize','clk_hidedate','clkinfo','timem','hidelp',
+    'clr_eta','clr_fin','clr_pname','clr_dorc','clr_doro','dor_lbl'];
+  WS43B_UNUSED_SETTINGS.forEach(function(id){
+    var el = document.getElementById(id); if (!el) return;
+    var row = el.closest('.door-color-row, .accent-color-row, .field, .check-row');
+    if (row) { row.hidden = true; row.style.display = 'none'; }
+  });
+  // Drop cards left with nothing to change.
+  document.querySelectorAll('#sec-clock .card, #sec-printscreen .card').forEach(function(card){
+    var controls = card.querySelectorAll('input:not([type=hidden]), select, textarea');
+    // Only look inside the card: the inactive section itself is hidden too.
+    var visible = Array.prototype.some.call(controls, function(el){
+      for (var n = el; n && n !== card; n = n.parentElement) { if (n.hidden || n.style.display === 'none') return false; }
+      return true;
+    });
+    if (controls.length && !visible) { card.hidden = true; card.style.display = 'none'; }
+  });
   // Upstream moved orientation into a separate card; its only control is
   // unsupported by the fixed landscape panel, so hide the empty card as well.
   var orientation = document.getElementById('rotation');
@@ -2493,22 +2524,24 @@ function setupWs43bWeather(){
   var host=document.querySelector('#sec-display');if(!host)return;
   var lang=['pl','en','de'].includes(document.documentElement.lang)?document.documentElement.lang:'en';var pl=lang==='pl';function W(a,b,c){return lang==='de'?c:pl?a:b;}
   var card=document.createElement('div');card.id='wsWeatherCard';card.className='card ws-weather-controls';
-  card.innerHTML='<h3>'+W('Pogoda i słoneczny tryb nocny','Weather and solar night schedule',"Wetter und Nachtplan nach Sonnenstand")+'</h3>'+
-    '<p>'+W('Źródło: Open-Meteo. Godzina i data używają strefy czasowej panelu.','Source: Open-Meteo. Time and date use the panel timezone.',"Quelle: Open-Meteo. Uhrzeit und Datum verwenden die Zeitzone des Panels.")+'</p>'+
-    '<form id="wsWeatherForm"><div class="field"><label for="wsWeatherQuery">'+W('Miejscowość lub kod pocztowy','City or postal code',"Ort oder Postleitzahl")+'</label><input type="text" id="wsWeatherQuery" maxlength="80" autocomplete="off" enterkeyhint="search"><button class="btn btn-ghost" type="button" id="wsWeatherSearch">'+W('Szukaj','Search',"Suchen")+'</button><select id="wsWeatherResults" aria-label="'+W('Miejscowość','Location','Standort')+'" hidden disabled></select><p id="wsWeatherLocation"></p></div>'+
-    '<label><input type="checkbox" id="wsWeatherEnabled"> '+W('Pogoda na wydruku i zegarze','Weather on print and clock screens',"Wetter in Druck- und Uhransicht")+'</label><br>'+
-    '<label><input type="checkbox" id="wsWeatherSolar"> '+W('Noc od zachodu do wschodu słońca','Night from sunset to sunrise',"Nacht von Sonnenuntergang bis Sonnenaufgang")+'</label>'+
-    '<p>'+W('Zakończenie kreatora włącza harmonogram nocny. Ręczne godziny są zapasowe przy braku danych słonecznych. Wyłącz tę opcję, aby zawsze używać ręcznych godzin.','Finishing setup enables the night schedule. Manual hours are the fallback when solar data is unavailable. Disable this option to always use manual hours.',"Der Abschluss der Einrichtung aktiviert den Nachtplan. Ohne Sonnenstandsdaten gelten die manuellen Zeiten. Deaktiviere diese Option, um immer manuelle Zeiten zu verwenden.")+'</p>'+
-    '<div class="field"><label>'+W('Nocny czas bez dotyku','Night inactivity timeout',"Nächtliche Inaktivitätszeit")+'</label><select id="wsWeatherNight"><option value="30">30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>'+
-    '<p>'+W('Nocne podświetlenie wyłączone: ekran gaśnie, a dotyk wybudza go na wybrany czas. Włączone: po tym czasie pojawia się zegar z kolorami przyciemnionymi do 30%. Dotyk przywraca normalne kolory.','Night backlight off: the screen is dark and touch wakes it for the selected time. On: this timeout opens the clock with colors dimmed to 30%. Touch restores normal colors.',"Nachthintergrundbeleuchtung aus: Der Bildschirm ist dunkel, eine Berührung weckt ihn für die gewählte Zeit. Ein: Nach Ablauf dieser Zeit erscheint die Uhr mit auf 30% gedimmten Farben. Eine Berührung stellt die normalen Farben wieder her.")+'</p>'+
-    '<button class="btn btn-primary" type="submit" id="wsWeatherSave" disabled>'+W('Zapisz pogodę i tryb nocny','Save weather and night settings',"Wetter- und Nachteinstellungen speichern")+'</button><p id="wsWeatherStatus" role="status"></p></form>';
+  card.innerHTML='<div class="card-head"><div><h3>'+W('Pogoda i noc słoneczna','Weather and solar night','Wetter und Nacht nach Sonnenstand')+'</h3>'+
+    '<p>'+W('Źródło: Open-Meteo. Godzina i data używają strefy czasowej panelu.','Source: Open-Meteo. Time and date use the panel timezone.',"Quelle: Open-Meteo. Uhrzeit und Datum verwenden die Zeitzone des Panels.")+'</p></div></div>'+
+    '<form id="wsWeatherForm"><div class="ws-weather-groups"><fieldset class="ws-display-group"><legend>'+W('Lokalizacja i pogoda','Location and weather','Standort und Wetter')+'</legend>'+
+    '<div class="field"><label for="wsWeatherQuery">'+W('Miejscowość lub kod pocztowy','City or postal code',"Ort oder Postleitzahl")+'</label><div class="ws-weather-search"><input type="text" id="wsWeatherQuery" maxlength="80" autocomplete="off" enterkeyhint="search"><button class="btn btn-secondary" type="button" id="wsWeatherSearch">'+W('Szukaj','Search',"Suchen")+'</button></div><select id="wsWeatherResults" aria-label="'+W('Miejscowość','Location','Standort')+'" hidden disabled></select><p id="wsWeatherLocation" class="hint"></p></div>'+
+    '<label class="check-row"><input type="checkbox" id="wsWeatherEnabled"> '+W('Pogoda na wydruku i zegarze','Weather on print and clock screens',"Wetter in Druck- und Uhransicht")+'</label></fieldset>'+
+    '<fieldset class="ws-display-group"><legend>'+W('Zmrok i wybudzanie','Dusk and wake-up','Dämmerung und Aufwecken')+'</legend>'+
+    '<label class="check-row"><input type="checkbox" id="wsWeatherSolar"> '+W('Przyciemniaj od zachodu do wschodu słońca','Dim from sunset to sunrise',"Von Sonnenuntergang bis Sonnenaufgang abdunkeln")+'</label>'+
+    '<p class="hint">'+W('Gdy na zewnątrz jest ciemno, poza godzinami nocy ekran po nocnym czasie bez dotyku przygasa do 50%, a dotyk przywraca pełną jasność. Godziny nocy ustawiasz w karcie Podświetlenie nocą. Zakończenie kreatora włącza harmonogram nocny.','When it is dark outside, outside the night hours the screen dims to 50% after the night inactivity timeout; touch restores full brightness. Set the night hours in the Night backlight card. Finishing setup enables the night schedule.',"Wenn es draußen dunkel ist, wird der Bildschirm außerhalb der Nachtzeiten nach der nächtlichen Inaktivitätszeit auf 50% abgedunkelt; eine Berührung stellt die volle Helligkeit wieder her. Die Nachtzeiten legst du in der Karte Hintergrundbeleuchtung nachts fest. Der Abschluss der Einrichtung aktiviert den Nachtplan.")+'</p>'+
+    '<div class="field"><label for="wsWeatherNight">'+W('Nocny czas bez dotyku','Night inactivity timeout',"Nächtliche Inaktivitätszeit")+'</label><select id="wsWeatherNight"><option value="30">30 s</option><option value="60">1 min</option><option value="300">5 min</option></select></div>'+
+    '<p class="hint">'+W('Nocne podświetlenie wyłączone: ekran gaśnie, a dotyk wybudza go na wybrany czas. Włączone: po tym czasie pojawia się zegar z kolorami przyciemnionymi do 30%. Dotyk przywraca normalne kolory.','Night backlight off: the screen is dark and touch wakes it for the selected time. On: this timeout opens the clock with colors dimmed to 30%. Touch restores normal colors.',"Nachthintergrundbeleuchtung aus: Der Bildschirm ist dunkel, eine Berührung weckt ihn für die gewählte Zeit. Ein: Nach Ablauf dieser Zeit erscheint die Uhr mit auf 30% gedimmten Farben. Eine Berührung stellt die normalen Farben wieder her.")+'</p></fieldset></div>'+
+    '<div class="action-bar ws-display-actions"><button class="btn btn-primary" type="submit" id="wsWeatherSave" disabled>'+W('Zapisz pogodę i tryb nocny','Save weather and night settings',"Wetter- und Nachteinstellungen speichern")+'</button><p id="wsWeatherStatus" class="hint" role="status" aria-live="polite"></p></div></form>';
   host.appendChild(card);
   var cfg=null,results=[],form=document.getElementById('wsWeatherForm'),status=document.getElementById('wsWeatherStatus'),save=document.getElementById('wsWeatherSave');
   var wizard=null;
-  var launch=document.createElement('button');launch.type='button';launch.className='btn btn-ghost';launch.textContent=W('Konfiguruj pogodę i noc','Set up weather and night',"Wetter und Nacht einrichten");host.insertBefore(launch,card);
+  var launch=document.createElement('button');launch.type='button';launch.className='btn btn-ghost';launch.textContent=W('Konfiguruj pogodę i noc','Set up weather and night',"Wetter und Nacht einrichten");card.querySelector('.card-head').appendChild(launch);
   function openWizard(state){
     if(wizard)return;
-    wizard=document.createElement('dialog');wizard.className='ws-setup-dialog';wizard.setAttribute('aria-labelledby','wsSetupTitle');
+    wizard=document.createElement('dialog');wizard.className='ws-setup-dialog ws-display-settings';wizard.setAttribute('aria-labelledby','wsSetupTitle');
     var title=document.createElement('h2');title.id='wsSetupTitle';title.tabIndex=-1;title.textContent=W('Dokończ ustawienia ekranu','Finish display setup',"Anzeigeeinrichtung abschließen");wizard.appendChild(title);
     var hint=document.createElement('p');hint.textContent=W('Ustaw lokalizację i nocny ekran. Wi-Fi i drukarka pozostają bez zmian. Możesz pominąć i wrócić tutaj później.','Set your location and night display. Wi-Fi and printer settings are preserved. You can skip and return later.',"Lege Standort und Nachtanzeige fest. WLAN- und Druckereinstellungen bleiben erhalten. Du kannst diesen Schritt überspringen und später zurückkehren.");wizard.appendChild(hint);
     wizard.appendChild(card);
@@ -2519,9 +2552,9 @@ function setupWs43bWeather(){
     var skip=document.createElement('button');skip.type='button';skip.className='btn btn-ghost';skip.textContent=W('Pomiń na razie','Skip for now',"Vorerst überspringen");wizard.appendChild(skip);
     skip.onclick=async function(){skip.disabled=true;try{await completeSetup(true);closeWizard();}catch(e){status.textContent=W('Nie zapisano pominięcia. Spróbuj ponownie.','Could not save skip. Retry.',"Überspringen konnte nicht gespeichert werden. Erneut versuchen.");}finally{skip.disabled=false;}};
     wizard.addEventListener('cancel',function(e){e.preventDefault();skip.click();});
-    save.textContent=W('Zapisz i zakończ','Save and finish',"Speichern und abschließen");document.body.appendChild(wizard);wizard.showModal();title.focus({preventScroll:true});wizard.scrollTop=0;
+    launch.hidden=true;save.textContent=W('Zapisz i zakończ','Save and finish',"Speichern und abschließen");document.body.appendChild(wizard);wizard.showModal();title.focus({preventScroll:true});wizard.scrollTop=0;
   }
-  function closeWizard(){if(!wizard)return;host.appendChild(card);wizard.close();wizard.remove();wizard=null;save.textContent=W('Zapisz pogodę i tryb nocny','Save weather and night settings',"Wetter- und Nachteinstellungen speichern");}
+  function closeWizard(){if(!wizard)return;host.appendChild(card);wizard.close();wizard.remove();wizard=null;launch.hidden=false;save.textContent=W('Zapisz pogodę i tryb nocny','Save weather and night settings',"Wetter- und Nachteinstellungen speichern");}
   async function completeSetup(skip){
     var body=new URLSearchParams({action:skip?'skip':'finish',dark:document.getElementById('wsSetupAction').value});
     var response=await fetch('/monitor/weather/setup',{method:'POST',body:body});if(!response.ok)throw Error();

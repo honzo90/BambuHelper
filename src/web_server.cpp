@@ -27,6 +27,7 @@
 #include <WebServer.h>
 #if defined(BOARD_IS_WS43B)
 #include "ws43b_weather.h"
+#include "display_ws43b.h"
 #include <WiFi.h>  // core 3 no longer provides WiFi through WebServer's headers
 #include <esp_system.h>
 #include <esp_heap_caps.h>
@@ -96,8 +97,10 @@ static void readDisplayFromForm() {
   if (server.hasArg("bright")) brightness = server.arg("bright").toInt();
   // Night mode
   dpSettings.nightModeEnabled = server.hasArg("nighten");
-  if (server.hasArg("nstart")) dpSettings.nightStartHour = server.arg("nstart").toInt();
-  if (server.hasArg("nend"))   dpSettings.nightEndHour = server.arg("nend").toInt();
+  if (server.hasArg("nstart")) dpSettings.nightStartHour = constrain(server.arg("nstart").toInt(), 0, 23);
+  if (server.hasArg("nend"))   dpSettings.nightEndHour = constrain(server.arg("nend").toInt(), 0, 23);
+  if (server.hasArg("nsmin"))  dpSettings.nightStartMinute = constrain(server.arg("nsmin").toInt(), 0, 59);
+  if (server.hasArg("nemin"))  dpSettings.nightEndMinute = constrain(server.arg("nemin").toInt(), 0, 59);
   if (server.hasArg("nbright")) dpSettings.nightBrightness = server.arg("nbright").toInt();
   if (server.hasArg("ssbright")) dpSettings.screensaverBrightness = server.arg("ssbright").toInt();
   // Native 4.3B inactivity/night policy owns its binary backlight.
@@ -274,7 +277,7 @@ R"MONITOR(<section><h2>Wygląd panelu</h2><form id="display" action="/monitor/di
 <p><button disabled>Zapisz ustawienia panelu</button></p></form></section>
 <section><h2>Tryb wyświetlania</h2><form id="displayMode" action="/monitor/display-mode" method="post">
 <label>Wydruk i wygaszacz<select name="mode"><option value="simple">Prosty</option><option value="advanced">Zaawansowany (w budowie)</option></select></label>
-<small>Jeden wybór dla ekranu Wydruk i wygaszacza. Prosty pokazuje procent MQTT i ważne ostrzeżenia. Zaawansowany dodaje szczegóły etapów. Ustawienia zegara pozostają bez zmian.</small>
+<small>Jedno ustawienie dla wydruku i wygaszacza. Prosty pokazuje procent MQTT i ważne ostrzeżenia. Zaawansowany dodaje szczegóły etapów. Ustawienia zegara pozostają bez zmian.</small>
 <p><button disabled>Zapisz tryb wyświetlania</button></p></form></section>
 <section><h2>Zegar i wygaszanie</h2><form id="clock" action="/monitor/clock" method="post">
 <label>Czas bez dotykania ekranu<select name="idle_minutes"><option value="0">Wyłączone</option><option value="1">1 minuta</option><option value="5">5 minut</option><option value="15">15 minut</option><option value="30">30 minut</option></select></label>
@@ -912,6 +915,12 @@ static void handleMonitorStatus() {
   doc["display_frames"] = displayDiag.frames;
   doc["display_last_render_us"] = displayDiag.lastRenderUs;
   doc["display_max_render_us"] = displayDiag.maxRenderUs;
+  doc["display_last_copy_us"] = displayDiag.lastCopyUs;
+  doc["display_last_wait_us"] = displayDiag.lastWaitUs;
+  doc["display_last_copy_rows"] = displayDiag.lastCopyRows;
+  doc["display_presents"] = displayDiag.presents;
+  doc["clock_flip_frames"] = ws43bLastFlipFrames();
+  doc["clock_flip_ms"] = ws43bLastFlipMs();
   doc["display_legacy_fill_probes"] = displayDiag.legacyFillProbes;
   doc["display_legacy_fill_mismatches"] = displayDiag.legacyFillMismatches;
   doc["display_fill_readback_errors"] = displayDiag.fillReadbackErrors;
@@ -990,6 +999,12 @@ static void handleStatus() {
   doc["display_frames"] = displayDiag.frames;
   doc["display_last_render_us"] = displayDiag.lastRenderUs;
   doc["display_max_render_us"] = displayDiag.maxRenderUs;
+  doc["display_last_copy_us"] = displayDiag.lastCopyUs;
+  doc["display_last_wait_us"] = displayDiag.lastWaitUs;
+  doc["display_last_copy_rows"] = displayDiag.lastCopyRows;
+  doc["display_presents"] = displayDiag.presents;
+  doc["clock_flip_frames"] = ws43bLastFlipFrames();
+  doc["clock_flip_ms"] = ws43bLastFlipMs();
   doc["display_legacy_fill_probes"] = displayDiag.legacyFillProbes;
   doc["display_legacy_fill_mismatches"] = displayDiag.legacyFillMismatches;
   doc["display_fill_readback_errors"] = displayDiag.fillReadbackErrors;
@@ -2425,6 +2440,8 @@ static void handleSettingsExport() {
   dp["nightModeEnabled"] = dpSettings.nightModeEnabled;
   dp["nightStartHour"] = dpSettings.nightStartHour;
   dp["nightEndHour"] = dpSettings.nightEndHour;
+  dp["nightStartMinute"] = dpSettings.nightStartMinute;
+  dp["nightEndMinute"] = dpSettings.nightEndMinute;
   dp["nightBrightness"] = dpSettings.nightBrightness;
   dp["screensaverBrightness"] = dpSettings.screensaverBrightness;
 
@@ -2913,6 +2930,9 @@ static void handleSettingsImportFinish() {
     if (dp["nightModeEnabled"].is<bool>())      dpSettings.nightModeEnabled = dp["nightModeEnabled"].as<bool>();
     if (dp["nightStartHour"].is<uint8_t>())     dpSettings.nightStartHour = dp["nightStartHour"].as<uint8_t>();
     if (dp["nightEndHour"].is<uint8_t>())       dpSettings.nightEndHour = dp["nightEndHour"].as<uint8_t>();
+    // Older exports carry whole hours only: missing minutes mean :00.
+    dpSettings.nightStartMinute = dp["nightStartMinute"].is<uint8_t>() && dp["nightStartMinute"].as<uint8_t>() < 60 ? dp["nightStartMinute"].as<uint8_t>() : 0;
+    dpSettings.nightEndMinute = dp["nightEndMinute"].is<uint8_t>() && dp["nightEndMinute"].as<uint8_t>() < 60 ? dp["nightEndMinute"].as<uint8_t>() : 0;
     if (dp["nightBrightness"].is<uint8_t>())    dpSettings.nightBrightness = dp["nightBrightness"].as<uint8_t>();
     if (dp["screensaverBrightness"].is<uint8_t>()) dpSettings.screensaverBrightness = dp["screensaverBrightness"].as<uint8_t>();
   }

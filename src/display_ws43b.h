@@ -14,3 +14,9 @@ void drawWs43bHmsScreen();
 void beginWs43bErrorScreen(const char *printer);
 void drawWs43bErrorCard(unsigned row,const char *label,const char *code,const char *description,uint16_t color);
 void endWs43bErrorScreen(unsigned remaining);
+
+#if defined(BOARD_IS_WS43B)
+// Screensaver clock flip statistics (last finished flip).
+uint16_t ws43bLastFlipFrames();
+uint32_t ws43bLastFlipMs();
+#endif

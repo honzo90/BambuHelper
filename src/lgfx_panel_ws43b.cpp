@@ -357,7 +357,7 @@ bool Panel_WS43B::captureInfo(ws43b::FrameCaptureInfo &info) const {
 
 bool Panel_WS43B::captureRow(size_t row, uint8_t *out, size_t capacity) const {
   if (!_initialized || !ws43b::ready() || !guardsIntact()) return false;
-  // display() has already waited for release and flipped _backIndex. The
+  // display() has flipped _backIndex; _backIndex ^ 1 is the latest front. The
   // driver only reads this front; no renderer runs during this HTTP handler.
   return ws43b::captureRow(reinterpret_cast<const volatile uint16_t *>(_canvas),
                            reinterpret_cast<const volatile uint16_t *>(_scanout[_backIndex ^ 1]),
@@ -380,30 +380,47 @@ void Panel_WS43B::display(uint_fast16_t x, uint_fast16_t y,
   }
   if(_presentedPercent != colorPercent) {
     _presentedPercent=colorPercent;
-    _pendingRows.mark(0,HEIGHT); // Both alternating buffers need the new level.
+    _pending.mark(0,WIDTH,0,HEIGHT); // Both alternating buffers need the new level.
     _range_mod.left=0;_range_mod.right=WIDTH-1;
     _range_mod.top=0;_range_mod.bottom=HEIGHT-1;
   }
   if (_range_mod.empty()) return;
   if (_range_mod.left < 0 || _range_mod.right >= WIDTH ||
       _range_mod.top < 0 || _range_mod.bottom >= HEIGHT) ws43b::fatal("DIRTY_RANGE");
-  // Refresh all rows changed since this particular back buffer was current.
-  // Untouched rows already match the canvas, including across alternating frames.
-  if (!_pendingRows.mark(_range_mod.top, _range_mod.bottom + 1))
+  // Refresh the rectangle changed since this particular back buffer was
+  // current (pixel columns rounded to 32-bit words). Untouched pixels already
+  // match the canvas, including across alternating frames.
+  const size_t left = size_t(_range_mod.left) & ~size_t(1);
+  const size_t right = std::min<size_t>(WIDTH, (size_t(_range_mod.right) + 2) & ~size_t(1));
+  if (!_pending.mark(left, right, _range_mod.top, _range_mod.bottom + 1))
     ws43b::fatal("DIRTY_ROWS");
+  // The back buffer was the displayed one until the last switch: it may only
+  // be written once the panel has released it. The canvas drawing for this
+  // frame already happened during that wait.
+  const uint32_t waitStarted = micros();
+  if (_releasePending) waitForFrameRelease(_releaseAfter);
+  _releasePending = false;
+  renderStats.lastWaitUs = uint32_t(micros() - waitStarted);
   uint8_t *back = _scanout[_backIndex];
-  const size_t first = _pendingRows.top[_backIndex];
-  const size_t rows = _pendingRows.bottom[_backIndex] - first;
+  const size_t first = _pending.top[_backIndex];
+  const size_t rows = _pending.bottom[_backIndex] - first;
+  const size_t xBytes = _pending.left[_backIndex] * sizeof(uint16_t);
+  const size_t widthBytes = (_pending.right[_backIndex] - _pending.left[_backIndex]) * sizeof(uint16_t);
   const size_t offset = first * WIDTH * sizeof(uint16_t);
-  if (!ws43b::copyFrameChecked(back + offset, _canvas + offset, copyRow, sizeof(copyRow),
-                              WIDTH * sizeof(uint16_t), rows, colorPercent))
+  const uint32_t copyStarted = micros();
+  if (!ws43b::copyRectChecked(back + offset, _canvas + offset, copyRow, sizeof(copyRow),
+                              WIDTH * sizeof(uint16_t), xBytes, widthBytes, rows, colorPercent))
     ws43b::fatal("FRAME_COPY_READBACK");
-  _pendingRows.copied(_backIndex);
+  renderStats.lastCopyUs = uint32_t(micros() - copyStarted);
+  renderStats.lastCopyRows = uint32_t(rows);
+  _pending.copied(_backIndex);
   if (!guardsIntact()) ws43b::fatal("CANVAS_GUARD");
   if (!lcd->switchFrameBufferTo(back)) ws43b::fatal("FRAME_SWITCH");
-  const uint32_t afterSwitch = completedFrames();
-  waitForFrameRelease(afterSwitch);
-  // Neither the new front nor the previous front is written during the wait.
+  _releaseAfter = completedFrames();
+  _releasePending = true;
+  ++renderStats.presents;
+  // The new front is never written; the previous front is written only after
+  // its release has been observed at the start of the next present.
   _backIndex ^= 1;
   _range_mod.top = _range_mod.left = INT16_MAX;
   _range_mod.right = _range_mod.bottom = 0;

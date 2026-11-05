@@ -51,6 +51,8 @@ uint32_t bounceBufferPixels() {return bouncePixels;}
 uint32_t requestedPclkHz() {return 14000000;}
 uint32_t dcacheLineBytes() {return cacheLineBytes;}
 }
+uint16_t ws43bLastFlipFrames() {return 27;}
+uint32_t ws43bLastFlipMs() {return 1000;}
 uint32_t millis() {return nowMs;}
 uint32_t uxTaskGetStackHighWaterMark(void*) {return 16384;}
 bool isWiFiConnected() {return wifi;}
@@ -95,12 +97,14 @@ JsonDocument status() {
  assert(doc["display_dcache_line_bytes"].is<uint32_t>() && doc["display_dcache_line_bytes"]==cacheLineBytes);
  assert(doc["display_frames"].is<uint32_t>() && doc["display_frames"]==renderDiag.frames);
  assert(doc["display_last_render_us"].is<uint32_t>() && doc["display_last_render_us"]==renderDiag.lastRenderUs);
+ assert(doc["display_last_copy_us"].is<uint32_t>() && doc["display_last_wait_us"].is<uint32_t>() && doc["display_last_copy_rows"].is<uint32_t>());
+ assert(doc["clock_flip_frames"]==27 && doc["clock_flip_ms"]==1000);
  assert(doc["display_max_render_us"].is<uint32_t>() && doc["display_max_render_us"]==renderDiag.maxRenderUs);
  assert(doc["display_legacy_fill_probes"].is<uint32_t>() && doc["display_legacy_fill_probes"]==renderDiag.legacyFillProbes);
  assert(doc["display_legacy_fill_mismatches"].is<uint32_t>() && doc["display_legacy_fill_mismatches"]==renderDiag.legacyFillMismatches);
  assert(doc["display_fill_readback_errors"].is<uint32_t>() && doc["display_fill_readback_errors"]==renderDiag.fillReadbackErrors);
  assert(doc["display_requested_pclk_hz"]==14000000);
- assert(doc.as<JsonObject>().size()==32);
+ assert(doc.as<JsonObject>().size()==38);
  assert(doc["loop_stack_high_water_mark"]==16384);
  for(auto key:{"ssid","password","code","token","serial","ip","mac","name","nozzle","bed","progress"})
    assert(!doc[key].is<JsonVariant>());  // never export identities or fake zero telemetry

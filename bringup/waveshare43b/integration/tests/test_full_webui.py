@@ -39,10 +39,10 @@ let fields={}, buttons=[], card=null;
 function setupWs43bDisplaySettings(){card={integrated:true};}
 function setupWs43bWeather(){}
 const document={
- getElementById(id){return fields[id] ||= {value:'test',checked:true,style:{},closest(){return {style:{}};}};},
+ getElementById(id){return fields[id] ||= {value:'test',checked:true,style:{},classList:{add(){}},closest(){return {style:{}};}};},
  querySelector(){return {after(c){card=c;}};},
  createElement(){return {};},
- querySelectorAll(){return buttons;}
+ querySelectorAll(selector){return selector==='[onclick]'?buttons:[];}
 };
 let DEV={board:'esp32s3'};
 ''' + setup + '\n' + function(js,'function toggleAfterPrint()') + r'''
@@ -54,7 +54,7 @@ assert(fields.btntype.disabled && fields.btntype.value==='3');
 assert(fields.rotation.disabled && fields.rotation.value==='0');
 assert(!fields.rotsplit.checked && fields.rotsplit.disabled);
 assert(buttons[0].disabled && !buttons[1].disabled);
-assert(!fields.nighten && !fields.pong); // Supported native scheduled off and pong remain usable.
+assert(!fields.nighten && !fields.pong); // Supported native scheduled off and pong remain usable.\nfor(const id of ['clkinfo','timem','hidelp','clr_eta','dor_lbl'])assert(fields[id] && !fields[id].disabled,id); // hidden, still submitted
 document.getElementById('afterfin').value='off';toggleAfterPrint();assert(!fields.pong.disabled);
 DEV.board='esp32s3';toggleAfterPrint();assert(fields.pong.disabled);
 '''

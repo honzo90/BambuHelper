@@ -20,6 +20,7 @@ class RepaintIntegration(unittest.TestCase):
 #include "ws43b_animation_policy.h"
 #define bit(b) (1UL << (b))
 #include "ws43b_repaint_plan.h"
+#include "ws43b_dusk_policy.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -28,7 +29,7 @@ class RepaintIntegration(unittest.TestCase):
 #include <vector>
 using ws43b_repaint::Mask;using ws43b_repaint::Region;using ws43b_repaint::regionBit;
 constexpr unsigned MAX_ACTIVE_PRINTERS=2;
-enum class Page { Dashboard,Details,Clock,Settings,ClockSettings,Gauges,Ams,WeatherSettings,Appearance,GeneralSettings,WebQr,System,FactoryReset };
+enum class Page { Dashboard,Details,Clock,Settings,ClockSettings,Gauges,Ams,WeatherSettings,Appearance,GeneralSettings,WebQr,System,FactoryReset,NightSettings,NightHourPicker,NightMinutePicker };
 Page page=Page::Dashboard;
 uint32_t currentMs=1000,lastFrame=0,nightActivity=0,language=0;
 uint32_t millis(){return currentMs;}
@@ -97,6 +98,7 @@ bool isWiFiConnected(){return wifi;}bool isAPMode(){return ap;}bool isAnyPrinter
 bool isPrinterConfigured(unsigned i){return configured&&i<MAX_ACTIVE_PRINTERS;}
 bool navigationShown(uint32_t){return navigation;}
 bool isNightModeActive(){return night;}
+bool ws43bSolarNight(bool &value){value=false;return false;}
 unsigned getScreenState(){return screen;}
 bool glowIsArmed(){return glowArmed;}
 bool glowConsumeCleanup(){const bool result=glowCleanup;glowCleanup=false;return result;}
@@ -110,6 +112,10 @@ const char *ws43bText(const char *p,const char*,const char* = nullptr){return p;
 void updateIdleView(uint32_t){}void cancelWs43bMonitorTouch(){++cancelCount;}
 bool clockValid=true;unsigned clockMinute=15;
 bool getLocalTime(tm *t,uint32_t){*t={};t->tm_year=126;t->tm_yday=100;t->tm_mday=10;t->tm_mon=3;t->tm_hour=10;t->tm_min=clockMinute;return clockValid;}
+#include "ws43b_clock_flip.h"
+ws43b_clock_flip::Flip clockFlip;char clockShown[ws43b_clock_flip::kTextMax]={};bool clockBandDirty=false;
+bool clockTimeText(char *out,size_t size,bool &pm){tm t{};const bool ok=getLocalTime(&t,0);snprintf(out,size,"%02d:%02d",t.tm_hour,t.tm_min);pm=false;return ok;}
+void clockDigitsBand(const char *s,bool,bool,uint32_t,int){tft.text.emplace_back(s);}
 bool dashboardWeatherNight(const WeatherData &){return night;}
 ws43b_live::View liveView(){
  if(page==Page::Dashboard)return ws43b_live::View::Dashboard;
@@ -142,7 +148,7 @@ void amsView(const BambuMonitorTelemetry &,bool,uint32_t,bool,Mask mask){++bodyC
 void dashboardScreen(const BambuMonitorTelemetry &,bool,uint32_t,Mask mask){++bodyCount;bodyMask=mask;}
 void detailsScreen(const BambuMonitorTelemetry &,bool,uint32_t){++detailCount;}
 void gaugesScreen(const Printer &,bool,uint32_t){++bodyCount;}
-void clockSettingsScreen(){}void weatherSettingsScreen(){}void appearanceSettingsScreen(){}
+void clockSettingsScreen(){}void weatherSettingsScreen(){}void nightSettingsScreen(){}void nightHourPickerScreen(){}void nightMinutePickerScreen(){}void appearanceSettingsScreen(){}
 void generalSettingsScreen(){}void webQrScreen(){}void systemSettingsScreen(){}
 void factoryResetScreen(uint32_t){}void settingsScreen(){}
 namespace ws43b_boot {
@@ -214,6 +220,23 @@ int main(){
  m.partFanRoundedPct=51;tick();assert(!tft.full&&detailCount==1);
  page=Page::Clock;painted=false;tick();assert(clockCount==1&&!lastClockPartial);
  tick();assert(clockCount==1&&lastClockPartial&&!probes);
+ // A new minute on a cached screensaver flips the digits with partial frames.
+ ++clockMinute;tick();assert(clockCount==1&&lastClockPartial&&!probes&&clockFlip.active&&clockBandDirty);
+ {char expected[8];snprintf(expected,sizeof expected,"10:%02u",clockMinute);assert(strcmp(clockFlip.from,clockFlip.to)&&!strcmp(clockFlip.to,expected));}
+ tick();assert(clockCount==1&&lastClockPartial&&!probes); // band frames keep coming
+ // While flipping, frames come every ~40 ms and incoming MQTT does not defer them.
+ currentMs+=45;resetOps();renderWs43bMonitor(false);assert(clockCount==1&&lastClockPartial);
+ rxPending=true;currentMs+=45;resetOps();renderWs43bMonitor(false);assert(clockCount==1&&lastClockPartial);
+ rxPending=false;
+ clockBandDirty=false;clockFlip.active=false;              // (the band draws in clockScreen)
+ // A momentarily unreadable clock never flips the digits to "--:--".
+ {char before[8];snprintf(before,sizeof before,"%s",clockShown);
+  clockValid=false;currentMs+=100;resetOps();renderWs43bMonitor(false);
+  assert(!clockFlip.active && !clockBandDirty && !strcmp(clockShown,before));
+  clockValid=true;currentMs+=100;resetOps();renderWs43bMonitor(false);
+  assert(!clockFlip.active && !strcmp(clockShown,before));}
+ currentMs+=45;resetOps();renderWs43bMonitor(false);assert(!clockCount); // normal 84 ms cadence again
+ tick();assert(!clockCount||lastClockPartial); // never a full redraw for the minute
  advancedDisplay=true;++displayModeRevision;tick();assert(clockCount==1&&!lastClockPartial);
  advancedDisplay=false;++displayModeRevision;tick();assert(clockCount==1&&!lastClockPartial);
  // First layer can arrive without a percentage/ETA or clock-minute change.

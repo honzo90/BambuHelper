@@ -38,7 +38,7 @@ writeOk=false;toggle(true);assert(!clockState.use24h && server.code==500);}
         for source in (original,localize_web.javascript(original)):
             code=function(source,'function ws43bDisplaySettingsMarkup()')+'\n'+function(source,'function setupWs43bDisplaySettings()')
             harness=r'''
-const assert=require('assert');let fields={}, requests=[], reloaded=0,failLoad=true,failSave=false,badMode=false,card=null;
+const assert=require('assert');let fields={}, requests=[], toasts=[], reloaded=0,failLoad=true,failSave=false,badMode=false,card=null;
 function element(id){return fields[id] ||= {value:'',checked:false,disabled:false,style:{},textContent:'',querySelector(){return this.button ||= {disabled:true};}};}
 const nightCard={style:{display:'none'},querySelector(){return {};}};
 const field={querySelector(){return {};}};
@@ -51,6 +51,7 @@ const document={getElementById(id){
  return element(id);
 },querySelector(){return intro;},createElement(){return {closest(){return field;}};}};
 const location={reload(){reloaded++;}};
+function showToast(message){toasts.push(message);}
 async function fetch(path,options){
  requests.push([path,options]);
  if(options.method==='POST')return {ok:!failSave,json:async()=>({status:failSave?'error':'ok',message:'save rejected'})};
@@ -64,9 +65,11 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
  assert.equal(nightCard.style.display,'');assert.equal(fields.nbright.value,'255');
  assert(card.innerHTML.includes('wsIdleForm'));assert(!card.innerHTML.includes('href="/monitor"'));
  assert(fields.wsThemeForm.button.disabled && fields.wsIdleForm.button.disabled && fields.wsDisplayModeForm.button.disabled);
+ assert.equal(fields.wsNativeStatus.textContent,'load rejected');assert.deepEqual(toasts,[]);
  let posts=()=>requests.filter(x=>x[1].method==='POST');
  await fields.wsIdleForm.onsubmit({preventDefault(){}});assert.equal(posts().length,0);
  await fields.wsDisplayModeForm.onsubmit({preventDefault(){}});assert.equal(posts().length,0);
+ assert.deepEqual(toasts,[]);
  failLoad=false;await fields.wsNativeReload.onclick();
  assert.equal(fields.wsTheme.value,'2');assert.equal(fields.wsIdle.value,'15');
  assert.equal(fields.wsIdleAction.value,'1');assert(!fields.use24h.checked && fields.fanmp.checked);
@@ -76,14 +79,21 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
  assert.equal(posts()[0][0],'/monitor/clock');
  assert.deepEqual(Object.fromEntries(new URLSearchParams(posts()[0][1].body)),{idle_minutes:'5',screen_off:'0',use24h:'1'});
  assert(!fields.wsIdleForm.button.disabled && reloaded===0);
+ assert.equal(toasts.length,1);assert(toasts[0]);assert.equal(toasts[0],fields.wsNativeStatus.textContent);
  fields.wsDisplayMode.value='simple';await fields.wsDisplayModeForm.onsubmit({preventDefault(){}});
  assert.equal(posts()[1][0],'/monitor/display-mode');
  assert.deepEqual(Object.fromEntries(new URLSearchParams(posts()[1][1].body)),{mode:'simple'});
  assert.equal(fields.wsIdle.value,'5');assert.equal(fields.wsIdleAction.value,'0');assert(fields.use24h.checked);
+ assert.equal(toasts.length,2);assert(toasts[1]);assert.equal(toasts[1],fields.wsNativeStatus.textContent);
  failSave=true;fields.wsDisplayMode.value='advanced';await fields.wsDisplayModeForm.onsubmit({preventDefault(){}});
  assert.equal(fields.wsNativeStatus.textContent,'save rejected');assert(!fields.wsDisplayModeForm.button.disabled&&reloaded===0);
+ assert.equal(toasts.length,3);assert.equal(toasts[2],'save rejected');
+ await fields.wsIdleForm.onsubmit({preventDefault(){}});
+ assert.equal(fields.wsNativeStatus.textContent,'save rejected');assert(!fields.wsIdleForm.button.disabled&&reloaded===0);
+ assert.equal(toasts.length,4);assert.equal(toasts[3],'save rejected');
  failSave=true;await fields.wsThemeForm.onsubmit({preventDefault(){}});
  assert.equal(reloaded,0);assert(!fields.wsThemeForm.button.disabled);assert.equal(fields.wsNativeStatus.textContent,'save rejected');
+ assert.equal(toasts.length,5);assert.equal(toasts[4],'save rejected');
  failSave=false;await fields.wsThemeForm.onsubmit({preventDefault(){}});
  assert.equal(reloaded,1);let last=posts().at(-1);assert.equal(last[0],'/monitor/display');
  assert.deepEqual(Object.fromEntries(new URLSearchParams(last[1].body)),{theme:'2',fan_match_printer:'1'});
@@ -91,6 +101,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
  badMode=true;await fields.wsNativeReload.onclick();const count=posts().length;
  assert(fields.wsDisplayModeForm.button.disabled);await fields.wsDisplayModeForm.onsubmit({preventDefault(){}});assert.equal(posts().length,count);
  badMode=false;await fields.wsNativeReload.onclick();assert(!fields.wsDisplayModeForm.button.disabled);
+ assert.equal(toasts.length,5);
 })().catch(e=>{console.error(e);process.exit(1);});
 '''
             with self.subTest(polish=source!=original):

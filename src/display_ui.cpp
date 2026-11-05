@@ -5366,17 +5366,16 @@ static bool isNightHour() {
   localtime_r(&t, &now);
   if (now.tm_year < (2020 - 1900)) return false;  // NTP not synced yet
 
-#if defined(BOARD_IS_WS43B)
-  bool solarNight=false;
-  if(ws43bSolarNight(solarNight))return solarNight;
-#endif
-  uint8_t h = now.tm_hour;
-  uint8_t s = dpSettings.nightStartHour;
-  uint8_t e = dpSettings.nightEndHour;
+  // WS43B: solar data no longer replaces these hours; between sunset and
+  // sunrise outside them the panel only dims (see eveningDimActive()).
+  // Minutes of the day; start/end minutes default to 0 (whole hours).
+  const uint16_t h = uint16_t(now.tm_hour) * 60 + now.tm_min;
+  const uint16_t s = uint16_t(dpSettings.nightStartHour) * 60 + dpSettings.nightStartMinute;
+  const uint16_t e = uint16_t(dpSettings.nightEndHour) * 60 + dpSettings.nightEndMinute;
 
-  if (s == e) return false;  // same hour = disabled
+  if (s == e) return false;  // same time = disabled
   if (s < e) return (h >= s && h < e);     // e.g. 01:00-07:00
-  return (h >= s || h < e);                // e.g. 22:00-07:00 (wraps midnight)
+  return (h >= s || h < e);                // e.g. 22:30-06:45 (wraps midnight)
 }
 
 // True while scheduled night dimming should be in force. Also consumed by the
