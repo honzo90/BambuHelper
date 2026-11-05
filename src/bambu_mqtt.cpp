@@ -16,6 +16,16 @@
 #if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
 #include "bambu_monitor_parser.h"
 #endif
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_connect_gate.h"
+#include "ws43b_tls_memory.h"
+#include <esp_heap_caps.h>
+bool ws43bWebActivity(uint32_t &lastMs);  // web_server.cpp
+// TLS handshake buffers of the printer connect go to PSRAM (ws43b_tls_memory).
+#define WS43B_MQTT_TLS_SCOPE() ws43b_tls::MqttConnectScope ws43bTlsScope_
+#else
+#define WS43B_MQTT_TLS_SCOPE()
+#endif
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -1803,6 +1813,7 @@ static bool connectJobBusy = false;  // main loop only
 static uint32_t connectGeneration[MAX_ACTIVE_PRINTERS]{};
 
 static void connectWorker(void*) {
+  WS43B_MQTT_TLS_SCOPE();
   auto& j = connectJob;
   auto& c = j.candidate;
   const auto& cfg = j.config;
@@ -1986,6 +1997,19 @@ static void reconnectConn(MqttConn& c) {
 
   // First attempt is immediate; subsequent attempts respect the interval
   if (c.diag.lastAttemptMs && now - c.lastReconnectAttempt < interval) return;
+#if defined(BOARD_IS_WS43B)
+  // Start the TLS handshake only when the WebUI is quiet and internal RAM is
+  // free (at most 20 s of delay); see ws43b_connect_gate.h.
+  {
+    static ws43b_gate::ConnectGate gate;
+    uint32_t lastWeb = 0;
+    const bool webSeen = ws43bWebActivity(lastWeb);
+    if (!ws43b_gate::allowConnect(gate, uint32_t(now),
+          heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+          heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+          webSeen, lastWeb)) return;
+  }
+#endif
 
   c.diag.lastAttemptMs = now;
   c.lastReconnectAttempt = now;

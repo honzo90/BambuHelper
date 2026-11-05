@@ -21,5 +21,18 @@ class WeatherScope {
  private:
   bool active_ = false;
 };
+// Same for the printer (MQTT) connect task: the TLS handshake allocates the
+// session's large record buffers, which then live in PSRAM. Measured on the
+// panel: with them in internal RAM, WebUI traffic during a live printer
+// connection left < 1 KB of internal heap.
+class MqttConnectScope {
+ public:
+  MqttConnectScope();
+  ~MqttConnectScope();
+  MqttConnectScope(const MqttConnectScope &) = delete;
+  MqttConnectScope &operator=(const MqttConnectScope &) = delete;
+ private:
+  bool active_ = false;
+};
 #endif
 }

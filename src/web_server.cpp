@@ -28,6 +28,8 @@
 #if defined(BOARD_IS_WS43B)
 #include "ws43b_weather.h"
 #include "display_ws43b.h"
+#include "ws43b_connect_gate.h"
+void ws43bNoteWebRequest();
 #include <WiFi.h>  // core 3 no longer provides WiFi through WebServer's headers
 #include <esp_system.h>
 #include <esp_heap_caps.h>
@@ -3636,9 +3638,32 @@ void initWebServer() {
 #endif
   const char* otaHeaders[] = {"X-MD5"};
   server.collectHeaders(otaHeaders, 1);
+#if defined(BOARD_IS_WS43B)
+  // Note WebUI activity for the printer connect gate, and shed requests only
+  // while a printer connect runs with critically little internal RAM.
+  server.addMiddleware([](WebServer &s, Middleware::Callback next) {
+    ws43bNoteWebRequest();
+    bool pending = false;
+    for (uint8_t slot = 0; slot < MAX_ACTIVE_PRINTERS; ++slot) pending = pending || getMqttDiag(slot).connectPending;
+    if (ws43b_gate::shedWebRequest(pending, heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                                   s.uri().startsWith("/ota/"))) {
+      s.sendHeader("Retry-After", "1");
+      s.send(503, "text/plain", "Busy connecting to the printer - retry in a moment.");
+      return true;
+    }
+    return next();
+  });
+#endif
   server.begin();
   Serial.println("Web server started on port 80");
 }
+
+#if defined(BOARD_IS_WS43B)
+static uint32_t ws43bLastWebMs = 0;
+static bool ws43bWebSeen = false;
+void ws43bNoteWebRequest() { ws43bLastWebMs = millis(); ws43bWebSeen = true; }
+bool ws43bWebActivity(uint32_t &lastMs) { lastMs = ws43bLastWebMs; return ws43bWebSeen; }
+#endif
 
 void handleWebServer() {
   server.handleClient();

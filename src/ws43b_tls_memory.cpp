@@ -12,12 +12,15 @@ extern "C" {
 namespace ws43b_tls {
 namespace {
 std::atomic<TaskHandle_t> weatherTask{nullptr};
+std::atomic<TaskHandle_t> mqttConnectTask{nullptr};
 std::atomic<bool> installed{false};
 std::atomic<uint32_t> allocations{0}, failures{0};
 
 void *taskCalloc(size_t count, size_t size) {
+  const TaskHandle_t current = xTaskGetCurrentTaskHandle();
   const TaskHandle_t selected = weatherTask.load(std::memory_order_acquire);
-  if (selected && selected == xTaskGetCurrentTaskHandle()) {
+  const TaskHandle_t mqtt = mqttConnectTask.load(std::memory_order_acquire);
+  if ((selected && selected == current) || (mqtt && mqtt == current)) {
     // The pinned IDF supports this same allocation pair in its external-RAM
     // mbedTLS profile. Do not fall back to scarce internal RAM on failure.
     void *p = heap_caps_calloc(count, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -50,6 +53,15 @@ WeatherScope::WeatherScope() {
 }
 WeatherScope::~WeatherScope() {
   if (active_) weatherTask.store(nullptr, std::memory_order_release);
+}
+MqttConnectScope::MqttConnectScope() {
+  if (!installed.load(std::memory_order_acquire)) return;
+  TaskHandle_t expected = nullptr;
+  active_ = mqttConnectTask.compare_exchange_strong(expected, xTaskGetCurrentTaskHandle(),
+                                                   std::memory_order_acq_rel);
+}
+MqttConnectScope::~MqttConnectScope() {
+  if (active_) mqttConnectTask.store(nullptr, std::memory_order_release);
 }
 }
 #endif

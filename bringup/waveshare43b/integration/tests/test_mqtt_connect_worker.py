@@ -18,6 +18,7 @@ class ConnectWorker(unittest.TestCase):
 #include <chrono>
 #include <cstdint>
 #define BOARD_MQTT_ASYNC_CONNECT 1
+#define WS43B_MQTT_TLS_SCOPE()
 #define BAMBU_MONITOR_ONLY 1
 #define BAMBU_PORT 8883
 #define BAMBU_USERNAME "bblp"
