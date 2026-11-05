@@ -25,6 +25,20 @@ Rules of thumb:
 - Fixes that help every board (e.g. shared Wi-Fi, MQTT, settings code) are candidates
   for a pull request upstream, which keeps the fork from drifting.
 
+## Branch policy
+
+- **`waveshare-43b` (default branch) always matches the latest stable release.** It
+  only receives changes through one pull request per Stable release (v4.1.0, v4.2.0, …).
+- **Betas are built only from `ws43b/layout-settings`.** Day-to-day work and upstream
+  ports land there first.
+- **Urgent fixes:** a serious bug in a stable release (e.g. restarts, failing updates)
+  gets a stable patch release (v4.1.1, …) built from the work branch and merged to the
+  default branch right away, without waiting for the next feature release.
+- The README on the default branch describes the stable release and points to the
+  Beta channel / work branch for test builds.
+- Exception in effect until v4.1.0: the default branch already carries beta.18 code
+  (merged before this policy); it is aligned again by the v4.1.0 pull request.
+
 ## Last reviewed
 
 - **2026-11-05**, upstream `main` at `35ea068` (2026-11-01).
