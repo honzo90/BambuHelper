@@ -118,20 +118,22 @@ function saveWifi(){
 }
 fetch('/wifi/diag').then(function(r){return r.json();}).then(function(d){
   if(!d||d.kind==='none')return;
-  var q='"'+d.ssid+'"',db=d.rssi?' ('+d.rssi+' dBm)':'',t,m;
+  // Whole sentences with {ssid}/{dbm}/{near} so the WebUI language catalog
+  // can translate them; values are filled in here.
   var H={
-    not_found:['Network not found','Could not find '+q+'. Check the name. BambuHelper needs a 2.4 GHz network: 5 GHz-only networks and phone hotspots without "Maximize Compatibility" are invisible to it.'],
-    name_mismatch:['Network name mismatch','Could not find '+q+', but "'+d.near+'" is nearby. Names are case-sensitive - the field below now holds the name as seen.'],
-    weak:['Signal too weak',q+' was found, but the signal is too weak'+db+' to stay connected. Move the device closer to the router or an access point.'],
-    pass_short:['Password too short','The saved password for '+q+' is shorter than 8 characters, which WPA2 does not accept. Re-enter it below.'],
-    bad_pass:['Wrong password?',q+db+' rejected the connection. The password is most likely wrong - re-enter it below.'],
-    enterprise:['Unsupported network',q+' uses WPA2-Enterprise (user name + password login), which BambuHelper does not support. Use a WPA2/WPA3 Personal network.'],
-    no_ip:['No IP address',q+db+' accepted the connection, but the router never assigned an IP address. Check its DHCP server or MAC filter.'],
-    other:['Could not connect','Could not connect to '+q+db+'.']
+    not_found:['Network not found','Could not find {ssid}. Check the name. BambuHelper needs a 2.4 GHz network: 5 GHz-only networks and phone hotspots without "Maximize Compatibility" are invisible to it.'],
+    name_mismatch:['Network name mismatch','Could not find {ssid}, but {near} is nearby. Names are case-sensitive - the field below now holds the name as seen.'],
+    weak:['Signal too weak','{ssid} was found, but the signal is too weak{dbm} to stay connected. Move the device closer to the router or an access point.'],
+    pass_short:['Password too short','The saved password for {ssid} is shorter than 8 characters, which WPA2 does not accept. Re-enter it below.'],
+    bad_pass:['Wrong password?','{ssid}{dbm} rejected the connection. The password is most likely wrong - re-enter it below.'],
+    enterprise:['Unsupported network','{ssid} uses WPA2-Enterprise (user name + password login), which BambuHelper does not support. Use a WPA2/WPA3 Personal network.'],
+    no_ip:['No IP address','{ssid}{dbm} accepted the connection, but the router never assigned an IP address. Check its DHCP server or MAC filter.'],
+    other:['Could not connect','Could not connect to {ssid}{dbm}.']
   }[d.kind];
   if(!H)return;
+  var fill=function(t){return t.split('{ssid}').join('"'+d.ssid+'"').split('{near}').join('"'+d.near+'"').split('{dbm}').join(d.rssi?' ('+d.rssi+' dBm)':'');};
   document.getElementById('failT').textContent=H[0];
-  document.getElementById('failM').textContent=H[1];
+  document.getElementById('failM').textContent=fill(H[1]);
   document.getElementById('failD').textContent='Details: '+d.kind+', reason '+d.reason+(d.rssi?', '+d.rssi+' dBm, ch '+d.ch:'');
   document.getElementById('fail').hidden=false;
   var s=document.getElementById('ssid');

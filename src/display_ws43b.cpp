@@ -1671,6 +1671,21 @@ void setupScreen(bool ap, bool wifi) {
   v2Text(ws43bText("KONFIGURACJA","SETUP","EINRICHTUNG"),602,28,174,ws43b_v2_b14,14,v2Dim());
   tft.drawFastHLine(24,62,752,ws43b_native::line);
   if(ap) {
+    // After a failed connect, say why (wifi_manager diagnoseStaFailure).
+    const WifiFailInfo &fail=getWifiFailInfo();
+    char hint[96]="";
+    switch(fail.kind) {
+      case WIFI_FAIL_NOT_FOUND: snprintf(hint,sizeof hint,"%s",ws43bText("Nie znaleziono zapisanej sieci Wi-Fi","Saved Wi-Fi network not found","Gespeichertes WLAN nicht gefunden"));break;
+      case WIFI_FAIL_NAME_MISMATCH: snprintf(hint,sizeof hint,ws43bText("Inna wielkość liter w nazwie sieci: %s","Network name differs in case: %s","Netzwerkname weicht in Groß-/Kleinschreibung ab: %s"),fail.nearName);break;
+      case WIFI_FAIL_WEAK: snprintf(hint,sizeof hint,ws43bText("Za słaby sygnał Wi-Fi (%d dBm)","Wi-Fi signal too weak (%d dBm)","WLAN-Signal zu schwach (%d dBm)"),fail.rssi);break;
+      case WIFI_FAIL_PASS_SHORT: snprintf(hint,sizeof hint,"%s",ws43bText("Zapisane hasło Wi-Fi jest za krótkie","Saved Wi-Fi password is too short","Gespeichertes WLAN-Passwort ist zu kurz"));break;
+      case WIFI_FAIL_BAD_PASS: snprintf(hint,sizeof hint,"%s",ws43bText("Prawdopodobnie błędne hasło Wi-Fi","Wi-Fi password is probably wrong","WLAN-Passwort ist wahrscheinlich falsch"));break;
+      case WIFI_FAIL_ENTERPRISE: snprintf(hint,sizeof hint,"%s",ws43bText("Sieć firmowa (Enterprise) nie jest obsługiwana","Enterprise Wi-Fi is not supported","Enterprise-WLAN wird nicht unterstützt"));break;
+      case WIFI_FAIL_NO_IP: snprintf(hint,sizeof hint,"%s",ws43bText("Router nie przydzielił adresu IP","The router assigned no IP address","Der Router hat keine IP-Adresse vergeben"));break;
+      case WIFI_FAIL_OTHER: snprintf(hint,sizeof hint,ws43bText("Nie udało się połączyć z Wi-Fi (%u)","Could not connect to Wi-Fi (%u)","WLAN-Verbindung fehlgeschlagen (%u)"),unsigned(fail.reason));break;
+      default: break;
+    }
+    if(hint[0])dashText(hint,32,76,736,18,RED);
     dashText(ws43bText("Połącz telefon z panelem","Connect your phone to the panel","Telefon mit dem Panel verbinden"),32,116,736,24,ACCENT);
     const String ssid=getAPSSID();
     // Wi-Fi QR syntax: escape reserved characters independently of text labels.

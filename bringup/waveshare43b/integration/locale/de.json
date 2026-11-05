@@ -892,5 +892,21 @@
   "Location and weather": "Standort und Wetter",
   "Solar night and wake-up": "Nacht nach Sonnenstand und Aufwecken",
   "Unsaved changes": "Ungespeicherte Änderungen",
-  "More info": "Weitere Informationen"
+  "More info": "Weitere Informationen",
+  "Network not found": "Netzwerk nicht gefunden",
+  "Could not find {ssid}. Check the name. BambuHelper needs a 2.4 GHz network: 5 GHz-only networks and phone hotspots without \"Maximize Compatibility\" are invisible to it.": "{ssid} wurde nicht gefunden. Prüfe den Namen. BambuHelper benötigt ein 2,4-GHz-Netz: reine 5-GHz-Netze und Handy-Hotspots ohne „Kompatibilität maximieren“ sind für ihn unsichtbar.",
+  "Network name mismatch": "Abweichender Netzwerkname",
+  "Could not find {ssid}, but {near} is nearby. Names are case-sensitive - the field below now holds the name as seen.": "{ssid} wurde nicht gefunden, aber {near} ist in der Nähe. Groß- und Kleinschreibung zählt – im Feld unten steht jetzt der gefundene Name.",
+  "Signal too weak": "Signal zu schwach",
+  "{ssid} was found, but the signal is too weak{dbm} to stay connected. Move the device closer to the router or an access point.": "{ssid} wurde gefunden, aber das Signal ist zu schwach{dbm}, um verbunden zu bleiben. Stelle das Gerät näher an den Router oder einen Access Point.",
+  "Password too short": "Passwort zu kurz",
+  "The saved password for {ssid} is shorter than 8 characters, which WPA2 does not accept. Re-enter it below.": "Das gespeicherte Passwort für {ssid} ist kürzer als 8 Zeichen, was WPA2 nicht akzeptiert. Gib es unten erneut ein.",
+  "Wrong password?": "Falsches Passwort?",
+  "{ssid}{dbm} rejected the connection. The password is most likely wrong - re-enter it below.": "{ssid}{dbm} hat die Verbindung abgelehnt. Das Passwort ist höchstwahrscheinlich falsch – gib es unten erneut ein.",
+  "Unsupported network": "Nicht unterstütztes Netzwerk",
+  "{ssid} uses WPA2-Enterprise (user name + password login), which BambuHelper does not support. Use a WPA2/WPA3 Personal network.": "{ssid} verwendet WPA2-Enterprise (Anmeldung mit Benutzername und Passwort), was BambuHelper nicht unterstützt. Verwende ein WPA2/WPA3-Personal-Netz.",
+  "No IP address": "Keine IP-Adresse",
+  "{ssid}{dbm} accepted the connection, but the router never assigned an IP address. Check its DHCP server or MAC filter.": "{ssid}{dbm} hat die Verbindung angenommen, aber der Router hat keine IP-Adresse vergeben. Prüfe seinen DHCP-Server oder MAC-Filter.",
+  "Could not connect": "Verbindung fehlgeschlagen",
+  "Could not connect to {ssid}{dbm}.": "Verbindung mit {ssid}{dbm} fehlgeschlagen."
 }
