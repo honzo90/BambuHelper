@@ -2,7 +2,7 @@
 
 [English](README.md) | **Polski** | [Deutsch](README.de.md)
 
-> **[▶ Instalator przez przeglądarkę (USB) — v4.1.0](https://honzo90.github.io/BambuHelper/)** (Chrome lub Edge na komputerze, pierwsza instalacja; kasuje panel) · działający panel? aktualizuj w WebUI: **Stable → Sprawdź aktualizacje**
+> **[▶ Instalator przez przeglądarkę (USB) — v4.1.0](https://honzo90.github.io/BambuHelper/?lang=pl)** (Chrome lub Edge na komputerze, pierwsza instalacja; kasuje panel) · działający panel? aktualizuj w WebUI: **Stable → Sprawdź aktualizacje**
 
 Monitor drukarek Bambu Lab dla **Waveshare ESP32-S3-Touch-LCD-4.3B**, z dotykowym ekranem RGB **800×480**. Pokazuje dane drukarki i AMS, postęp wydruku, zegar i opcjonalną pogodę. Interfejs panelu oraz konfiguracja przez przeglądarkę są dostępne po polsku, angielsku i niemiecku.
 
@@ -37,7 +37,7 @@ To fork projektu [BambuHelper autorstwa Keralots i współtwórców](https://git
 
 Instalator USB wgrywa od razu **v4.1.0**. Późniejsze aktualizacje: **Stable → Sprawdź aktualizacje** w WebUI panelu.
 
-1. Otwórz **[instalator BambuHelper](https://honzo90.github.io/BambuHelper/)** w Chrome lub Edge na komputerze. Instalacja przez USB nie działa na iPhonie.
+1. Otwórz **[instalator BambuHelper](https://honzo90.github.io/BambuHelper/?lang=pl)** w Chrome lub Edge na komputerze. Instalacja przez USB nie działa na iPhonie.
 2. Podłącz panel kablem USB obsługującym transmisję danych. Instalator jest przeznaczony wyłącznie dla **Waveshare ESP32-S3-Touch-LCD-4.3B**.
 3. Potwierdź model płytki i usunięcie ustawień. Wybierz **Przygotuj instalację**, a następnie **Połącz i zainstaluj**.
 4. Po wgraniu skonfiguruj Wi-Fi przez sieć panelu; dane połączenia pojawią się na ekranie. Następnie dodaj drukarkę w WebUI panelu.

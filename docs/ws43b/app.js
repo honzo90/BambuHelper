@@ -17,6 +17,103 @@ const EXPECTED_MANIFEST = {
   new_install_improv_wait_time: 0,
 };
 
+const STRINGS = {
+  pl: {
+    lead: "Monitor druku i suszenia AMS dla panelu Waveshare ESP32-S3-Touch-LCD-4.3B (800x480, 16MB flash).",
+    steps: "Kroki",
+    s1: "Użyj Chrome/Edge na komputerze i połączenia USB danych.",
+    s2: "Potwierdź dokładny model: Waveshare ESP32-S3-Touch-LCD-4.3B.",
+    s3: "Przygotuj instalację, następnie zainstaluj.",
+    s4: "Po instalacji skonfiguruj Wi-Fi przez sieć panelu; dane tej sieci pojawią się na LCD.",
+    s5: "Późniejsze aktualizacje wykonaj w WebUI panelu: Stable → Sprawdź aktualizacje.",
+    notice: "Pierwsza instalacja USUWA ustawienia Wi-Fi, drukarki i poprzedni firmware. Dla już działającego panelu zalecane OTA w jego WebUI.",
+    warning: "Instalator USB wymaga Chrome lub Edge na komputerze. Na iPhonie możesz przeczytać instrukcję, ale instalację wykonaj na komputerze. Po wgraniu sprawdź obraz, dotyk i połączenie Wi-Fi.",
+    confirm: "Potwierdzam dokładny model 4.3B i zgodę na usunięcie ustawień",
+    confirmHelp: "Inne modele płytek nie są obsługiwane przez ten instalator.",
+    prepare: "Przygotuj instalację",
+    source: "Kod źródłowy",
+    notes: "v4.1.0 — opis wydania",
+    issue: "Znany problem ekranu",
+    fork: "Fork projektu",
+    forkBy: "BambuHelper autorstwa Keralots",
+    stConfirm: "Potwierdź model płytki i usunięcie ustawień, aby przygotować instalację.",
+    stUnsupported: "Instalacja USB wymaga Chrome lub Edge na komputerze oraz połączenia HTTPS. Na iPhonie ta funkcja jest niedostępna.",
+    stTick: "Zaznacz potwierdzenie modelu 4.3B.",
+    stPreparing: "Przygotowanie instalacji…",
+    connect: "Połącz i zainstaluj",
+    stReady: "Plik sprawdzony. Instalator przygotowany. Kliknij Połącz i zainstaluj.",
+    stError: "Błąd przygotowania: {msg}. Można ponowić ręcznie.",
+  },
+  en: {
+    lead: "Print and AMS drying monitor for the Waveshare ESP32-S3-Touch-LCD-4.3B panel (800x480, 16MB flash).",
+    steps: "Steps",
+    s1: "Use Chrome/Edge on a computer and a USB data cable.",
+    s2: "Confirm the exact model: Waveshare ESP32-S3-Touch-LCD-4.3B.",
+    s3: "Prepare the installation, then install.",
+    s4: "After installing, set up Wi-Fi through the panel's own network; its details appear on the LCD.",
+    s5: "Later updates: panel WebUI → Stable → Check for updates.",
+    notice: "The first installation ERASES Wi-Fi and printer settings and the previous firmware. For a panel that already runs, use OTA in its WebUI.",
+    warning: "The USB installer needs Chrome or Edge on a computer. On an iPhone you can read the steps, but install from a computer. After flashing, check the picture, touch and Wi-Fi.",
+    confirm: "I confirm the exact 4.3B model and agree to erase the settings",
+    confirmHelp: "Other boards are not supported by this installer.",
+    prepare: "Prepare installation",
+    source: "Source code",
+    notes: "v4.1.0 — release notes",
+    issue: "Known display issue",
+    fork: "Fork of",
+    forkBy: "BambuHelper by Keralots",
+    stConfirm: "Confirm the board model and erasing the settings to prepare the installation.",
+    stUnsupported: "USB installation needs Chrome or Edge on a computer and an HTTPS connection. It is not available on an iPhone.",
+    stTick: "Tick the 4.3B model confirmation.",
+    stPreparing: "Preparing the installation…",
+    connect: "Connect and install",
+    stReady: "Image verified. Installer ready. Click Connect and install.",
+    stError: "Preparation failed: {msg}. You can try again.",
+  },
+  de: {
+    lead: "Druck- und AMS-Trocknungsmonitor für das Panel Waveshare ESP32-S3-Touch-LCD-4.3B (800x480, 16MB Flash).",
+    steps: "Schritte",
+    s1: "Verwende Chrome/Edge auf einem Computer und ein USB-Datenkabel.",
+    s2: "Bestätige das genaue Modell: Waveshare ESP32-S3-Touch-LCD-4.3B.",
+    s3: "Installation vorbereiten, dann installieren.",
+    s4: "Richte danach das WLAN über das Netzwerk des Panels ein; seine Daten erscheinen auf dem Display.",
+    s5: "Spätere Updates: im WebUI des Panels Stable → Nach Updates suchen.",
+    notice: "Die Erstinstallation LÖSCHT WLAN- und Druckereinstellungen sowie die bisherige Firmware. Für ein laufendes Panel das OTA-Update im WebUI verwenden.",
+    warning: "Der USB-Installer benötigt Chrome oder Edge auf einem Computer. Auf dem iPhone kannst du die Anleitung lesen, installiere aber am Computer. Prüfe danach Bild, Touch und WLAN.",
+    confirm: "Ich bestätige das genaue Modell 4.3B und das Löschen der Einstellungen",
+    confirmHelp: "Andere Platinen werden von diesem Installer nicht unterstützt.",
+    prepare: "Installation vorbereiten",
+    source: "Quellcode",
+    notes: "v4.1.0 — Versionshinweise",
+    issue: "Bekanntes Display-Problem",
+    fork: "Fork von",
+    forkBy: "BambuHelper von Keralots",
+    stConfirm: "Bestätige Platinenmodell und Löschen der Einstellungen, um die Installation vorzubereiten.",
+    stUnsupported: "Die USB-Installation benötigt Chrome oder Edge auf einem Computer und eine HTTPS-Verbindung. Auf dem iPhone nicht verfügbar.",
+    stTick: "Setze das Häkchen zur Bestätigung des Modells 4.3B.",
+    stPreparing: "Installation wird vorbereitet…",
+    connect: "Verbinden und installieren",
+    stReady: "Abbild geprüft. Installer bereit. Klicke auf Verbinden und installieren.",
+    stError: "Vorbereitung fehlgeschlagen: {msg}. Du kannst es erneut versuchen.",
+  },
+};
+const LANGS = ["pl", "en", "de"];
+export function pickLanguage(search, stored, browserLangs) {
+  const q = new URLSearchParams(search || "").get("lang");
+  if (LANGS.includes(q)) return q;
+  if (LANGS.includes(stored)) return stored;
+  for (const l of browserLangs || []) {
+    const base = String(l).slice(0, 2).toLowerCase();
+    if (LANGS.includes(base)) return base;
+  }
+  return "en";
+}
+let lang = "en";
+function t(key, vars = {}) {
+  const s = (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key] || key;
+  return s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}
+
 function fail(message) {
   throw new Error(message);
 }
@@ -145,10 +242,34 @@ function initDOM() {
   let operationCounter = 0;
   let blobUrls = [];
 
-  function setStatus(message, className = "") {
-    status.textContent = message;
+  let statusState = null;
+  function setStatus(key, className = "", vars = {}) {
+    statusState = { key, className, vars };
+    status.textContent = t(key, vars);
     status.className = `status ${className}`.trim();
   }
+
+  function applyLanguage(next) {
+    lang = next;
+    try { localStorage.setItem("ws43b_installer_lang", lang); } catch { /* ignore */ }
+    document.documentElement.lang = lang;
+    for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+    for (const el of document.querySelectorAll("[data-lang]")) el.setAttribute("aria-current", el.dataset.lang === lang ? "true" : "false");
+    for (const el of installerContainer.querySelectorAll('button[slot="activate"]')) el.textContent = t("connect");
+    if (statusState) setStatus(statusState.key, statusState.className, statusState.vars);
+  }
+
+  let stored = null;
+  try { stored = localStorage.getItem("ws43b_installer_lang"); } catch { /* ignore */ }
+  for (const el of document.querySelectorAll("[data-lang]")) {
+    el.addEventListener("click", (event) => {
+      event.preventDefault();
+      applyLanguage(el.dataset.lang);
+      const url = new URL(location.href); url.searchParams.set("lang", lang); history.replaceState(null, "", url);
+    });
+  }
+  applyLanguage(pickLanguage(location.search, stored, navigator.languages || [navigator.language]));
+  setStatus("stConfirm");
 
   function revokeBlobUrls() {
     for (const url of blobUrls) {
@@ -220,7 +341,7 @@ function initDOM() {
 
   if (!supportsInstall()) {
     checkbox.disabled = true;
-    setStatus("Instalacja USB wymaga Chrome lub Edge na komputerze oraz połączenia HTTPS. Na iPhonie ta funkcja jest niedostępna.", "error");
+    setStatus("stUnsupported", "error");
   }
 
   checkbox.addEventListener("change", () => {
@@ -229,19 +350,19 @@ function initDOM() {
     if (!checkbox.checked) {
       operationCounter += 1;
       removeInstaller();
-      setStatus("Potwierdź model płytki i usunięcie ustawień, aby przygotować instalację.");
+      setStatus("stConfirm");
     }
   });
 
   prepareButton.addEventListener("click", async () => {
     if (!checkbox.checked) {
-      setStatus("Zaznacz potwierdzenie modelu 4.3B.", "error");
+      setStatus("stTick", "error");
       return;
     }
 
     if (!supportsInstall()) {
       setStatus(
-        "Instalacja USB wymaga Chrome lub Edge na komputerze oraz połączenia HTTPS. Na iPhonie ta funkcja jest niedostępna.",
+        "stUnsupported",
         "error"
       );
       return;
@@ -252,7 +373,7 @@ function initDOM() {
 
     prepareButton.disabled = true;
     removeInstaller();
-    setStatus("Przygotowanie instalacji…");
+    setStatus("stPreparing");
 
     try {
       const info = await fetchJson("./build-info.json");
@@ -321,15 +442,15 @@ function initDOM() {
       const activateSlot = document.createElement("button");
       activateSlot.slot = "activate";
       activateSlot.type = "button";
-      activateSlot.textContent = "Połącz i zainstaluj";
+      activateSlot.textContent = t("connect");
       button.appendChild(activateSlot);
 
       installerContainer.appendChild(button);
-      setStatus("Plik sprawdzony. Instalator przygotowany. Kliknij Połącz i zainstaluj.", "ok");
+      setStatus("stReady", "ok");
     } catch (error) {
       if (operationCounter === operationId && checkbox.checked) {
         removeInstaller();
-        setStatus(`Błąd przygotowania: ${error.message}. Można ponowić ręcznie.`, "error");
+        setStatus("stError", "error", { msg: error.message });
       }
     } finally {
       if (operationCounter === operationId) {
