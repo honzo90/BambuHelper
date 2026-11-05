@@ -24,6 +24,27 @@ This fork builds on [BambuHelper by Keralots and contributors](https://github.co
 The `waveshare-43b` branch is based on upstream **v3.9.0** (`23347fbb`);
 `main` retains the upstream project history.
 
+## Beta testing: v4.1.0-beta.19
+
+> A new firmware is **in beta testing**. The stable release stays [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0). Install the beta only if you want to test the new features; full notes: [v4.1.0-beta.19](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0-beta.19).
+
+**What is new or different**
+- **Night hours with minutes** — set on the panel (hour grid, then minutes in 5-minute steps) or to any minute in the WebUI.
+- **Dusk dimming instead of an earlier night** — from sunset to the night start the panel dims to 50% after the night no-touch timeout and switches to the screensaver, also while printing. The night (screen off or clock at 30%) only runs in the set hours. *If you used "night from sunset", check your night hours after updating.*
+- **Smooth dimming**, instant full brightness on touch.
+- **Screensaver clock** flips the changed digits like a calendar page; the boot screen shows the real firmware version.
+- **Panel settings menu**: Night page, Appearance (theme, display mode, fans), "Language and WebUI" with version, IP and Wi-Fi signal, Pong toggle.
+- **WebUI**: reorganised Display section; settings the 4.3B screen never uses are hidden.
+- **Wi-Fi diagnosis** (from the original project): if the panel cannot join the saved network, the setup screen and setup page explain why (not found, name case, weak signal, wrong password, enterprise network, no IP).
+
+**What is fixed or improved**
+- Faster screen updates (saver frame ~34–66 ms instead of ~168 ms, clock animation ~14 fps instead of ~4).
+- Firmware 182 KB smaller (compressed WebUI pages).
+- Much more free internal memory: printer TLS buffers moved to PSRAM — after an update the panel keeps ~46–62 KB free instead of ~3 KB, even while the browser reloads the WebUI.
+- The screensaver clock no longer flashes "--:--".
+
+**Install:** WebUI → **Beta → Check for updates**. **Back to stable:** upload the [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0) OTA file under manual update. Known open items: occasional display artifacts during long prints (under investigation) and touch wake ([#1](https://github.com/honzo90/BambuHelper/issues/1)).
+
 ## Layout examples
 
 These **800×480 host-rendered previews** use the published Waveshare display

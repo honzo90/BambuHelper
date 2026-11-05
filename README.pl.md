@@ -10,6 +10,27 @@ To fork projektu [BambuHelper autorstwa Keralots i współtwórców](https://git
 
 **Potwierdzenie z urządzenia:** właściciel projektu potwierdził działanie Bety 5 i stabilny obraz na fizycznym ekranie. v4.0.0 to ponowna kompilacja tego samego kodu ze zmienionym wyłącznie numerem firmware; obrazu z nowym numerem nie testowano osobno na sprzęcie. Długotrwała praca i odzyskiwanie po zakłóceniach wymagają dalszego sprawdzenia. Wcześniejszy [problem ciemnego ekranu i braku wybudzania dotykiem](https://github.com/honzo90/BambuHelper/issues/1) pozostaje otwarty do obserwacji.
 
+## Wersja testowa: v4.1.0-beta.19
+
+> Nowy firmware jest **w testach beta**. Wersją stabilną pozostaje [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0). Instaluj betę tylko, jeśli chcesz testować nowości; pełny opis: [v4.1.0-beta.19](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0-beta.19).
+
+**Co jest nowe lub inaczej**
+- **Godziny nocy z minutami** — na panelu (siatka godzin, potem minuty co 5 min) albo dowolna minuta w WebUI.
+- **Przyciemnianie o zmroku zamiast wcześniejszej nocy** — od zachodu słońca do początku nocy panel po nocnym czasie bez dotyku przygasa do 50% i przechodzi do wygaszacza, także podczas druku. Noc (wyłączony ekran albo zegar 30%) działa tylko w ustawionych godzinach. *Jeśli korzystałeś z „nocy od zachodu słońca”, sprawdź po aktualizacji godziny nocy.*
+- **Płynne przygaszanie**, natychmiastowa pełna jasność po dotyku.
+- **Zegar w wygaszaczu** zmienia cyfry jak kartka kalendarza; ekran startowy pokazuje prawdziwą wersję firmware.
+- **Menu ustawień na panelu**: ekran Noc, Wygląd (motyw, tryb ekranu, wentylatory), „Język i WebUI” z wersją, adresem IP i sygnałem Wi-Fi, przełącznik Pong.
+- **WebUI**: nowy układ sekcji „Ekran”; ukryte ustawienia, których ekran 4.3B nie używa.
+- **Diagnoza Wi-Fi** (z oryginalnego projektu): gdy panel nie połączy się z zapisaną siecią, ekran i strona konfiguracji wyjaśniają dlaczego (brak sieci, wielkość liter w nazwie, słaby sygnał, błędne hasło, sieć firmowa, brak adresu IP).
+
+**Co jest poprawione**
+- Szybsze odświeżanie ekranu (klatka wygaszacza ok. 34–66 ms zamiast ok. 168 ms, animacja zegara ok. 14 klatek/s zamiast ok. 4).
+- Firmware mniejszy o 182 KB (skompresowane strony WebUI).
+- Znacznie więcej wolnej pamięci wewnętrznej: bufory szyfrowanego połączenia z drukarką w PSRAM — po aktualizacji zostaje ok. 46–62 KB zapasu zamiast ok. 3 KB, nawet gdy przeglądarka przeładowuje WebUI.
+- Zegar w wygaszaczu nie pokazuje już na chwilę „--:--”.
+
+**Instalacja:** WebUI → **Beta → Sprawdź aktualizacje**. **Powrót do stabilnej:** prześlij plik OTA z [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0) w aktualizacji ręcznej. Otwarte sprawy: sporadyczne artefakty obrazu podczas długiego druku (w trakcie analizy) i wybudzanie dotykiem ([#1](https://github.com/honzo90/BambuHelper/issues/1)).
+
 ## Instalacja i aktualizacje
 
 ### Pierwsza instalacja przez USB
