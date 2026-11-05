@@ -6,6 +6,27 @@ Ein Monitor für Bambu-Lab-Drucker auf dem **Waveshare ESP32-S3-Touch-LCD-4.3B**
 
 **Aktuelle stabile Version: [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0).** Sie enthält die mit Beta 5 eingeführte Korrektur für Bildartefakte beim Speichern von Einstellungen, etwa für Wetter und Nachtmodus. Das Release verwendet ein neu gebautes SDK mit XIP aus dem PSRAM und einen angeforderten RGB-Pixeltakt von **12 MHz**. Die Funktionen von Beta 5 und die Oberflächen auf **DE / PL / EN** bleiben erhalten. Auf dem Startbildschirm steht weiterhin v0.9; die Firmware-Version in den Geräteinformationen ist **v4.0.0**.
 
+## Testversion: v4.1.0-beta.19
+
+> Eine neue Firmware ist **in der Beta-Testphase**. Die stabile Version bleibt [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0). Installiere die Beta nur, wenn du die Neuerungen testen möchtest; vollständige Hinweise: [v4.1.0-beta.19](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0-beta.19).
+
+**Was neu oder anders ist**
+- **Nachtzeiten mit Minuten** — am Panel (Stundenraster, dann Minuten in 5-Minuten-Schritten) oder jede beliebige Minute in der WebUI.
+- **Abdunkeln in der Dämmerung statt früherer Nacht** — von Sonnenuntergang bis Nachtbeginn dunkelt das Panel nach der nächtlichen Inaktivitätszeit auf 50% ab und wechselt in den Bildschirmschoner, auch während des Drucks. Die Nacht (Bildschirm aus oder Uhr mit 30%) gilt nur in den eingestellten Zeiten. *Wenn du „Nacht ab Sonnenuntergang“ genutzt hast, prüfe nach dem Update die Nachtzeiten.*
+- **Sanftes Abdunkeln**, volle Helligkeit sofort bei Berührung.
+- **Uhr im Bildschirmschoner** blättert die geänderten Ziffern wie ein Kalenderblatt um; der Startbildschirm zeigt die echte Firmware-Version.
+- **Einstellungsmenü am Panel**: Seite Nacht, Darstellung (Design, Anzeigemodus, Lüfter), „Sprache und WebUI“ mit Version, IP-Adresse und WLAN-Signal, Pong-Schalter.
+- **WebUI**: neu geordneter Bereich „Anzeige“; Einstellungen, die der 4.3B-Bildschirm nicht nutzt, sind ausgeblendet.
+- **WLAN-Diagnose** (aus dem Originalprojekt): Wenn das Panel das gespeicherte Netz nicht erreicht, erklären Einrichtungsbildschirm und -seite den Grund (nicht gefunden, Groß-/Kleinschreibung, schwaches Signal, falsches Passwort, Enterprise-Netz, keine IP-Adresse).
+
+**Was behoben oder verbessert ist**
+- Schnellere Bildschirmaktualisierung (Bildschirmschoner-Frame ca. 34–66 ms statt ca. 168 ms, Uhr-Animation ca. 14 statt ca. 4 Bilder/s).
+- Firmware 182 KB kleiner (komprimierte WebUI-Seiten).
+- Deutlich mehr freier interner Speicher: Puffer der verschlüsselten Druckerverbindung im PSRAM — nach einem Update bleiben ca. 46–62 KB frei statt ca. 3 KB, auch wenn der Browser die WebUI neu lädt.
+- Die Uhr im Bildschirmschoner zeigt nicht mehr kurz „--:--“.
+
+**Installation:** WebUI → **Beta → Nach Updates suchen**. **Zurück zur stabilen Version:** die OTA-Datei von [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0) im manuellen Update hochladen. Offene Punkte: gelegentliche Bildartefakte bei langen Drucken (in Analyse) und Aufwecken per Berührung ([#1](https://github.com/honzo90/BambuHelper/issues/1)).
+
 ## Funktionen
 
 | Bereich | Funktionsumfang für Waveshare 4.3B |
