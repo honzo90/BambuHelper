@@ -15,11 +15,16 @@
 #include <ArduinoJson.h>
 #if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
 #include "bambu_monitor_parser.h"
+#endif
 #if defined(BOARD_IS_WS43B)
 #include "ws43b_connect_gate.h"
+#include "ws43b_tls_memory.h"
 #include <esp_heap_caps.h>
 bool ws43bWebActivity(uint32_t &lastMs);  // web_server.cpp
-#endif
+// TLS handshake buffers of the printer connect go to PSRAM (ws43b_tls_memory).
+#define WS43B_MQTT_TLS_SCOPE() ws43b_tls::MqttConnectScope ws43bTlsScope_
+#else
+#define WS43B_MQTT_TLS_SCOPE()
 #endif
 #include <PubSubClient.h>
 #include <WiFi.h>
@@ -1808,6 +1813,7 @@ static bool connectJobBusy = false;  // main loop only
 static uint32_t connectGeneration[MAX_ACTIVE_PRINTERS]{};
 
 static void connectWorker(void*) {
+  WS43B_MQTT_TLS_SCOPE();
   auto& j = connectJob;
   auto& c = j.candidate;
   const auto& cfg = j.config;
