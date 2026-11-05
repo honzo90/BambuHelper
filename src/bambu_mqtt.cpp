@@ -15,6 +15,11 @@
 #include <ArduinoJson.h>
 #if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
 #include "bambu_monitor_parser.h"
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_connect_gate.h"
+#include <esp_heap_caps.h>
+bool ws43bWebActivity(uint32_t &lastMs);  // web_server.cpp
+#endif
 #endif
 #include <PubSubClient.h>
 #include <WiFi.h>
@@ -1986,6 +1991,19 @@ static void reconnectConn(MqttConn& c) {
 
   // First attempt is immediate; subsequent attempts respect the interval
   if (c.diag.lastAttemptMs && now - c.lastReconnectAttempt < interval) return;
+#if defined(BOARD_IS_WS43B)
+  // Start the TLS handshake only when the WebUI is quiet and internal RAM is
+  // free (at most 20 s of delay); see ws43b_connect_gate.h.
+  {
+    static ws43b_gate::ConnectGate gate;
+    uint32_t lastWeb = 0;
+    const bool webSeen = ws43bWebActivity(lastWeb);
+    if (!ws43b_gate::allowConnect(gate, uint32_t(now),
+          heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+          heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+          webSeen, lastWeb)) return;
+  }
+#endif
 
   c.diag.lastAttemptMs = now;
   c.lastReconnectAttempt = now;
