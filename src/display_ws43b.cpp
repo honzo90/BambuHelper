@@ -28,6 +28,8 @@
 #include "ws43b_boot_scene.h"
 #include "ws43b_dusk_policy.h"
 #include "ws43b_clock_flip.h"
+#include <new>
+#include <esp_heap_caps.h>
 #include "ws43b_drying_scene.h"
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
@@ -1357,7 +1359,9 @@ bool clockTimeText(char *out, size_t size, bool &pm) {
 // Pre-rendered digits of a running flip: drawn once, then only copied per
 // frame. Antialiased text straight onto the PSRAM canvas costs ~200 ms per
 // frame; a sprite copy of a digit cell takes a few milliseconds.
-lgfx::LGFX_Sprite flipGlyph[2][ws43b_clock_flip::kTextMax];  // [0] old, [1] new
+// Sprite objects live in PSRAM and only during a flip: as globals they kept
+// ~5.5 KB of internal RAM busy, which the TLS handshake needs at boot.
+lgfx::LGFX_Sprite *flipGlyph[2][ws43b_clock_flip::kTextMax] = {};  // [0] old, [1] new
 int flipCellX[ws43b_clock_flip::kTextMax]={},flipCellW[ws43b_clock_flip::kTextMax]={};
 bool flipGlyphsReady=false;
 // Last finished flip: frames drawn and wall time, for /monitor/status.
@@ -1367,7 +1371,10 @@ uint16_t ws43bLastFlipFrames(){return lastFlipFrames;}
 uint32_t ws43bLastFlipMs(){return lastFlipMs;}
 namespace {
 void releaseFlipGlyphs() {
-  for(auto &row:flipGlyph)for(auto &sprite:row)sprite.deleteSprite();
+  for(auto &row:flipGlyph)for(auto *&sprite:row) {
+    if(!sprite)continue;
+    sprite->deleteSprite();sprite->~LGFX_Sprite();heap_caps_free(sprite);sprite=nullptr;
+  }
   flipGlyphsReady=false;
 }
 bool prepareFlipGlyphs(uint16_t bg,uint16_t white) {
@@ -1385,7 +1392,9 @@ bool prepareFlipGlyphs(uint16_t bg,uint16_t white) {
   for(size_t i=0;i<len;++i) {
     if(!changed(clockFlip,i))continue;
     for(int k=0;k<2;++k) {
-      auto &sprite=flipGlyph[k][i];
+      void *memory=heap_caps_malloc(sizeof(lgfx::LGFX_Sprite),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+      if(!memory){releaseFlipGlyphs();return false;}
+      auto &sprite=*(flipGlyph[k][i]=new(memory) lgfx::LGFX_Sprite(&tft));
       sprite.setColorDepth(16);sprite.setPsram(true);
       if(!sprite.createSprite(flipCellW[i],142)){releaseFlipGlyphs();return false;}
       sprite.fillSprite(bg);
@@ -1411,8 +1420,8 @@ void clockDigitsBand(const char *text, bool ampm, bool pm, uint32_t now, uint16_
       if(!changed(clockFlip,i))continue;
       tft.setClipRect(flipCellX[i],62,flipCellW[i],142);
       tft.fillRect(flipCellX[i],62,flipCellW[i],142,bg);
-      flipGlyph[0][i].pushSprite(&tft,flipCellX[i],62+oldOffset(p));
-      flipGlyph[1][i].pushSprite(&tft,flipCellX[i],62+newOffset(p));
+      flipGlyph[0][i]->pushSprite(&tft,flipCellX[i],62+oldOffset(p));
+      flipGlyph[1][i]->pushSprite(&tft,flipCellX[i],62+newOffset(p));
     }
     tft.clearClipRect();
     clockBandDirty=true;
