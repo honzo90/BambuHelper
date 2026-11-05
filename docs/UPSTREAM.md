@@ -36,8 +36,6 @@ Rules of thumb:
   default branch right away, without waiting for the next feature release.
 - The README on the default branch describes the stable release and points to the
   Beta channel / work branch for test builds.
-- Exception in effect until v4.1.0: the default branch already carries beta.18 code
-  (merged before this policy); it is aligned again by the v4.1.0 pull request.
 
 ## Last reviewed
 
