@@ -57,9 +57,19 @@ The resulting firmware uses `BAMBU_MONITOR_ONLY=0` and includes normal printer
 controls; it is not a passive monitor build. Generated output stays ignored.
 For first installation, use the [WS43B browser USB installer](https://honzo90.github.io/BambuHelper/)
 with the exact ESP32-S3-Touch-LCD-4.3B board. Factory installation erases flash
-and saved settings; the browser USB workflow still needs physical acceptance.
-For an existing installation, prefer the panel WebUI OTA flow described in
-[README](README.md#building-and-validation) and [OTA channel notes](docs/WS43B_OTA_CHANNEL.md).
+and saved settings; a complete first installation of v4.1.0 was confirmed on a
+4.3B board. For an existing installation, prefer the panel WebUI OTA flow
+([OTA channel notes](docs/WS43B_OTA_CHANNEL.md)).
+
+## Release builds
+
+Releases use **Arduino ESP32 3.3.11**, **ESP-IDF 5.5.5**, the rebuilt
+**cache64_xip** SDK and a **12 MHz** requested RGB PCLK. Each release's
+`BUILD-INFO.json` records the exact source commit, SDK provenance, configuration
+and validation results. Reproduction requires the separately prepared XIP SDK,
+its matching manifest and SHA-256, `WS43B_SDK_PROFILE=cache64_xip` and
+`WS43B_RGB_PCLK_HZ=12000000`; the default cache64 build does not reproduce a
+release. The build fails if a local filesystem path would end up in the image.
 
 ## Host tests
 
