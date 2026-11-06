@@ -62,7 +62,7 @@ Done. Later versions install from the panel WebUI: **Stable → Check for update
 
 ## Known issues
 
-- Occasional picture glitches during long prints — a fix is in testing.
+- Occasional picture glitches during long prints — a fix is in testing in [v4.1.1-beta.1](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.1-beta.1) (panel WebUI: **Beta → Check for updates**).
 - [Black screen that does not wake on touch (#1)](https://github.com/honzo90/BambuHelper/issues/1) — seen rarely.
 
 Something not working? [Open an issue](https://github.com/honzo90/BambuHelper/issues).

@@ -62,7 +62,7 @@ Gotowe. Kolejne wersje instalujesz w WebUI panelu: **Stable → Sprawdź aktuali
 
 ## Znane problemy
 
-- Sporadyczne zakłócenia obrazu podczas długich wydruków — poprawka jest w testach.
+- Sporadyczne zakłócenia obrazu podczas długich wydruków — poprawka jest w testach w [v4.1.1-beta.1](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.1-beta.1) (WebUI panelu: **Beta → Sprawdź aktualizacje**).
 - [Czarny ekran i brak wybudzenia dotykiem (#1)](https://github.com/honzo90/BambuHelper/issues/1) — obserwowane rzadko.
 
 Coś nie działa? [Zgłoś problem](https://github.com/honzo90/BambuHelper/issues).

@@ -62,7 +62,7 @@ Fertig. Spätere Versionen installierst du im WebUI des Panels: **Stable → Nac
 
 ## Bekannte Probleme
 
-- Gelegentliche Bildstörungen bei langen Drucken — eine Korrektur ist im Test.
+- Gelegentliche Bildstörungen bei langen Drucken — eine Korrektur ist in [v4.1.1-beta.1](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.1-beta.1) im Test (WebUI des Panels: **Beta → Nach Updates suchen**).
 - [Schwarzer Bildschirm, der nicht per Berührung aufwacht (#1)](https://github.com/honzo90/BambuHelper/issues/1) — selten beobachtet.
 
 Etwas funktioniert nicht? [Problem melden](https://github.com/honzo90/BambuHelper/issues).
