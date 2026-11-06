@@ -300,6 +300,7 @@ def main():
     record['private_sdk'] = ({'profile': sdk_profile, 'sdk_path': sdk_record['sdk_path'],
                               'manifest_sha256': sdk_manifest_hash, 'inputs_unchanged': sdk_unchanged,
                               'link_check': sdk_link_check,
+                              'rgb_isr_iram_safe': bool(sdk_record.get('rgb_isr_iram_safe', False)),
                               'verification': sdk_record.get('verification')} if sdk_record else None)
     if result.returncode == 0 and unchanged and sdk_unchanged and i2c_check['passed'] and (not sdk_link_check or sdk_link_check['passed']):
         for name in ['BambuHelper43B.ino.bin', 'BambuHelper43B.ino.bootloader.bin', 'BambuHelper43B.ino.partitions.bin', 'boot_app0.bin']:
