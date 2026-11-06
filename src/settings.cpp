@@ -1,4 +1,7 @@
 #include "settings.h"
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_ota_status.h"
+#endif
 #include "config.h"
 #include "button.h"
 #include "buzzer.h"
@@ -1402,6 +1405,9 @@ void resetSettings() {
   prefs.begin(NVS_NAMESPACE, false);
   prefs.clear();
   prefs.end();
+#if defined(BOARD_IS_WS43B)
+  ws43b_ota_status::confirmBeforeRestart();  // a factory reset must not roll back the firmware
+#endif
   ESP.restart();
 }
 

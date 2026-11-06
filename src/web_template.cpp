@@ -26,6 +26,9 @@
 #include "led.h"
 #include "timezones.h"
 #include "esp_ota_ops.h"   // OTASLOT token: next update partition size
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_ota_status.h"  // OTAFAILED token
+#endif
 #include "tasmota.h"
 #include <Arduino.h>
 
@@ -640,6 +643,15 @@ static bool resolvePlaceholder(const char* name, String& out) {
   if (strcmp(name, "OTASLOT") == 0) {
     const esp_partition_t* p = esp_ota_get_next_update_partition(NULL);
     out = String(p ? p->size : 0);
+    return true;
+  }
+  // Version that failed to boot on this panel; the update check skips it.
+  if (strcmp(name, "OTAFAILED") == 0) {
+#if defined(BOARD_IS_WS43B)
+    out = ws43b_ota_status::failedVersion();
+#else
+    out = "";
+#endif
     return true;
   }
   if (strcmp(name, "FLASHMB") == 0)      { out = String(ESP.getFlashChipSize() >> 20); return true; }

@@ -29,6 +29,10 @@
 #include "ws43b_weather.h"
 #include "display_ws43b.h"
 #include "ws43b_connect_gate.h"
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_ota_health.h"
+#include "ws43b_ota_status.h"
+#endif
 void ws43bNoteWebRequest();
 #include <WiFi.h>  // core 3 no longer provides WiFi through WebServer's headers
 #include <esp_system.h>
@@ -3243,6 +3247,14 @@ static void handleOtaAuto() {
     server.send(400, "application/json", "{\"error\":\"Missing or invalid url\"}");
     return;
   }
+#if defined(BOARD_IS_WS43B)
+  // Never offer the version that already failed to boot here; a deliberate
+  // retry stays possible through the manual file upload.
+  if (ws43b_ota_health::urlIsFailedVersion(url.c_str(), ws43b_ota_status::failedVersion())) {
+    server.send(409, "application/json", "{\"error\":\"This version failed to start on this panel and was rolled back\"}");
+    return;
+  }
+#endif
 
 #if defined(BOARD_IS_WS43B)
   if(!ws43b::beginOtaDisplay()) {
@@ -3454,6 +3466,11 @@ static void handleOtaSlots() {
   doc["can"] = other != nullptr;
   if (other) { if (fw.length() > 0) doc["fw"] = fw; }
   else doc["reason"] = reason;
+#if defined(BOARD_IS_WS43B)
+  if (ws43b_ota_status::failedVersion()[0]) doc["failed"] = ws43b_ota_status::failedVersion();
+  doc["rolled_back"] = ws43b_ota_status::rolledBack();
+  doc["pending_confirm"] = ws43b_ota_status::pendingConfirm();
+#endif
   String json;
   serializeJson(doc, json);
   server.send(200, "application/json", json);
@@ -3709,6 +3726,9 @@ void handleWebServer() {
 
   if (pendingRestartAt && millis() >= pendingRestartAt) {
     Serial.println("Deferred restart triggered");
+#if defined(BOARD_IS_WS43B)
+    ws43b_ota_status::confirmBeforeRestart();  // a restart the user asked for must not roll back
+#endif
     ESP.restart();
   }
 }

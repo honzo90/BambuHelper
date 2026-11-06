@@ -2160,6 +2160,11 @@ function checkWs43bUpdates(){
         res.textContent = 'No newer compatible update (' + current + ')';
         return;
       }
+      if (DEV.otaFailed && picked.release.tag_name === DEV.otaFailed){
+        res.style.color = 'var(--warn)';
+        res.textContent = 'This version failed to start on this panel and was rolled back. Use the manual upload only if you want to try it again.';
+        return;
+      }
       res.style.color = 'var(--warn)'; res.textContent = 'Update available!';
       document.getElementById('updateVer').textContent = picked.release.tag_name;
       document.getElementById('updateDate').textContent = new Date(picked.release.published_at).toLocaleDateString();

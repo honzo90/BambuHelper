@@ -908,5 +908,6 @@
   "No IP address": "Brak adresu IP",
   "{ssid}{dbm} accepted the connection, but the router never assigned an IP address. Check its DHCP server or MAC filter.": "Sieć {ssid}{dbm} przyjęła połączenie, ale router nie przydzielił adresu IP. Sprawdź jego serwer DHCP lub filtr adresów MAC.",
   "Could not connect": "Nie udało się połączyć",
-  "Could not connect to {ssid}{dbm}.": "Nie udało się połączyć z siecią {ssid}{dbm}."
+  "Could not connect to {ssid}{dbm}.": "Nie udało się połączyć z siecią {ssid}{dbm}.",
+  "This version failed to start on this panel and was rolled back. Use the manual upload only if you want to try it again.": "Ta wersja nie uruchomiła się na tym panelu i została cofnięta. Wgraj ją ręcznie tylko wtedy, gdy chcesz spróbować ponownie."
 }

@@ -37,6 +37,7 @@
 #include "ws43b_idle_policy.h"
 #include "ws43b_water_clock.h"
 #include "ws43b_dashboard_policy.h"
+#include "ws43b_ota_status.h"
 #include <WiFi.h>
 #include <stdio.h>
 #include <time.h>
@@ -952,6 +953,23 @@ void settingRow(const char *title,const char *value,int y,bool selected=false) {
   dashText(value,398,y+13,312,18,selected?ACCENT:DIM);
   tft.drawLine(727,y+18,733,y+24,DIM);tft.drawLine(733,y+24,727,y+30,DIM);
 }
+// Panel health worth a glance: an update that did not start, or a reset
+// caused by a weak supply. Long form for the info page, short for the tile.
+const char *panelHealthNotice(bool shortForm) {
+  static char buf[112];
+  if (ws43b_ota_status::rolledBack()) {
+    if (shortForm) return ws43bText("Aktualizacja cofnięta – zobacz","Update rolled back – see details","Update zurückgesetzt – Details");
+    const char *ver = ws43b_ota_status::failedVersion();
+    if (!ver[0]) return ws43bText("Aktualizacja nie uruchomiła się – działa poprzednia wersja","An update failed to start – the previous version is running","Ein Update startete nicht – die vorherige Version läuft");
+    snprintf(buf, sizeof(buf), ws43bText("Aktualizacja %s nie uruchomiła się – działa poprzednia wersja","Update %s failed to start – the previous version is running","Update %s startete nicht – die vorherige Version läuft"), ver);
+    return buf;
+  }
+  if (ws43b_ota_status::brownoutReset()) {
+    return shortForm ? ws43bText("Za słabe zasilanie – zobacz","Weak power supply – see details","Schwache Versorgung – Details")
+                     : ws43bText("Ostatni restart: za słabe zasilanie – sprawdź zasilacz i kabel USB","Last restart: power too weak – check the USB supply and cable","Letzter Neustart: Versorgung zu schwach – Netzteil und USB-Kabel prüfen");
+  }
+  return nullptr;
+}
 void settingsScreen() {
   dashText(ws43bText("Ustawienia", "Settings","Einstellungen"),44,91,520,24,INK);
   const bool holding=touchHeld&&!touchMoved&&systemTouchArea(pressX,pressY);
@@ -967,7 +985,8 @@ void settingsScreen() {
     const UiAsset icons[]={UiAsset::Settings,UiAsset::Clock,UiAsset::Weather,UiAsset::Network};
     panelIcon(icons[i],x+34,y+33,CARD,36);
     dashText(titles[i],x+62,y+20,290,24,INK);
-    dashText(hints[i],x+20,y+65,326,14,DIM);
+    const char *health=i==3?panelHealthNotice(true):nullptr;
+    dashText(health?health:hints[i],x+20,y+65,326,14,health?WARN:DIM);
   }
 }
 void systemSettingsScreen() {
@@ -1031,6 +1050,7 @@ void generalSettingsScreen() {
     snprintf(info,sizeof(info),"%s  ·  %s  ·  Wi-Fi %d dBm",FW_VERSION,WiFi.localIP().toString().c_str(),int(WiFi.RSSI()));
   else snprintf(info,sizeof(info),"%s  ·  %s",FW_VERSION,ws43bText("Brak Wi-Fi","No Wi-Fi","Kein WLAN"));
   dashText(info,44,340,708,18,INK);
+  if(const char *health=panelHealthNotice(false))dashText(health,44,364,708,14,WARN);
   small(settingsNotice,44,382,710);
 }
 void connectedWifiName(int x,int y,int w) {

@@ -1548,7 +1548,7 @@ R"rawliteral(
 <div class="scrim" id="scrim"></div>
 <div class="toast" id="toast" role="status" aria-live="polite">Saved!</div>
 
-<script>var DEV={board:'%BOARD%',fw:'%FW_VER%',flashMb:'%FLASHMB%',otaSlot:'%OTASLOT%',round:'%ISROUND%',fixedAudio:'%FIXED_AUDIO%',hmsFull:'%HMSFULL%',boardBtn:'%BOARDBTN%'};</script>
+<script>var DEV={board:'%BOARD%',fw:'%FW_VER%',flashMb:'%FLASHMB%',otaSlot:'%OTASLOT%',otaFailed:'%OTAFAILED%',round:'%ISROUND%',fixedAudio:'%FIXED_AUDIO%',hmsFull:'%HMSFULL%',boardBtn:'%BOARDBTN%'};</script>
 <script src="/app.js?v=%JSVER%"></script>
 </body>
 </html>

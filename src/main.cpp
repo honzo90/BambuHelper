@@ -1,4 +1,7 @@
 #include "ws43b_memory_diag.h"
+#if defined(BOARD_IS_WS43B)
+#include "ws43b_ota_status.h"
+#endif
 #include <Arduino.h>
 #include "display_ui.h"
 #include "thumb_fetch.h"
@@ -1647,6 +1650,9 @@ void setup() {
   for (uint8_t i = 0; i < TASMOTA_PLUG_COUNT; ++i) tasmotaSettings[i].enabled = false;
 #endif
   recordBootSlotVersion();  // names this slot's fw for the OTA rollback UI
+#if defined(BOARD_IS_WS43B)
+  ws43b_ota_status::begin();  // probation of a new image, failed version, brownout
+#endif
   { ws43b_memory::Scope memory(ws43b_memory::Stage::DisplayInit); initDisplay(); }
 #if !BAMBU_MONITOR_ONLY
   Battery::begin();
@@ -1664,6 +1670,7 @@ void loop() {
 
   { ws43b_memory::Scope memory(ws43b_memory::Stage::Wifi); handleWiFi(); }
 #if defined(BOARD_IS_WS43B)
+  ws43b_ota_status::tick();  // confirm a freshly installed image once it runs healthily
   // Touch first, then live telemetry before weather, UI decisions and drawing.
   // This board reconnects asynchronously; other boards keep their old order.
   handleWakeButton();
