@@ -2,117 +2,83 @@
 
 [English](README.md) | [Polski](README.pl.md) | **Deutsch**
 
-> **[▶ Im Browser über USB installieren — v4.1.0](https://honzo90.github.io/BambuHelper/?lang=de)** (Chrome oder Edge am Computer, Erstinstallation; löscht das Panel) · Panel läuft schon? Update im WebUI: **Stable → Nach Updates suchen**
+**Ein 4,3″-Touchpanel, das neben deinem Bambu-Lab-Drucker steht und alles Wichtige zeigt — Druckfortschritt, AMS und Temperaturen — ohne zum Handy zu greifen.**
 
-Ein Monitor für Bambu-Lab-Drucker auf dem **Waveshare ESP32-S3-Touch-LCD-4.3B** mit kapazitivem **800×480-RGB-Touchscreen**. BambuHelper zeigt Druckfortschritt, Temperaturen und AMS-Daten sowie eine Uhr und auf Wunsch das Wetter. Die Bedienung am Panel und die Konfiguration im Browser sind auf **Deutsch, Polnisch und Englisch** verfügbar.
+![BambuHelper auf dem Waveshare 4.3B: Druckfortschritt, Temperaturen und AMS](img/waveshare-43b/print.png)
 
-**Aktuelle stabile Version: [v4.1.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0).** Sie bringt Nachtzeiten mit Minuten, Abdunkeln in der Dämmerung mit Bildschirmschoner, eine Uhr im Kalenderblatt-Stil, ein überarbeitetes Einstellungsmenü am Panel, eine aufgeräumte WebUI, WLAN-Diagnose, schnellere Bildschirmaktualisierung, eine um 182 KB kleinere Firmware und deutlich mehr freien internen Speicher — Details unter [Neu in v4.1.0](#neu-in-v410). Das Release behält das SDK mit XIP aus dem PSRAM, den angeforderten RGB-Pixeltakt von **12 MHz** und die Oberflächen auf **DE / PL / EN**.
+<p align="center">
+  <a href="https://honzo90.github.io/BambuHelper/?lang=de"><b>▶ Im Browser installieren</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0">v4.1.0 herunterladen</a>
+  &nbsp;·&nbsp;
+  <a href="#neu-in-v410">Neuigkeiten</a>
+</p>
+
+## Was es kann
+
+- **Druckfortschritt auf einen Blick** — Prozent, Restzeit und Endzeit, Modellname.
+- **Vollständige AMS-Ansicht** — Farbe und Material in jedem Slot, aktive Spule, Feuchtigkeit und Trocknung.
+- **Temperaturen und Lüfter** — Düse, Bett und Kammer mit Zielwerten.
+- **Uhr und Wetter** — ohne Berührung wird das Panel zur Uhr mit Druck- und Trocknungsfortschritt; die Ziffern blättern wie ein Kalender.
+- **Rücksichtsvoll bei Nacht** — dunkelt in der Dämmerung ab, schaltet nachts aus oder zeigt eine gedimmte Uhr. Eine Berührung bringt sofort volle Helligkeit.
+- **Alles am Panel oder im Browser einstellbar** — auf Deutsch, Englisch oder Polnisch.
+- **Updates mit einem Klick** — das WebUI prüft und installiert neue Versionen direkt von GitHub.
+
+| AMS | Druckdetails |
+|---|---|
+| ![AMS-Spulen, Feuchtigkeit und Trocknung](img/waveshare-43b/ams.png) | ![Schichten, Geschwindigkeit und Lüfter](img/waveshare-43b/details.png) |
+
+![Uhr mit Druck- und AMS-Trocknungsfortschritt](img/waveshare-43b/screensaver.png)
+<p align="center"><sub>Bildschirmschoner-Uhr — Druck und Trocknung gleichzeitig</sub></p>
+
+<sub>Dashboard, AMS und Details: aus dem Firmware-Code mit Demodaten gerendert. Bildschirmschoner: Aufnahme eines echten Panels.</sub>
+
+## Was du brauchst
+
+- Ein **Waveshare ESP32-S3-Touch-LCD-4.3B** (Version **B**, 800×480) — fertige Platine, kein Löten.
+- Einen Bambu-Lab-Drucker im selben WLAN (LAN-Modus) oder ein Bambu-Cloud-Konto.
+- Für die Erstinstallation: einen Computer mit **Chrome** oder **Edge** und ein USB-Datenkabel.
+
+## Installation in drei Schritten
+
+1. Öffne den **[Installer](https://honzo90.github.io/BambuHelper/?lang=de)**, verbinde das Panel per USB und klicke auf **Verbinden und installieren**.
+2. Das Panel zeigt einen QR-Code für sein Einrichtungsnetz — scanne ihn mit dem Handy, öffne die angezeigte Seite und wähle dein WLAN.
+3. Öffne das WebUI des Panels (Adresse und QR-Code am Panel: **Einstellungen → Sprache und WebUI**) und füge den Drucker hinzu: IP-Adresse, Seriennummer und Zugangscode vom Druckerdisplay oder Bambu-Cloud-Anmeldung.
+
+Fertig. Spätere Versionen installierst du im WebUI des Panels: **Stable → Nach Updates suchen**.
+
+> Die Erstinstallation löscht das Panel. Läuft es bereits, aktualisiere über das WebUI — die Einstellungen bleiben erhalten.
 
 ## Neu in v4.1.0
 
-**Was neu oder anders ist**
-- **Nachtzeiten mit Minuten** — am Panel (Stundenraster, dann Minuten in 5-Minuten-Schritten) oder jede beliebige Minute in der WebUI.
-- **Abdunkeln in der Dämmerung statt früherer Nacht** — von Sonnenuntergang bis Nachtbeginn dunkelt das Panel nach der nächtlichen Inaktivitätszeit auf 50% ab und wechselt in den Bildschirmschoner, auch während des Drucks. Die Nacht (Bildschirm aus oder Uhr mit 30%) gilt nur in den eingestellten Zeiten. *Wenn du „Nacht ab Sonnenuntergang“ genutzt hast, prüfe nach dem Update die Nachtzeiten.*
-- **Sanftes Abdunkeln**, volle Helligkeit sofort bei Berührung.
-- **Uhr im Bildschirmschoner** blättert die geänderten Ziffern wie ein Kalenderblatt um; der Startbildschirm zeigt die echte Firmware-Version.
-- **Einstellungsmenü am Panel**: Seite Nacht, Darstellung (Design, Anzeigemodus, Lüfter), „Sprache und WebUI“ mit Version, IP-Adresse und WLAN-Signal, Pong-Schalter.
-- **WebUI**: neu geordneter Bereich „Anzeige“; Einstellungen, die der 4.3B-Bildschirm nicht nutzt, sind ausgeblendet.
-- **WLAN-Diagnose** (aus dem Originalprojekt): Wenn das Panel das gespeicherte Netz nicht erreicht, erklären Einrichtungsbildschirm und -seite den Grund (nicht gefunden, Groß-/Kleinschreibung, schwaches Signal, falsches Passwort, Enterprise-Netz, keine IP-Adresse).
+- Nachtzeiten minutengenau — am Panel oder im Browser.
+- Abdunkeln in der Dämmerung mit Bildschirmschoner, auch während des Drucks; sanftes Abblenden und sofort volle Helligkeit bei Berührung.
+- Eine Uhr, deren Ziffern wie Kalenderblätter umblättern.
+- Neue Einstellungen am Panel: Nacht, Darstellung, „Sprache und WebUI“ mit Version, IP-Adresse und WLAN-Signal.
+- WLAN-Diagnose: Wenn das Panel dein Netz nicht erreicht, sagt es dir warum.
+- Schnellerer Bildschirm (Animationen etwa 3× flüssiger), 182 KB kleinere Firmware und deutlich mehr freier Speicher.
 
-**Was behoben oder verbessert ist**
-- Schnellere Bildschirmaktualisierung (Bildschirmschoner-Frame ca. 34–66 ms statt ca. 168 ms, Uhr-Animation ca. 14 statt ca. 4 Bilder/s).
-- Firmware 182 KB kleiner (komprimierte WebUI-Seiten).
-- Deutlich mehr freier interner Speicher: Puffer der verschlüsselten Druckerverbindung im PSRAM — nach einem Update bleiben ca. 46–62 KB frei statt ca. 3 KB, auch wenn der Browser die WebUI neu lädt.
-- Die Uhr im Bildschirmschoner zeigt nicht mehr kurz „--:--“.
+[Vollständige Versionshinweise](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0) · [Alle Releases](https://github.com/honzo90/BambuHelper/releases)
 
-**Nach dem Update von v4.0.0:** Wenn du „Nacht ab Sonnenuntergang“ genutzt hast, prüfe die Nachtzeiten im Bereich **Anzeige**. **Zurück:** die OTA-Datei von [v4.0.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.0.0) manuell hochladen (ignoriert die Nachtminuten).
+## Bekannte Probleme
 
-## Funktionen
+- Gelegentliche Bildstörungen bei langen Drucken — eine Korrektur ist im Test.
+- [Schwarzer Bildschirm, der nicht per Berührung aufwacht (#1)](https://github.com/honzo90/BambuHelper/issues/1) — selten beobachtet.
 
-| Bereich | Funktionsumfang für Waveshare 4.3B |
-|---|---|
-| **Display und Touch** | ST7262-RGB-Display mit 800×480 Pixeln, kapazitiver GT911-Touchcontroller über I2C und Ansteuerung der Hintergrundbeleuchtung. |
-| **Bedienoberfläche** | Eigene Ansichten für Druck, AMS, Druckdetails, Anzeigen, Uhr und Einstellungen mit Navigation für das 4,3-Zoll-Panel. |
-| **Druckerdaten** | MQTT/TLS über LAN Direct oder Bambu Cloud; Fortschritt, Schichten, Restzeit, Temperaturen und Lüfterwerte, soweit vom Drucker bereitgestellt. |
-| **AMS-Daten** | Material, Farbe, verbleibendes Filament, Temperatur, Feuchtigkeit und Trocknungsstatus, soweit von Drucker oder AMS gemeldet. |
-| **Datenaktualität** | Gültigkeit und Alter einzelner Messwerte werden getrennt bewertet. In inkrementellen MQTT-Meldungen ausgelassene Felder bleiben erhalten; ein echter Nullwert wird von einem fehlenden Messwert unterschieden. |
-| **Ansichten und Animationen** | Einfacher Modus und ein erweiterter Modus in Entwicklung; Druck-, Trocknungs- und Kühlansichten, Uhr und Bildschirmschoner einschließlich Pong und Wasseruhr. |
-| **Deutsch / Polski / English** | Gespeicherte Sprachwahl für Panel und WebUI gemeinsam. Deutsch ist ab Beta 3 verfügbar. |
-| **Wetter und Nachtmodus** | Optionale Open-Meteo-Daten, Sonnenaufgang und Sonnenuntergang sowie Nachtzeitplan. Wetterabruf und Ortssuche benötigen Internetzugang. |
-| **Konfiguration und Diagnose** | WLAN-, Drucker- und Anzeigeeinstellungen, Steuerungsfunktionen und OTA im Browser; zusätzlich `/monitor/status` und Werkzeuge zur Bildaufzeichnung für die Entwicklung. |
-| **Entwicklungswerkzeuge** | Separater Arduino-CLI-Build mit festgelegtem SDK (cache64_xip für v4.1.0), Tests auf dem Computer, synthetische MQTT-Daten sowie Grafik- und Schriftgeneratoren. |
+Etwas funktioniert nicht? [Problem melden](https://github.com/honzo90/BambuHelper/issues).
 
-Das Profil verwendet `BAMBU_MONITOR_ONLY=0` und enthält auch die Steuerung der Bauraumbeleuchtung und intelligenter Steckdosen. Andere Platinen, Druckermodelle und Konfigurationen mit mehreren Druckern wurden in diesem Projekt noch nicht vollständig geprüft.
+<details>
+<summary><b>Für Entwickler</b></summary>
 
-## Installation und Updates
+- Build: Arduino CLI mit **Arduino ESP32 3.3.11** / **ESP-IDF 5.5.5** und eigenem SDK mit XIP aus dem PSRAM (cache64_xip), RGB-Takt 12 MHz — Details in [WAVESHARE.md](WAVESHARE.md) und in der `BUILD-INFO.json` jedes Releases.
+- Panel-Code: [Bildschirme](src/display_ws43b.cpp), [Displaytreiber](src/lgfx_panel_ws43b.cpp), [Touch](src/button_touch_ws43b.cpp), [MQTT](src/bambu_mqtt.cpp).
+- Host-Tests: [bringup/waveshare43b/integration/tests](bringup/waveshare43b/integration/tests).
+- Branch-Regeln und Upstream-Abgleich: [docs/UPSTREAM.md](docs/UPSTREAM.md).
 
-### Erste Installation über USB
+</details>
 
-1. Öffne den **[BambuHelper-Installer](https://honzo90.github.io/BambuHelper/?lang=de)** in Chrome oder Edge auf einem Computer. Die USB-Installation funktioniert nicht auf dem iPhone.
-2. Verbinde das Panel mit einem USB-Kabel, das Datenübertragung unterstützt. Der Installer ist ausschließlich für das **Waveshare ESP32-S3-Touch-LCD-4.3B** vorgesehen.
-3. Bestätige das genaue Platinenmodell und das Löschen der Einstellungen. Wähle **„Installation vorbereiten“**, danach **„Verbinden und installieren“**.
-4. Richte nach dem Neustart das WLAN über das Netzwerk des Panels ein. Die Verbindungsdaten erscheinen auf dem Display.
-5. Der USB-Installer installiert direkt **v4.1.0**. Wähle danach **Deutsch** im Menü oder WebUI und füge den Drucker hinzu. Spätere Updates: Kanal **Stable** im WebUI.
+## Basisprojekt und Lizenz
 
-**Die erste USB-Installation löscht den Flash-Speicher einschließlich WLAN-Einstellungen, Druckerkonfiguration und bisheriger Firmware.** Die Seite prüft das Firmwareabbild, bevor sie die Installation freigibt. Der Projektbetreiber hat eine vollständige Erstinstallation von v4.1.0 auf einer 4.3B-Platine bestätigt (Installation, WLAN, Druckerverbindung).
+Ein Fork von [BambuHelper von Keralots und Mitwirkenden](https://github.com/Keralots/BambuHelper), angepasst an das Waveshare-4.3B-Panel. Die Originaldokumentation (andere Platinen, Bambu Cloud, HMS-Fehlercodes) steht in [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md) (Englisch).
 
-### Vorhandenes Panel per OTA aktualisieren
-
-- Im WebUI den Kanal **Stable** wählen, nach Updates suchen und **v4.1.0** installieren. Nutzer von v3.9.1 und v4.0.0-alpha.1 können ihre bisherige Update-Suche verwenden; Versionen ohne Kanalauswahl suchen nach stabilen Releases.
-- **Manuelles Update:** [`BambuHelper-ws_lcd_43b-v4.1.0-ota.bin`](https://github.com/honzo90/BambuHelper/releases/download/v4.1.0/BambuHelper-ws_lcd_43b-v4.1.0-ota.bin) herunterladen und auf der Firmware-Update-Seite im WebUI hochladen. Dies ist auch eine Option, wenn das Online-Update das Release nicht anbietet.
-- [Versionshinweise und Quellen für v4.1.0](https://github.com/honzo90/BambuHelper/releases/tag/v4.1.0) · [Prüfsummen](https://github.com/honzo90/BambuHelper/releases/download/v4.1.0/SHA256SUMS) · [Alle Releases](https://github.com/honzo90/BambuHelper/releases).
-
-OTA setzt das vorhandene WS43B-Partitionslayout mit **zwei Slots zu je 3 MiB** voraus. Die OTA-Datei enthält nur die Anwendung und eignet sich nicht für die Erstinstallation.
-
-## Entwicklungsstand
-
-**Rückmeldung vom Gerät:** Der Projektbetreiber hat die Betas von v4.1.0 am Panel getestet (Abdunkeln, Nacht, Menü, WebUI, Speicherlast, Frame-Zeiten). v4.1.0 ist der Code von Beta 19 mit ausschließlich geänderter Firmware-Versionsnummer. Offene Punkte: gelegentliche Bildartefakte bei langen Drucken (in Analyse) und [dunkler Bildschirm / Aufwecken per Berührung](https://github.com/honzo90/BambuHelper/issues/1).
-
-Der frühere [Fehler mit dunklem Bildschirm und fehlendem Aufwecken per Touch](https://github.com/honzo90/BambuHelper/issues/1) bleibt zur weiteren Beobachtung **offen**.
-
-## Beispielansichten
-
-Die folgenden Bilder sind **auf dem Computer erzeugte 800×480-Vorschauen** mit den Anzeigefunktionen, Schriften und Grafiken des Projekts sowie synthetischen Daten. Sie zeigen die **polnische Oberfläche**, keine Fotos oder Bildschirmaufnahmen einer deutschen Installation. Demo-Kopfzeile und Darstellung können vom Gerät abweichen.
-
-| Druckübersicht | AMS |
-|---|---|
-| ![Druckfortschritt, Temperaturen und aktives Filament](img/waveshare-43b/print.png) | ![Filamentspulen, Feuchtigkeit und Trocknungsstatus des AMS](img/waveshare-43b/ams.png) |
-
-| Druckdetails | Einstellungen |
-|---|---|
-| ![Schichten, Bauraumtemperatur, Geschwindigkeit und Lüfter](img/waveshare-43b/details.png) | ![Einstellungen für Darstellung, Uhr, Wetter und Sprache](img/waveshare-43b/settings.png) |
-
-| Darstellung | Startbildschirm |
-|---|---|
-| ![Farbschemata und Anzeigemodi](img/waveshare-43b/appearance.png) | ![Startphasen und Warten auf Druckerdaten](img/waveshare-43b/boot.png) |
-
-[Herkunft der Vorschauen und Prüfsummen der Quellen](img/waveshare-43b/provenance.json). Die Vorschauen belegen nicht die Stabilität von Display, Touch oder Aufwecken.
-
-## Firmware bauen und prüfen
-
-Das **Release v4.1.0** verwendet **Arduino ESP32 3.3.11**, **ESP-IDF 5.5.5**, das neu gebaute SDK **cache64_xip** und einen angeforderten RGB-Pixeltakt von **12 MHz**. Die genauen Quellen stehen unter [Tag v4.1.0](https://github.com/honzo90/BambuHelper/tree/v4.1.0); SDK-Herkunft, Konfiguration und Prüfergebnisse enthält [BUILD-INFO.json](https://github.com/honzo90/BambuHelper/releases/download/v4.1.0/BUILD-INFO.json). Zum Nachbauen sind das separat vorbereitete XIP-SDK, sein passendes Manifest mit SHA-256 sowie `WS43B_SDK_PROFILE=cache64_xip` und `WS43B_RGB_PCLK_HZ=12000000` erforderlich. Der Standard-Build mit cache64 reproduziert dieses Release nicht.
-
-Für die Entwicklung dienen die englischen **[Waveshare-Build- und Testhinweise](WAVESHARE.md)**, das Profil [`boards/ws_lcd_43b.ini`](boards/ws_lcd_43b.ini) und [`bringup/waveshare43b/integration/build.py`](bringup/waveshare43b/integration/build.py). Dies ist ein eigener Arduino-CLI-Build, keine PlatformIO-Umgebung.
-
-Der Build und die Prüfungen des Firmwareabbilds v4.1.0 waren erfolgreich, ebenso alle **223 Host-Tests** (einschließlich der Auswahl des Update-Kanals). Der Umfang der physischen Bestätigung ist oben beschrieben; Build und Host-Tests ersetzen keine Hardwareprüfung.
-
-## Orientierung im Quellcode
-
-- **Display und Touch:** [Displayintegration](src/lgfx_panel_ws43b.cpp), [Toucheingaben](src/button_touch_ws43b.cpp), [Paneloberfläche](src/display_ws43b.cpp).
-- **Telemetrie und MQTT:** [Datenmodell](include/bambu_monitor.h), [Parser der Druckermeldungen](include/bambu_monitor_parser.h), [MQTT-Verbindung](src/bambu_mqtt.cpp).
-- **Uhr, Wetter und Sprache:** [Uhreinstellungen](src/ws43b_clock_settings.cpp), [Wetter](src/ws43b_weather.cpp), [Sprachwahl](src/ws43b_language.cpp).
-- **Werkzeuge:** [Host-Tests](bringup/waveshare43b/integration/tests), [Build-Vorbereitung](prepare_build.py), [Hinweise zu Drittkomponenten](THIRD_PARTY_NOTICES.md).
-
-## Weiterführende Dokumentation
-
-Die erhaltene englische Dokumentation behandelt auch andere Platinen. Deren GPIO-, PlatformIO- und Installationsanleitungen gelten nicht unmittelbar für das 4.3B; dafür sind die obigen Schritte und [WAVESHARE.md](WAVESHARE.md) maßgeblich.
-
-- [Weitere unterstützte Platinen](README.md#supported-boards)
-- [Verbindung zu Bambu Cloud](README.md#connecting-to-bambu-cloud) und [Sicherheit im Cloud-Modus](README.md#cloud-mode-security-notice)
-- [Energiemessung](README.md#power-monitoring)
-- [Druckerfehler und HMS-Codes](README.md#printer-errors-hms)
-- [Eigene geglättete Schriften](README.md#custom-smooth-fonts)
-
-## Lizenz und Mitwirkende
-
-MIT. Dieses Projekt basiert auf [BambuHelper von Keralots und Mitwirkenden](https://github.com/Keralots/BambuHelper). Der Zweig `waveshare-43b` entstand auf Grundlage von v3.9.0 (`23347fbb`); `main` bewahrt die Geschichte des Ausgangsprojekts. Die Lizenzen externer Komponenten sind in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) aufgeführt.
+MIT-Lizenz · [Komponenten von Drittanbietern](THIRD_PARTY_NOTICES.md)
