@@ -17,8 +17,8 @@ The owner tests on hardware and decides releases; agents do the rest.
 | `bringup/waveshare43b/integration/localize_web.py` | Build-time WebUI patches + PL/DE translation. | fork |
 | `bringup/waveshare43b/integration/locale/{pl,de}.json` | WebUI translations (source strings are English). | fork |
 | `bringup/waveshare43b/integration/tests/` | Host regression tests (`test_*.py`). | fork |
-| `bringup/waveshare43b/*.md`, `*.json` | Hardware journal — **git-ignored on purpose** (private data). Never commit. | local |
-| `docs/` | GitHub Pages: web installer, OTA channel (`WS43B_OTA_CHANNEL.md`), `UPSTREAM.md`. | fork |
+| `bringup/waveshare43b/*.md`, `bringup/waveshare43b/*.json` | Hardware journal — **git-ignored on purpose** (private data). Never commit. | local |
+| `docs/` | GitHub Pages: web installer, OTA channel (`docs/WS43B_OTA_CHANNEL.md`), upstream sync log (`docs/UPSTREAM.md`). | fork |
 | `tools/companion/` | Upstream desktop companion tool. Do not reformat. | upstream |
 | `WAVESHARE.md` | Human-facing build instructions and hardware status. | fork |
 
@@ -78,6 +78,23 @@ into the binary (`-ffile-prefix-map`); keep it that way.
 - Upstream sync procedure and log: `docs/UPSTREAM.md` (update "Last reviewed" each time).
 - Local-only branches whose names start with `feature/` or `backup/` contain private
   data in history — never push them.
+
+## Keeping this guide working
+
+`tests/test_agent_guide.py` enforces the first three points.
+
+- `CLAUDE.md` stays a one-line `@AGENTS.md` import and must not be git-ignored
+  (upstream ignores `CLAUDE.md`; re-check `.gitignore` after every upstream sync).
+- Every repo path and command named in this file must exist. When you move or rename
+  one, update this file in the same commit.
+- Rules live here only — not in editor configs or private notes. Continue (VS Code)
+  and Claude Code load this file automatically from the repo root, so the editor
+  must open the repository folder itself, not its parent.
+- When a fact here changes (flash/RAM budget, versions, branch or release policy,
+  new hardware constraint), update this file in the same change. A stale rule is
+  worse than none.
+- After a big edit here or a model change in the editor, the owner re-runs the local
+  model check (questions answered with and without this file; expected 5/5 with it).
 
 ## Before committing
 
