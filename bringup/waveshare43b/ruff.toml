@@ -1,0 +1,13 @@
+# Formatting for fork-owned Python (see AGENTS.md "Code conventions").
+# Run: ruff format bringup/waveshare43b
+line-length = 100
+extend-exclude = [
+    "integration/vendor", "integration/staging", "integration/cache64-work", "integration/sdk-cache64",
+    # SHA256-pinned in asset provenance; reformatting requires regenerating the assets.
+    "integration/generate_dashboard_fonts.py", "integration/visual-v2/generate.py",
+    # Read as text and patched by test_waiting_integration.py (marker strings).
+    "integration/tests/test_ws43b_view_interaction.py", "integration/tests/test_repaint_integration.py",
+]
+
+[format]
+quote-style = "preserve"

@@ -55,3 +55,5 @@ __pycache__/
 *.log
 .env
 .env.*
+# Fork: agent instructions are versioned (CLAUDE.md just imports AGENTS.md).
+!/CLAUDE.md
