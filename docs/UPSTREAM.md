@@ -39,7 +39,7 @@ Rules of thumb:
 
 ## Last reviewed
 
-- **2026-11-05**, upstream `main` at `35ea068` (2026-11-01).
+- **2026-11-08**, upstream `main` at `db0c29c` (2026-11-04).
 
 ## Taken
 
@@ -60,6 +60,7 @@ Rules of thumb:
 | `5bbf2e4` | 2026-11-01 | ci: build every env on push and pull requests | upstream CI for PlatformIO envs |
 | `7fdd46f` | 2026-11-01 | release: v3.9.1 | version bump and binaries of other boards |
 | `5adc0ad`, `99abc5b`, `8aa1a27`, `c2ad808`, `a2a64ec` | 2026-10-20/21 | docs(readme): community forks table | upstream README only |
+| `db0c29c` | 2026-11-04 | fix(display): step AMS units on tap on idle drying screen (#203) | Tap and drying paths of other boards; on 4.3B touch only wakes the screen and drying is drawn by `display_ws43b.cpp`. Cherry-pick tested clean (227 host tests, release build OK) |
 
 ## Possible upstream contributions
 
