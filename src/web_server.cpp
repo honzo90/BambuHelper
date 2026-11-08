@@ -41,6 +41,7 @@ void ws43bNoteWebRequest();
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
 #include "ws43b_language.h"
+#include "ws43b_web_security.h"
 #include <lwip/sockets.h>
 #include <errno.h>
 #endif
@@ -2308,7 +2309,11 @@ static void handleSettingsExport() {
     p["name"] = cfg.name;
     p["ip"] = cfg.ip;
     p["serial"] = cfg.serial;
+#if !defined(BOARD_IS_WS43B)
     p["accessCode"] = cfg.accessCode;
+#endif
+    // 4.3B: the access code controls the printer, so it stays out of backups;
+    // import keeps the code already stored when the field is missing.
     p["cloudUserId"] = cfg.cloudUserId;
     p["region"] = (uint8_t)cfg.region;
     JsonArray slots = p["gaugeSlots"].to<JsonArray>();
@@ -3313,6 +3318,12 @@ static void handleOtaUpload() {
     }
 #endif
 #if defined(BOARD_IS_WS43B)
+    // Uploads are parsed before middleware runs: check access before any flash write.
+    if (!ws43b_web_security::allow(server, false)) {
+      otaError = "Not allowed";
+      otaInProgress = false;
+      return;
+    }
     if(!ws43b::beginOtaDisplay()) {otaError="Display is busy; retry update";return;}
 #endif
     otaInProgress = true;
@@ -3637,7 +3648,13 @@ void initWebServer() {
   server.on("/brightness", HTTP_GET, handleBrightnessPreview);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/api/timezones", HTTP_GET, handleTimezones);
+#if defined(BOARD_IS_WS43B)
+  // POST only: a GET could be fired by any web page through a plain link or image.
+  server.on("/reset", HTTP_POST, handleReset);
+  server.on("/security/pin", HTTP_POST, []() { ws43b_web_security::handlePinSave(server); });
+#else
   server.on("/reset", HTTP_GET, handleReset);
+#endif
   server.on("/reboot", HTTP_POST, handleReboot);
   server.on("/debug", HTTP_GET, handleDebug);
   server.on("/card.bmp", HTTP_GET, handleCardBmp);
@@ -3670,8 +3687,14 @@ void initWebServer() {
 #endif
   server.onNotFound(handleNotFound);
 #endif
+#if defined(BOARD_IS_WS43B)
+  // Origin/Referer feed the cross-site check in ws43b_web_security.
+  const char* otaHeaders[] = {"X-MD5", "Origin", "Referer"};
+  server.collectHeaders(otaHeaders, 3);
+#else
   const char* otaHeaders[] = {"X-MD5"};
   server.collectHeaders(otaHeaders, 1);
+#endif
 #if defined(BOARD_IS_WS43B)
   // Note WebUI activity for the printer connect gate, and shed requests only
   // while a printer connect runs with critically little internal RAM.
@@ -3687,6 +3710,8 @@ void initWebServer() {
     }
     return next();
   });
+  // Host / cross-site / optional PIN checks for every route (ws43b_web_security.h).
+  ws43b_web_security::begin(server);
 #endif
   server.begin();
   Serial.println("Web server started on port 80");

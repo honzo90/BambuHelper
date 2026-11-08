@@ -19,6 +19,7 @@
 #include "bambu_mqtt.h"
 #include "bambu_cloud.h"
 #include "wifi_manager.h"
+#include "ws43b_web_security.h"
 #include "display_ui.h"
 #include "config.h"
 #include "button.h"
@@ -117,6 +118,10 @@ static bool resolvePlaceholder(const char* name, String& out) {
   if (strcmp(name, "SHOWIP") == 0)     { out = netSettings.showIPAtStartup ? "checked" : ""; return true; }
   if (strcmp(name, "MDNS_EN") == 0)    { out = netSettings.mdnsEnabled ? "checked" : ""; return true; }
   if (strcmp(name, "MDNS_HOST") == 0)  { out = netSettings.hostname; return true; }
+#if defined(BOARD_IS_WS43B)
+  // Only reachable through the PIN gate itself, so showing it does not leak it.
+  if (strcmp(name, "WEB_PIN") == 0)    { out = ws43b_web_security::pin(); return true; }
+#endif
 
   // --- Clock ---
   if (strcmp(name, "USE24H") == 0)     { out = netSettings.use24h ? "checked" : ""; return true; }

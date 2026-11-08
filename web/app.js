@@ -802,6 +802,13 @@ async function scanWifi(){
 }
 
 /* ============ Save WiFi ============ */
+function saveWebPin(){
+  var pin = document.getElementById('web_pin').value.trim();
+  if (pin && !/^[0-9]{4,8}$/.test(pin)) { showToast('PIN must be 4-8 digits'); return; }
+  fetch('/security/pin',{method:'POST',body:new URLSearchParams({pin:pin})}).then(function(r){
+    showToast(r.ok ? (pin ? 'PIN saved' : 'PIN turned off') : 'PIN could not be saved');
+  }).catch(function(){ showToast('PIN could not be saved'); });
+}
 function saveWifi(){
   var ssid = document.getElementById('ssid').value;
   var netmode = document.getElementById('netmode').value;
@@ -2280,7 +2287,9 @@ function rebootDevice(){
 function factoryReset(){
   if (!confirm('Factory reset wipes ALL settings (WiFi, printers, gauge layout). Continue?')) return;
   if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
-  location = '/reset';
+  fetch('/reset',{method:'POST'}).then(function(r){return r.text();}).then(function(t){
+    document.body.innerHTML = t;
+  }).catch(function(){});
 }
 
 /* ============ After-print reveal ============ */

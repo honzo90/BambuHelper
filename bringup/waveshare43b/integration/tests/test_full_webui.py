@@ -156,6 +156,7 @@ bool singleSlot=false;
 const esp_partition_t* esp_ota_get_next_update_partition(void*){return singleSlot ? &running : &partition;}
 const esp_partition_t* esp_ota_get_running_partition(){return &running;}
 namespace ws43b { bool displayAllowed=true; bool beginOtaDisplay(){return displayAllowed;} }
+namespace ws43b_web_security { bool allowed=true; bool allow(Server&,bool respond){assert(!respond);return allowed;} }
 int disconnects=0;void disconnectBambuMqtt(){++disconnects;}
 bool isUnderPartitioned(){return false;}const char* REPARTITION_HINT="";
 String otaError;bool otaInProgress=false,otaFirstChunk=false,otaMqttReinitPending=false;
@@ -167,6 +168,9 @@ void data(int chip,size_t size){uploadData.status=UPLOAD_FILE_WRITE;uploadData.c
 int main(){
  start("BambuHelper-ws_lcd_43-ota.bin");assert(!otaError.empty()&&!otaInProgress&&Update.begins==0&&disconnects==0);
  data(9,24);assert(Update.writes==0);
+ // Refused by the access gate (host/cross-site/PIN): nothing starts.
+ ws43b_web_security::allowed=false;start("BambuHelper-ws_lcd_43b-v1-ota.bin");assert(!otaInProgress&&otaError=="Not allowed"&&Update.begins==0&&disconnects==0);
+ data(9,24);assert(Update.writes==0);ws43b_web_security::allowed=true;
  ws43b::displayAllowed=false;start("BambuHelper-ws_lcd_43b-v1-ota.bin");assert(!otaInProgress&&Update.begins==0&&disconnects==0);ws43b::displayAllowed=true;
  singleSlot=true;start("BambuHelper-ws_lcd_43b-v1-ota.bin");assert(!otaInProgress&&Update.begins==0);singleSlot=false;
  start("BambuHelper-ws_lcd_43b-v1-ota.bin");assert(otaInProgress&&Update.begins==1);

@@ -34,6 +34,7 @@
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
 #include "ws43b_language.h"
+#include "ws43b_web_security.h"
 #include "ws43b_idle_policy.h"
 #include "ws43b_water_clock.h"
 #include "ws43b_dashboard_policy.h"
@@ -1052,6 +1053,10 @@ void generalSettingsScreen() {
   dashText(info,44,340,708,18,INK);
   if(const char *health=panelHealthNotice(false))dashText(health,44,364,708,14,WARN);
   small(settingsNotice,44,382,710);
+  // Physical access recovers a forgotten WebUI PIN (ws43b_web_security).
+  const char *pin=ws43b_web_security::pin();
+  snprintf(info,sizeof(info),"%s: %s",ws43bText("PIN do WebUI","WebUI PIN","WebUI-PIN"),pin[0]?pin:ws43bText("wyłączony","off","aus"));
+  dashText(info,44,424,708,14,DIM);
 }
 void connectedWifiName(int x,int y,int w) {
   const String ssid=WiFi.SSID();

@@ -1263,6 +1263,20 @@ static const char PAGE_HTML_2[] PROGMEM = R"rawliteral(
       <input type="text" id="mdns_host" class="mono" value="%MDNS_HOST%" placeholder="bambuhelper" maxlength="31">
       <div class="hint">Shown in your router's client list. With mDNS on, also reach the device at <span class="mono">name.local</span>.</div>
     </div>
+)rawliteral"
+#if defined(BOARD_IS_WS43B)
+R"rawliteral(
+    <div class="field">
+      <label for="web_pin">WebUI PIN</label>
+      <div class="hstack" style="gap:var(--sp-2)">
+        <input type="password" id="web_pin" class="mono" value="%WEB_PIN%" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="new-password">
+        <button type="button" class="btn" onclick="saveWebPin()">Save PIN</button>
+      </div>
+      <div class="hint">Optional, 4-8 digits; empty turns it off. The browser asks for it with user name <span class="mono">admin</span>. Forgot it? The panel shows it under Settings &gt; Language and WebUI.</div>
+    </div>
+)rawliteral"
+#endif
+R"rawliteral(
     <dl class="kv" id="wifiInfo" style="margin-top:var(--sp-3)">
       <dt>Signal</dt><dd id="wifiRssi">-</dd>
       <dt>Uptime</dt><dd id="wifiUptime">-</dd>

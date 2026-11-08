@@ -37,7 +37,8 @@ into the binary (`-ffile-prefix-map`); keep it that way.
 
 ## Hard constraints
 
-- **Flash is ~97 % full.** No new libraries, no large tables/fonts/images. Prefer
+- **Flash is tight:** the app uses ~92 % of its 3 MiB OTA slot (2026-11-08,
+  2.91 MB; ~240 KB free). No new libraries, no large tables/fonts/images. Prefer
   smaller code; report the app size change of every firmware change.
 - **Internal RAM is tight** (min free internal heap ~57 KB under WebUI load).
   Large buffers go to PSRAM; TLS during MQTT connect already uses PSRAM.

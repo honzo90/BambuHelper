@@ -909,5 +909,15 @@
   "{ssid}{dbm} accepted the connection, but the router never assigned an IP address. Check its DHCP server or MAC filter.": "Sieć {ssid}{dbm} przyjęła połączenie, ale router nie przydzielił adresu IP. Sprawdź jego serwer DHCP lub filtr adresów MAC.",
   "Could not connect": "Nie udało się połączyć",
   "Could not connect to {ssid}{dbm}.": "Nie udało się połączyć z siecią {ssid}{dbm}.",
-  "This version failed to start on this panel and was rolled back. Use the manual upload only if you want to try it again.": "Ta wersja nie uruchomiła się na tym panelu i została cofnięta. Wgraj ją ręcznie tylko wtedy, gdy chcesz spróbować ponownie."
+  "This version failed to start on this panel and was rolled back. Use the manual upload only if you want to try it again.": "Ta wersja nie uruchomiła się na tym panelu i została cofnięta. Wgraj ją ręcznie tylko wtedy, gdy chcesz spróbować ponownie.",
+  "WebUI PIN": "PIN do WebUI",
+  "Save PIN": "Zapisz PIN",
+  "Optional, 4-8 digits; empty turns it off. The browser asks for it with user name": "Opcjonalny, 4–8 cyfr; puste pole go wyłącza. Przeglądarka zapyta o niego z nazwą użytkownika",
+  ". Forgot it? The panel shows it under Settings &gt; Language and WebUI.": ". Nie pamiętasz? Panel pokazuje go w Ustawienia &gt; Język i WebUI.",
+  "PIN must be 4-8 digits": "PIN musi mieć 4–8 cyfr",
+  "PIN saved": "PIN zapisany",
+  "PIN turned off": "PIN wyłączony",
+  "PIN could not be saved": "Nie udało się zapisać PIN-u",
+  "Cross-site request refused": "Odrzucono żądanie z innej strony",
+  "Forbidden host": "Niedozwolony adres"
 }

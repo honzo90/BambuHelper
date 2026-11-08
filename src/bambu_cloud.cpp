@@ -115,7 +115,9 @@ static int httpsRequest(const char* method, const char* url,
 #endif
   int httpCode = httpsRequestWith(*tls, method, url, body, authToken, response, cookie);
 
-#if !BAMBU_MONITOR_ONLY
+#if !BAMBU_MONITOR_ONLY && !defined(BOARD_IS_WS43B)
+  // 4.3B: no unverified retry - it would send the account token to whoever
+  // answers the handshake. The CA bundle verifies Bambu's servers fine.
   if (httpCode == -1) {
     // TLS handshake likely failed — retry without verification
     Serial.println("CLOUD: TLS verified request failed, retrying without CA check");
