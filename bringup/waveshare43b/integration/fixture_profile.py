@@ -4,26 +4,47 @@ hashes. Printer credentials are replaced in RAM; their persistence is blocked.
 The web server exposes only diagnostics and a fixture view selector. Restore a
 normal image after hardware stress testing.
 """
+
 import hashlib, ipaddress
 
+# RFC 1918 only: ipaddress.is_private also accepts documentation, benchmark,
+# reserved and broadcast ranges (192.0.2.0/24, 198.18.0.0/15, 240.0.0.0/4, ...).
+LAN_NETS = tuple(
+    ipaddress.IPv4Network(n) for n in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')
+)
+
+
 def validate_ip(value):
-    ip=ipaddress.IPv4Address(value)
-    if not ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_unspecified:
+    ip = ipaddress.IPv4Address(value)
+    if not any(ip in net for net in LAN_NETS):
         raise ValueError('Fixture requires an explicit private LAN IPv4 address')
     return str(ip)
 
-def apply(staged,host):
-    host=validate_ip(host);changed={}
-    def replace(name,old,new):
-        p=staged/name;s=p.read_text()
-        if s.count(old)!=1:raise RuntimeError(f'Fixture patch mismatch: {name}: {old[:70]}')
-        p.write_text(s.replace(old,new));changed[name]=hashlib.sha256(p.read_bytes()).hexdigest()
-    anchor='  { ws43b_memory::Scope memory(ws43b_memory::Stage::Settings); loadSettings(); }'
-    replace('main.cpp',anchor,anchor+'''\n  // SYNTHETIC FIXTURE: replace printer identity in RAM only.
+
+def apply(staged, host):
+    host = validate_ip(host)
+    changed = {}
+
+    def replace(name, old, new):
+        p = staged / name
+        s = p.read_text()
+        if s.count(old) != 1:
+            raise RuntimeError(f'Fixture patch mismatch: {name}: {old[:70]}')
+        p.write_text(s.replace(old, new))
+        changed[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+
+    anchor = '  { ws43b_memory::Scope memory(ws43b_memory::Stage::Settings); loadSettings(); }'
+    replace(
+        'main.cpp',
+        anchor,
+        anchor
+        + '''\n  // SYNTHETIC FIXTURE: replace printer identity in RAM only.
   for (uint8_t i=0;i<MAX_PRINTERS;++i) memset(&printers[i].config,0,sizeof(PrinterConfig));
   auto &fixture = printers[0].config;
   fixture.mode=CONN_LOCAL;
-  strlcpy(fixture.ip,"'''+host+'''",sizeof fixture.ip);
+  strlcpy(fixture.ip,"'''
+        + host
+        + '''",sizeof fixture.ip);
   strlcpy(fixture.serial,"SYNTHETIC000001",sizeof fixture.serial);
   strlcpy(fixture.accessCode,"TESTONLY",sizeof fixture.accessCode);
   strlcpy(fixture.name,"TEST MQTT",sizeof fixture.name);
@@ -35,11 +56,28 @@ def apply(staged,host):
   dispSettings.hmsAutoPresent=0;dispSettings.hmsAlertMask=0;
   dispSettings.pongClock=false;
   for(uint8_t i=0;i<TASMOTA_PLUG_COUNT;++i)tasmotaSettings[i].enabled=false;
-''')
-    for signature in ('void saveSettings() {','void savePrinterConfig(uint8_t index) {','void resetSettings() {'):
-        replace('settings.cpp',signature,signature+'\n  return; // Fixture: never persist synthetic printer identity or reset NVS.\n')
-    replace('ws43b_weather.cpp','void loadWs43bWeather(){','void loadWs43bWeather(){\n config={};config.enabled=false;config.solar=false;return; // Synthetic profile: no weather network traffic.\n')
-    replace('web_server.cpp','void initWebServer() {','''extern bool ws43bFixtureView(const char *view);
+''',
+    )
+    for signature in (
+        'void saveSettings() {',
+        'void savePrinterConfig(uint8_t index) {',
+        'void resetSettings() {',
+    ):
+        replace(
+            'settings.cpp',
+            signature,
+            signature
+            + '\n  return; // Fixture: never persist synthetic printer identity or reset NVS.\n',
+        )
+    replace(
+        'ws43b_weather.cpp',
+        'void loadWs43bWeather(){',
+        'void loadWs43bWeather(){\n config={};config.enabled=false;config.solar=false;return; // Synthetic profile: no weather network traffic.\n',
+    )
+    replace(
+        'web_server.cpp',
+        'void initWebServer() {',
+        '''extern bool ws43bFixtureView(const char *view);
 void initWebServer() {
   // No configuration, OTA, reset or printer-control routes in this test image.
   server.on("/monitor/status",HTTP_GET,handleMonitorStatus);
@@ -51,9 +89,12 @@ void initWebServer() {
   });
   server.onNotFound([](){server.send(403,"text/plain","Synthetic test image: diagnostics only");});
   server.begin();return;
-''')
+''',
+    )
     # One external helper, still calling the real page renderer. No fake bitmap.
-    p=staged/'display_ws43b.cpp';s=p.read_text();s+='''
+    p = staged / 'display_ws43b.cpp'
+    s = p.read_text()
+    s += '''
 // Diagnostic-only generated code, absent from normal source/builds.
 bool ws43bFixtureView(const char *view) {
   if(!strcmp(view,"hms"))return handleWs43bErrorTap(true);
@@ -71,7 +112,15 @@ bool ws43bFixtureView(const char *view) {
   idlePolicy.activity(millis());automaticIdle=false;navigationActivity=millis();painted=false;
   return true;
 }
-''';p.write_text(s);changed[p.name]=hashlib.sha256(p.read_bytes()).hexdigest()
-    return {'synthetic_only':True,'host':host,'serial':'SYNTHETIC000001',
-            'persistent_printer_writes_blocked':True,'web_routes':'diagnostics_only',
-            'weather_disabled':True,'transformed_sources_sha256':changed}
+'''
+    p.write_text(s)
+    changed[p.name] = hashlib.sha256(p.read_bytes()).hexdigest()
+    return {
+        'synthetic_only': True,
+        'host': host,
+        'serial': 'SYNTHETIC000001',
+        'persistent_printer_writes_blocked': True,
+        'web_routes': 'diagnostics_only',
+        'weather_disabled': True,
+        'transformed_sources_sha256': changed,
+    }
