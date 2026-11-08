@@ -6,7 +6,8 @@ Every non-merge commit is classified from its message:
   human    - trailer `AI-Assisted: none`
   upstream - cherry-pick of a commit from upstream (origin/main = Keralots); cherry-picks
              of fork commits are classified by the original commit
-  unknown  - no attribution (commits before the rule, or made outside the hook)
+  unknown  - no attribution (made outside the hook); pre-rule commits the owner
+             confirmed as AI are listed in BACKFILL
 
 Usage:
   python3 -B scripts/ai_share.py                  # report since the 4.3B fork base
@@ -24,6 +25,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FORK_BASE = "23347fb"  # upstream v3.9.0, start of the 4.3B port (docs/UPSTREAM.md)
 CATEGORIES = ("llm", "human", "upstream", "unknown")
+BACKFILL_MODEL = "AI (unspecified, before trailers)"
+# Commits from 2026-10-17..26 made before the trailer rule; the owner confirmed
+# on 2026-11-08 that they were written with AI. History is not rewritten.
+BACKFILL = frozenset(
+    {
+        "12a6424de3288b33e361c53e141d4b3150496e56",
+        "380c6023cdccddbbbde56bb50d0537af1f7565b0",
+        "4537ec3630244f0b724cd0e505bfe9d94308bdfe",
+        "4e0eb166de7485a77f05eb6c156b9036604c77a7",
+        "4f483532da6ce16bd95a0e7567242190cb5c92e4",
+        "552375bb3e05f0f499a0add9aa9156d92679287c",
+        "596b9f0fe73b92d2579eb721bdcd5962ce30ecc5",
+        "5b9d48e04b5b2ffee45e6f5b44ed6d4b61d9e07a",
+        "8a126a558baa4e359dd442c0f0267b4120ad768c",
+        "8c204aaf8d30272816a0cfbf45cf9fd8ec188cfd",
+        "8d49ae29e2d4b45184515287a4bed4e75747034d",
+        "bac529e25b1d56f48e801a28ed7eee5a5d68d967",
+        "c8cc344b9d9f6a58face655b5681126fddea75dd",
+        "d7a6e1d30019697dfc0a627a3196604a7734f7f5",
+        "ea4feae35a9b6ebc6aac8d784425a4107b0f3523",
+        "ee44a0a284b02465bf08443177bd0513d74f40aa",
+        "f6dee77dce5ed23e8e44af91a6c2e84998375bf3",
+    }
+)
 
 AI_NAMES = re.compile(
     r"claude|anthropic|gpt|openai|codex|copilot|gemini|gemma|qwen|llama|mistral|devstral|deepseek",
@@ -100,11 +125,17 @@ def commits(since):
         yield sha, date, message, added, deleted
 
 
+def full_sha(sha):
+    return git("rev-parse", sha).strip()
+
+
 def report(since, listing):
     totals = {c: [0, 0] for c in CATEGORIES}
     models = {}
     for sha, date, message, added, _ in commits(since):
         category, model = classify(message)
+        if category == "unknown" and full_sha(sha) in BACKFILL:
+            category, model = "llm", BACKFILL_MODEL
         totals[category][0] += 1
         totals[category][1] += added
         if model:

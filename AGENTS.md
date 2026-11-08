@@ -87,7 +87,8 @@ into the binary (`-ffile-prefix-map`); keep it that way.
 - `.githooks/commit-msg` refuses commits without one. Enable once per clone:
   `git config core.hooksPath .githooks`.
 - Report: `python3 -B scripts/ai_share.py` (`--since YYYY-MM-DD`, `--list`).
-  Commits made before 2026-11-04 have no trailer and show as `unknown`.
+  Commits before 2026-11-04 have no trailer; the owner confirmed they were AI-written,
+  so `BACKFILL` in `scripts/ai_share.py` counts them as `llm`.
 
 ## Keeping this guide working
 
