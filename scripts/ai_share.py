@@ -25,9 +25,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FORK_BASE = "23347fb"  # upstream v3.9.0, start of the 4.3B port (docs/UPSTREAM.md)
 CATEGORIES = ("llm", "human", "upstream", "unknown")
-BACKFILL_MODEL = "AI (unspecified, before trailers)"
+BACKFILL_MODEL = "Codex (before trailers)"
 # Commits from 2026-10-17..26 made before the trailer rule; the owner confirmed
-# on 2026-11-08 that they were written with AI. History is not rewritten.
+# on 2026-11-08 that they were written with Codex. History is not rewritten.
 BACKFILL = frozenset(
     {
         "12a6424de3288b33e361c53e141d4b3150496e56",
