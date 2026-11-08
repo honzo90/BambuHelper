@@ -59,8 +59,12 @@ into the binary (`-ffile-prefix-map`); keep it that way.
   `pip install ruff` into `.venv`). Files excluded there are SHA256-pinned by asset
   provenance or patched as text by other tests — editing them means regenerating the
   assets / updating the markers in the same change. Tests use stdlib `unittest` only.
-- WebUI text: English in source, add PL and DE to `locale/*.json` in the same
-  change. German uses informal "du".
+- WebUI text: English in source, add PL and DE to `locale/{pl,de}.json` in the same
+  change. German uses informal "du". Exceptions: the monitor page has Polish source
+  text (`locale/monitor_{en,de}.json`); inline triples `W(pl,en,de)` in `web/app.js`
+  and `ws43bText(pl,en,de)` (`src/ws43b_language.h`) in C++.
+- Memory: big buffers via `heap_caps_malloc(..., MALLOC_CAP_SPIRAM)`; no large stack
+  arrays; avoid `String` churn in hot paths.
 - Every logic change gets a host test in `tests/` (name `test_<area>.py`).
 - Comments explain *why* (hardware quirk, memory budget, upstream reason), not what.
 
