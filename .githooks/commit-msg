@@ -1,0 +1,4 @@
+#!/bin/sh
+# Refuse commits without an AI attribution trailer (AGENTS.md, "Attribution").
+# Enable once per clone: git config core.hooksPath .githooks
+exec python3 -B "$(git rev-parse --show-toplevel)/scripts/ai_share.py" --check-msg "$1"

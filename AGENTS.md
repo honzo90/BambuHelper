@@ -79,6 +79,16 @@ into the binary (`-ffile-prefix-map`); keep it that way.
 - Local-only branches whose names start with `feature/` or `backup/` contain private
   data in history — never push them.
 
+## Attribution (measurable LLM share)
+
+- Every non-merge commit carries a trailer: `AI-Assisted: <model>` for agent work
+  (e.g. `AI-Assisted: Claude Opus 5.5`, `AI-Assisted: qwen3.6:35b`), or
+  `AI-Assisted: none` for human-only work. An AI `Co-Authored-By:` trailer also counts.
+- `.githooks/commit-msg` refuses commits without one. Enable once per clone:
+  `git config core.hooksPath .githooks`.
+- Report: `python3 -B scripts/ai_share.py` (`--since YYYY-MM-DD`, `--list`).
+  Commits made before 2026-11-04 have no trailer and show as `unknown`.
+
 ## Keeping this guide working
 
 `tests/test_agent_guide.py` enforces the first three points.
