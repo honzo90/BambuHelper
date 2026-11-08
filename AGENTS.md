@@ -44,8 +44,9 @@ into the binary (`-ffile-prefix-map`); keep it that way.
 - **Display uses an RGB bounce buffer.** No long work in ISRs; avoid long
   PSRAM-heavy bursts while frames are output (causes scanout artifacts).
 - **Never** put IPs, MACs, serials, access codes, Wi-Fi data, usernames or home
-  paths into code, commits, docs or release notes. Use documentation addresses
-  (192.0.2.x) or `SYNTHETIC…` placeholders in examples and tests.
+  paths into code, commits, docs or release notes. In examples and tests use
+  generic `10.0.0.x` addresses (the fixture/capture validators accept private LAN
+  addresses only; 192.0.2.x is rejected) and `SYNTHETIC…` placeholders.
 - Hardware behaviour you cannot verify on the host: say so and propose a
   measurement (`/monitor/status`, `/diagnostics/*` endpoints) instead of guessing.
 
