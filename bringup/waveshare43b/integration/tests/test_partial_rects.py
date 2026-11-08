@@ -1,4 +1,5 @@
 """Rectangle copies keep both alternating scanout buffers consistent."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -52,10 +53,27 @@ int main() {
 class PartialRects(unittest.TestCase):
     def test_rects(self):
         with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / 'r.cpp'; src.write_text(CODE)
+            src = Path(tmp) / 'r.cpp'
+            src.write_text(CODE)
             exe = Path(tmp) / 'r'
-            subprocess.run(['clang++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'src'),
-                            str(src), '-o', str(exe)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O2',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'src'),
+                    str(src),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(exe)], check=True)
 
 

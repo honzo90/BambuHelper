@@ -1,9 +1,12 @@
 from pathlib import Path
 import tempfile, subprocess, unittest
+
 ROOT = Path(__file__).resolve().parents[4]
+
+
 class ActivityAnimation(unittest.TestCase):
- def test_priority_freshness_and_animation_lifetime(self):
-  code = r'''#include "ws43b_dashboard_policy.h"
+    def test_priority_freshness_and_animation_lifetime(self):
+        code = r'''#include "ws43b_dashboard_policy.h"
 #include <cassert>
 using namespace ws43b_view;
 int main(){
@@ -80,7 +83,23 @@ int main(){
  c.update(Activity::Finished,UINT32_MAX-100,3,1);assert(c.elapsed(10)==111);assert(c.animated(10));
  for(Activity s:{Activity::Offline,Activity::Idle,Activity::Unknown,Activity::Error}){c.update(s,100,1,0);assert(!c.animated(101));}
 }'''.replace('#include <cassert>', '#include <cassert>\n#include <initializer_list>')
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

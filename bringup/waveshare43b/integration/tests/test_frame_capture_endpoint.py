@@ -4,6 +4,7 @@ The C++ handler is extracted verbatim and built with ASan/UBSan. Python decodes
 the resulting wire bytes independently, using known, distinct canvas/front
 patterns. No serial ports, credentials, network or physical display are used.
 """
+
 import json
 from pathlib import Path
 import shutil
@@ -140,10 +141,26 @@ class FrameCaptureEndpointTests(unittest.TestCase):
         cls.binary = tmp / 'frame_capture'
         cpp.write_text(HARNESS + source[start:end] + MAIN)
         result = subprocess.run(
-            [compiler, '-std=c++17', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
-             '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
-             '-I', str(REPO / 'src'), str(cpp), '-o', str(cls.binary)],
-            capture_output=True, text=True, timeout=60)
+            [
+                compiler,
+                '-std=c++17',
+                '-O1',
+                '-g',
+                '-Wall',
+                '-Wextra',
+                '-Werror',
+                '-fsanitize=address,undefined',
+                '-fno-omit-frame-pointer',
+                '-I',
+                str(REPO / 'src'),
+                str(cpp),
+                '-o',
+                str(cls.binary),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
         if result.returncode:
             raise AssertionError(result.stderr)
 
@@ -166,16 +183,21 @@ class FrameCaptureEndpointTests(unittest.TestCase):
         self.assertEqual(headers['Content-Type'], 'application/octet-stream')
         self.assertEqual(int(headers['Content-Length']), 40 + 1536000)
         self.assertEqual(len(body), 40 + 1536000)
-        self.assertEqual(struct.unpack_from('<8sHH7I', body), (
-            b'W43CAP01', 800, 480, 0x12345678, 0xabcdef01, 1,
-            1600, 1536000, 1, 11))
+        self.assertEqual(
+            struct.unpack_from('<8sHH7I', body),
+            (b'W43CAP01', 800, 480, 0x12345678, 0xABCDEF01, 1, 1600, 1536000, 1, 11),
+        )
         # Decoder knows transport layout, not the implementation's constants.
         # Distinct front data detects exporting canvas twice or wrong order.
         for y in range(480):
-            self.assertEqual(struct.unpack_from('<800H', body, 40+y*3200),
-                             tuple(((x*73) ^ (y*257) ^ 0xa51c) & 0xffff for x in range(800)))
-            self.assertEqual(struct.unpack_from('<800H', body, 40+y*3200+1600),
-                             tuple((x*17 + y*511 + 0x1357) & 0xffff for x in range(800)))
+            self.assertEqual(
+                struct.unpack_from('<800H', body, 40 + y * 3200),
+                tuple(((x * 73) ^ (y * 257) ^ 0xA51C) & 0xFFFF for x in range(800)),
+            )
+            self.assertEqual(
+                struct.unpack_from('<800H', body, 40 + y * 3200 + 1600),
+                tuple((x * 17 + y * 511 + 0x1357) & 0xFFFF for x in range(800)),
+            )
 
     def test_setup_ap_unconfigured_never_read_pixels(self):
         for mode in ('before_monitor', 'ap', 'unconfigured'):
@@ -222,7 +244,7 @@ class FrameCaptureEndpointTests(unittest.TestCase):
                 self.assertEqual(stats['stops'], 1)
                 self.assertNotIn(b'HTTP/', body)
                 if mode == 'row_failure':
-                    self.assertEqual(len(body), 40+7*3200)
+                    self.assertEqual(len(body), 40 + 7 * 3200)
                     self.assertEqual(stats['reads'], 8)
 
     def test_blocked_client_eight_second_deadline_including_wrap(self):

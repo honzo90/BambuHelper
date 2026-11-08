@@ -1,4 +1,5 @@
 """Exercise delta retention through the real parser, UI policy and live-view gates."""
+
 from pathlib import Path
 import shutil
 import subprocess
@@ -228,9 +229,21 @@ class MonitorDeltaRetention(unittest.TestCase):
         cls.binary = directory / 'test'
         cpp.write_text(HARNESS)
         result = subprocess.run(
-            [compiler, '-std=c++17', '-fsanitize=address,undefined',
-             '-I', str(ROOT / 'include'), '-I', str(JSON_INCLUDE),
-             str(cpp), '-o', str(cls.binary)], capture_output=True, text=True)
+            [
+                compiler,
+                '-std=c++17',
+                '-fsanitize=address,undefined',
+                '-I',
+                str(ROOT / 'include'),
+                '-I',
+                str(JSON_INCLUDE),
+                str(cpp),
+                '-o',
+                str(cls.binary),
+            ],
+            capture_output=True,
+            text=True,
+        )
         if result.returncode:
             raise AssertionError(result.stderr)
 

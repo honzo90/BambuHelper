@@ -1,4 +1,5 @@
 """The real shared factory makes one PSRAM-only attempt and safely falls back."""
+
 from pathlib import Path
 import json
 import subprocess
@@ -59,17 +60,35 @@ int main(int argc,char **argv){
 '''
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)
-            (path/'esp_heap_caps.h').write_text(heap)
-            (path/'test.cpp').write_text(code)
-            result = subprocess.run([
-                'clang++', '-std=c++17', '-O1', '-Wall', '-Wextra', '-Werror',
-                '-fsanitize=address,undefined', '-DARDUINO', '-I', str(path),
-                '-I', str(ROOT/'include'), str(path/'test.cpp'), '-o', str(path/'test'),
-            ], capture_output=True, text=True)
+            (path / 'esp_heap_caps.h').write_text(heap)
+            (path / 'test.cpp').write_text(code)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O1',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-fsanitize=address,undefined',
+                    '-DARDUINO',
+                    '-I',
+                    str(path),
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(path / 'test.cpp'),
+                    '-o',
+                    str(path / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             for mode in ('success', 'fail'):
                 with self.subTest(mode=mode):
-                    result = subprocess.run([str(path/'test'), mode], capture_output=True, text=True)
+                    result = subprocess.run(
+                        [str(path / 'test'), mode], capture_output=True, text=True
+                    )
                     self.assertEqual(result.returncode, 0, result.stderr)
                     report = json.loads(result.stdout)
                     self.assertEqual(report['result'], 'PASS')

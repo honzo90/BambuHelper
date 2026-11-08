@@ -3,6 +3,7 @@
 Preprocesses project sources and compiles real request/client functions against
 counting TLS/HTTP stubs. Never starts networking, serial or account login.
 """
+
 from pathlib import Path
 import re
 import shutil
@@ -37,17 +38,24 @@ def preprocess(relative, monitor):
 
 def section(source, begin, end):
     start = source.index(begin)
-    return source[start:source.index(end, start)]
+    return source[start : source.index(end, start)]
 
 
 def native(source, monitor):
     with tempfile.TemporaryDirectory(prefix='bambu-cloud-policy-') as folder:
         cpp, binary = Path(folder) / 'policy.cpp', Path(folder) / 'policy'
         cpp.write_text('#include "ws43b_memory_diag.h"\n' + source)
-        args = [compiler(), '-std=c++17', '-I' + str(REPO / 'src'), f'-DBAMBU_MONITOR_ONLY={monitor}']
+        args = [
+            compiler(),
+            '-std=c++17',
+            '-I' + str(REPO / 'src'),
+            f'-DBAMBU_MONITOR_ONLY={monitor}',
+        ]
         if monitor:
             args.append('-DBOARD_IS_WS43B=1')
-        subprocess.run(args + [str(cpp), '-o', str(binary)], capture_output=True, text=True, check=True)
+        subprocess.run(
+            args + [str(cpp), '-o', str(binary)], capture_output=True, text=True, check=True
+        )
         subprocess.run([str(binary)], capture_output=True, text=True, check=True)
 
 
@@ -57,9 +65,15 @@ class CloudPolicyTests(unittest.TestCase):
         normal = preprocess('src/cloud_login.cpp', 0)
         self.assertIn('CLOUD_POLICY_FEATURE 0', monitor)
         self.assertIn('CLOUD_POLICY_FEATURE 1', normal)
-        for symbol in ('cloudLoginWithPassword(', 'cloudLoginRequestEmailCode(',
-                       'cloudLoginSubmitCode(', 'cloudLoginRefreshStored(',
-                       'loadCloudPassword(', 'user/login', 'sendemail/code'):
+        for symbol in (
+            'cloudLoginWithPassword(',
+            'cloudLoginRequestEmailCode(',
+            'cloudLoginSubmitCode(',
+            'cloudLoginRefreshStored(',
+            'loadCloudPassword(',
+            'user/login',
+            'sendemail/code',
+        ):
             self.assertNotIn(symbol, monitor)
             self.assertIn(symbol, normal)
 
@@ -76,7 +90,11 @@ class CloudPolicyTests(unittest.TestCase):
     def test_mqtt_has_no_password_login_call_or_definition(self):
         monitor = preprocess('src/bambu_mqtt.cpp', 1)
         normal = preprocess('src/bambu_mqtt.cpp', 0)
-        for symbol in ('tryStoredPasswordRelogin(', 'cloudLoginCanAutoRefresh(', 'cloudLoginRefreshStored('):
+        for symbol in (
+            'tryStoredPasswordRelogin(',
+            'cloudLoginCanAutoRefresh(',
+            'cloudLoginRefreshStored(',
+        ):
             self.assertNotIn(symbol, monitor)
             self.assertIn(symbol, normal)
         # LAN's original self-signed-certificate behavior is explicitly retained.
@@ -86,7 +104,8 @@ class CloudPolicyTests(unittest.TestCase):
     def test_actual_https_request_never_retries_insecure_in_monitor(self):
         source = (REPO / 'src/bambu_cloud.cpp').read_text()
         function = section(source, 'static int httpsRequest(const char*', '// Base64url decode')
-        harness = r'''
+        harness = (
+            r'''
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
@@ -108,7 +127,9 @@ struct Console {void println(const char*) {}} Serial;
 int httpsRequestWith(WiFiClientSecure&,const char*,const char*,const char*,const char*,String&,const char*) {
  ++requests;return requests==1?firstResult:200;
 }
-''' + function
+'''
+            + function
+        )
         harness += r'''
 int main() {
  String response;
@@ -132,7 +153,8 @@ int main() {
         source = (REPO / 'src/bambu_mqtt.cpp').read_text()
         function = section(source, 'static bool ensureClients(', '//  Request pushall')
         # Include only the function: the trailing separator comments are harmless.
-        harness = r'''
+        harness = (
+            r'''
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
@@ -172,7 +194,9 @@ struct Printer {PrinterConfig config;} printers[1];
 bool isCloudMode(int mode) {return mode==1;}
 const char* getBambuBroker(int) {return "synthetic.example";}
 struct MqttConn {int slotIndex=0;WiFiClientSecure* tls=nullptr;MqttRxClient* io=nullptr;PubSubClient* mqtt=nullptr;};
-''' + function
+'''
+            + function
+        )
         harness += r'''
 int main() {
  MqttConn cloud;printers[0].config.mode=1;

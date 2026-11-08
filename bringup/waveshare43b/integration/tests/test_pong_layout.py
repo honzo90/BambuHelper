@@ -1,10 +1,14 @@
 """Native Pong geometry must fit both the framebuffer and navigation."""
+
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class PongLayout(unittest.TestCase):
- def test_playfield_fits_native_screen_and_avoids_footer(self):
-  code=r'''
+    def test_playfield_fits_native_screen_and_avoids_footer(self):
+        code = r'''
 #include "layout_800x480.h"
 #include <cassert>
 int main(){
@@ -15,7 +19,19 @@ int main(){
  static_assert(LY_ARK_DATE_CLR_X+LY_ARK_DATE_CLR_W<=800,"date clear bounds");
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-I'+str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-I' + str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

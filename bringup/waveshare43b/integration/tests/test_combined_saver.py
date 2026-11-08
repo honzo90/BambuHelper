@@ -1,16 +1,20 @@
 """Run the real saver renderer against synthetic simultaneous activities."""
+
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class CombinedSaver(unittest.TestCase):
- def test_print_drying_priority_staleness_and_dirty_regions(self):
-  s=(ROOT/'src/display_ws43b.cpp').read_text()
-  start=s.index('// The two concurrent activities have independent timers.')
-  end=s.index('void setupScreen(',start)
-  real=s[start:end]
-  start=s.index('bool clockHasProgress(')
-  real=s[start:s.index('bool coolingView(',start)]+real
-  stub=r'''
+    def test_print_drying_priority_staleness_and_dirty_regions(self):
+        s = (ROOT / 'src/display_ws43b.cpp').read_text()
+        start = s.index('// The two concurrent activities have independent timers.')
+        end = s.index('void setupScreen(', start)
+        real = s[start:end]
+        start = s.index('bool clockHasProgress(')
+        real = s[start : s.index('bool coolingView(', start)] + real
+        stub = r'''
 #include "bambu_monitor.h"
 namespace lgfx {using rgb565_t=uint16_t;}
 #include "ws43b_dashboard_policy.h"
@@ -72,7 +76,7 @@ template<class F>const char*missing(const F&f,bool online,uint32_t now){return o
 bool alert=false,cooling=false;
 auto saverView(const BambuMonitorTelemetry&m,bool online,uint32_t now){return ws43b_view::saver(m,online,now,cooling,alert);}
 '''
-  case=r'''
+        case = r'''
 bool has(const char*s){for(auto&t:texts)if(t.find(s)!=std::string::npos)return true;return false;}
 bool exact(const char*s){for(auto&t:texts)if(t==s)return true;return false;}
 bool dual(){for(auto&r:clears)if(r.x==680&&r.y==262)return true;return false;}
@@ -182,8 +186,23 @@ void runMode(){
 }
 int main(){for(bool advanced:{false,true}){advancedDisplay=advanced;runMode();}}
 '''
-  with tempfile.TemporaryDirectory() as t:
-   p=Path(t);(p/'test.cpp').write_text(stub+real+case)
-   r=subprocess.run(['clang++','-std=c++17','-fsanitize=address,undefined','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],text=True,capture_output=True)
-   self.assertEqual(r.returncode,0,r.stderr)
-   r=subprocess.run([str(p/'test')],text=True,capture_output=True);self.assertEqual(r.returncode,0,r.stderr)
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t)
+            (p / 'test.cpp').write_text(stub + real + case)
+            r = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(p / 'test')], text=True, capture_output=True)
+            self.assertEqual(r.returncode, 0, r.stderr)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Independent offline acceptance: WS43B Beta channel; never contacts a device/network."""
+
 from html.parser import HTMLParser
 import json
 from pathlib import Path
@@ -15,8 +16,11 @@ import localize_web
 from test_full_webui import function
 
 FUNCTIONS = (
-    "compareWs43bVersions", "selectWs43bRelease", "changeWs43bOtaChannel",
-    "checkWs43bUpdates", "checkForUpdates",
+    "compareWs43bVersions",
+    "selectWs43bRelease",
+    "changeWs43bOtaChannel",
+    "checkWs43bUpdates",
+    "checkForUpdates",
 )
 
 
@@ -276,9 +280,20 @@ class BetaAcceptance(unittest.TestCase):
                 label = "No stable release has been published for this channel yet."
                 if language == "pl":
                     label = localize_web.catalog()[label]
-                script = "const STABLE404=" + json.dumps(label) + ";\n" + HARNESS + "\n".join(snippets) + CASES
-                result = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=30)
-                self.assertEqual(result.returncode, 0, language + ":\n" + result.stdout + result.stderr)
+                script = (
+                    "const STABLE404="
+                    + json.dumps(label)
+                    + ";\n"
+                    + HARNESS
+                    + "\n".join(snippets)
+                    + CASES
+                )
+                result = subprocess.run(
+                    ["node", "-e", script], capture_output=True, text=True, timeout=30
+                )
+                self.assertEqual(
+                    result.returncode, 0, language + ":\n" + result.stdout + result.stderr
+                )
 
     def test_review_edge_cases(self):
         """Run independent cases to report every edge failure in one repair pass."""
@@ -355,9 +370,20 @@ edges().catch(e=>{console.error(e);process.exitCode=1;});
                 label = "No stable release has been published for this channel yet."
                 if language == "pl":
                     label = localize_web.catalog()[label]
-                script = "const STABLE404=" + json.dumps(label) + ";\n" + HARNESS + "\n".join(snippets) + edge_cases
-                result = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=30)
-                self.assertEqual(result.returncode, 0, language + ":\n" + result.stdout + result.stderr)
+                script = (
+                    "const STABLE404="
+                    + json.dumps(label)
+                    + ";\n"
+                    + HARNESS
+                    + "\n".join(snippets)
+                    + edge_cases
+                )
+                result = subprocess.run(
+                    ["node", "-e", script], capture_output=True, text=True, timeout=30
+                )
+                self.assertEqual(
+                    result.returncode, 0, language + ":\n" + result.stdout + result.stderr
+                )
 
     def test_markup_compilation_and_labels_en_pl(self):
         source = (ROOT / "include/web_pages.h").read_text()
@@ -372,7 +398,9 @@ edges().catch(e=>{console.error(e);process.exitCode=1;});
                         argv += ["-DBOARD_IS_WS43B=1"]
                     if auto:
                         argv += ["-DENABLE_OTA_AUTO=1"]
-                    result = subprocess.run(argv + ["-"], input=minimal, capture_output=True, text=True, timeout=30)
+                    result = subprocess.run(
+                        argv + ["-"], input=minimal, capture_output=True, text=True, timeout=30
+                    )
                     self.assertEqual(result.returncode, 0, result.stderr)
                     parser = ChannelMarkup()
                     parser.feed(result.stdout)
@@ -380,12 +408,21 @@ edges().catch(e=>{console.error(e);process.exitCode=1;});
                     if not parser.selects:
                         continue
                     picker = parser.selects[0]
-                    self.assertRegex(picker["attrs"].get("onchange", ""), r"\bchangeWs43bOtaChannel\s*\(")
+                    self.assertRegex(
+                        picker["attrs"].get("onchange", ""), r"\bchangeWs43bOtaChannel\s*\("
+                    )
                     options = picker["options"]
                     self.assertEqual([o["attrs"].get("value") for o in options], ["stable", "beta"])
-                    self.assertEqual([o["text"].strip() for o in options], ["Stabilny" if language == "pl" else "Stable", "Beta"])
+                    self.assertEqual(
+                        [o["text"].strip() for o in options],
+                        ["Stabilny" if language == "pl" else "Stable", "Beta"],
+                    )
                     self.assertNotIn("selected", options[1]["attrs"])
-                    hint = ("Beta zawiera wydania testowe i może działać niestabilnie. Po ponownym otwarciu strony wybrany jest kanał stabilny." if language == "pl" else "Beta includes test releases and may be unstable. Stable is selected when this page is reopened.")
+                    hint = (
+                        "Beta zawiera wydania testowe i może działać niestabilnie. Po ponownym otwarciu strony wybrany jest kanał stabilny."
+                        if language == "pl"
+                        else "Beta includes test releases and may be unstable. Stable is selected when this page is reopened."
+                    )
                     self.assertIn(hint, result.stdout)
 
 

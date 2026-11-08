@@ -1,11 +1,18 @@
 """Exercise the upstream packet adapter with synthetic, fragmented MQTT frames."""
+
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class MqttRx(unittest.TestCase):
- def test_fragmentation_controls_invalid_lengths_and_recovery(self):
-  s=(ROOT/'src/bambu_mqtt.cpp').read_text();start=s.index('class MqttRxClient : public Client {');end=s.index('\n};',start)+3
-  code=r'''
+    def test_fragmentation_controls_invalid_lengths_and_recovery(self):
+        s = (ROOT / 'src/bambu_mqtt.cpp').read_text()
+        start = s.index('class MqttRxClient : public Client {')
+        end = s.index('\n};', start) + 3
+        code = (
+            r'''
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
@@ -31,7 +38,9 @@ struct WiFiClientSecure {
  void flush(){}void stop(){live=false;}uint8_t connected(){return live;}operator bool(){return live;}
  void add(std::initializer_list<uint8_t> b){in.insert(in.end(),b);}
 };
-''' + s[start:end] + r'''
+'''
+            + s[start:end]
+            + r'''
 static int callbacks=0;static std::string topic,payload;
 void got(char*t,byte*p,unsigned n){++callbacks;topic=t;payload.assign((char*)p,n);}
 int main(){
@@ -54,8 +63,22 @@ int main(){
  tls.in.clear();tls.pos=0;rx.connect("fixture",8883);tls.add({0x30,4,0,1,'t','3'});rx.available();assert(callbacks==4&&payload=="3");
 }
 '''
-  with tempfile.TemporaryDirectory() as t:
-   p=Path(t);(p/'rx.cpp').write_text(code)
-   for async_connect in (0,1):
-    subprocess.run(['clang++','-std=c++17',f'-DBOARD_MQTT_ASYNC_CONNECT={async_connect}','-fsanitize=address,undefined',str(p/'rx.cpp'),'-o',str(p/'rx')],check=True,capture_output=True)
-    subprocess.run([str(p/'rx')],check=True,capture_output=True)
+        )
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t)
+            (p / 'rx.cpp').write_text(code)
+            for async_connect in (0, 1):
+                subprocess.run(
+                    [
+                        'clang++',
+                        '-std=c++17',
+                        f'-DBOARD_MQTT_ASYNC_CONNECT={async_connect}',
+                        '-fsanitize=address,undefined',
+                        str(p / 'rx.cpp'),
+                        '-o',
+                        str(p / 'rx'),
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run([str(p / 'rx')], check=True, capture_output=True)

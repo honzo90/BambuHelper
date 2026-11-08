@@ -1,4 +1,5 @@
 """The table-based dimming used while presenting equals dimRgb565() exactly."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -29,10 +30,27 @@ int main(){
 class DimTable(unittest.TestCase):
     def test_table_matches_formula(self):
         with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / 'dim.cpp'; src.write_text(HARNESS)
+            src = Path(tmp) / 'dim.cpp'
+            src.write_text(HARNESS)
             exe = Path(tmp) / 'dim'
-            subprocess.run(['clang++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'src'),
-                            str(src), '-o', str(exe)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O2',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'src'),
+                    str(src),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(exe)], check=True)
 
 

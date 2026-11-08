@@ -1,4 +1,5 @@
 """Selective repaint preserves field freshness, age labels and scene dependencies."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -110,10 +111,20 @@ int main() {
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory)
             (p / 'test.cpp').write_text(code)
-            result = subprocess.run([
-                'clang++', '-std=c++17', '-fsanitize=address,undefined',
-                '-I', str(ROOT / 'include'), str(p / 'test.cpp'), '-o', str(p / 'test'),
-            ], capture_output=True, text=True)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(p / 'test')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

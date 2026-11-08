@@ -1,4 +1,5 @@
 """Advanced first-layer policy differs from the saver's current MQTT progress."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,16 +12,20 @@ class FirstLayerProgress(unittest.TestCase):
     def test_first_layer_evidence_sparse_fields_and_activity_precedence(self):
         display = (ROOT / 'src/display_ws43b.cpp').read_text()
         start = display.index('bool clockHasProgress(')
-        clock_gate = display[start:display.index('bool coolingView(', start)]
+        clock_gate = display[start : display.index('bool coolingView(', start)]
         start = display.index('uint16_t saverFilamentColor(const BambuMonitorTelemetry &m')
-        filament = display[start:display.index('void saverAnimation(', start)]
-        code = r'''
+        filament = display[start : display.index('void saverAnimation(', start)]
+        code = (
+            r'''
 #include "ws43b_dashboard_policy.h"
 #include "ws43b_live_view.h"
 #include <cassert>
 #include <initializer_list>
 using namespace ws43b_view;
-''' + clock_gate + filament + r'''
+'''
+            + clock_gate
+            + filament
+            + r'''
 BambuMonitorTelemetry active(const char *status="RUNNING",uint32_t now=100) {
  BambuMonitorTelemetry m;
  m.status.set(status,now);m.progress.set(12,now);m.remainingMinutes.set(80,now);
@@ -129,14 +134,27 @@ int main() {
  assert(signature(ws43b_live::View::Ams)==amsBefore);
 }
 '''
+        )
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory)
             (p / 'test.cpp').write_text(code)
-            result = subprocess.run([
-                'clang++', '-std=c++17', '-Wall', '-Wextra', '-Werror',
-                '-fsanitize=address,undefined', '-I', str(ROOT / 'include'),
-                str(p / 'test.cpp'), '-o', str(p / 'test'),
-            ], capture_output=True, text=True)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(p / 'test')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

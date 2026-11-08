@@ -237,8 +237,9 @@ def verify_sdk_manifest(manifest_path=None, expected_sha256=None):
     for config in configs:
         for key in enabled:
             _require(config.get(key) == "1", f"required config not enabled: {key}")
-        _require(config.get("CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE") == "64",
-                "cache line size must be 64")
+        _require(
+            config.get("CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE") == "64", "cache line size must be 64"
+        )
 
         disabled = [
             "CONFIG_ESP32S3_DATA_CACHE_LINE_16B",
@@ -394,7 +395,7 @@ def verify_link_map(record, map_path, elf_path):
         }
 
     cross_pos = map_text.find("Cross Reference Table", header_pos)
-    used_text = map_text[header_pos:cross_pos if cross_pos >= 0 else len(map_text)]
+    used_text = map_text[header_pos : cross_pos if cross_pos >= 0 else len(map_text)]
 
     required = {
         "cpu_start.c.obj": sdk / "libesp_system.a",
@@ -416,7 +417,9 @@ def verify_link_map(record, map_path, elf_path):
 
     definitions = {}
     for line in nm_output.splitlines():
-        m = re.fullmatch(r"\s*([0-9a-fA-F]+)\s+(?:([0-9a-fA-F]+)\s+)?([A-Za-z])\s+([^\s]+)\s*", line)
+        m = re.fullmatch(
+            r"\s*([0-9a-fA-F]+)\s+(?:([0-9a-fA-F]+)\s+)?([A-Za-z])\s+([^\s]+)\s*", line
+        )
         if not m:
             continue
         addr = m.group(1)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate one uninterrupted smoke observation; never claims visual hardware PASS."""
+
 import argparse
 from pathlib import Path
 
@@ -33,7 +34,19 @@ def evaluate(text):
             return False, 'Restart/nowy BOOT podczas obserwacji'
         if kind == 'DIAG' and runs:
             try:
-                row = {k: int(values[k]) for k in ('uptime_ms', 'run_ms', 'wifi', 'wifi_ms', 'drops', 'targets', 'touch_errors', 'memory_errors')}
+                row = {
+                    k: int(values[k])
+                    for k in (
+                        'uptime_ms',
+                        'run_ms',
+                        'wifi',
+                        'wifi_ms',
+                        'drops',
+                        'targets',
+                        'touch_errors',
+                        'memory_errors',
+                    )
+                }
                 row['boot'] = values['boot']
                 row['host'] = float(parts[0])
             except (KeyError, ValueError):
@@ -44,7 +57,11 @@ def evaluate(text):
     if rows[0]['run_ms'] > 10000:
         return False, 'Brak początku obserwacji'
     for r in rows:
-        if r['boot'] != boot or r['wifi'] != 1 or any(r[k] for k in ('drops', 'touch_errors', 'memory_errors')):
+        if (
+            r['boot'] != boot
+            or r['wifi'] != 1
+            or any(r[k] for k in ('drops', 'touch_errors', 'memory_errors'))
+        ):
             return False, 'Restart, utrata Wi-Fi lub błąd dotyku/pamięci'
     for a, b in zip(rows, rows[1:]):
         if not 0 < b['uptime_ms'] - a['uptime_ms'] <= 10000 or not 0 < b['host'] - a['host'] <= 12:
@@ -54,7 +71,9 @@ def evaluate(text):
         return False, 'Brak danych przy zakończeniu obserwacji'
     if min(last['run_ms'], last['wifi_ms']) < 600000 or last['targets'] != 31:
         return False, 'Nie osiągnięto 600 s ciągłego Wi-Fi i wszystkich pięciu celów'
-    if (last['host'] - rows[0]['host']) < 600 or (last['uptime_ms'] - rows[0]['uptime_ms']) < 600000:
+    if (last['host'] - rows[0]['host']) < 600 or (
+        last['uptime_ms'] - rows[0]['uptime_ms']
+    ) < 600000:
         return False, 'Za krótka rzeczywista obserwacja (wymagane 600 s między rekordami)'
     return True, 'LOG_OK; nadal wymagane 10 min wizualnego potwierdzenia obrazu i zgodności dotyku'
 

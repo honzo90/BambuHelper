@@ -3,6 +3,7 @@
 
 Uses temporary C++ stubs only; no serial port, network, firmware or credentials.
 """
+
 import pathlib
 import re
 import shutil
@@ -14,7 +15,7 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 
 
 def function_span(source, start, end):
-    return source[source.index(start):source.index(end, source.index(start))]
+    return source[source.index(start) : source.index(end, source.index(start))]
 
 
 def native_run(source, monitor):
@@ -25,9 +26,21 @@ def native_run(source, monitor):
         cpp = pathlib.Path(folder) / "policy.cpp"
         binary = pathlib.Path(folder) / "policy"
         cpp.write_text(source)
-        subprocess.run([compiler, "-std=c++17", f"-DBAMBU_MONITOR_ONLY={monitor}",
-                        "-DHAS_CLOUD_LOGIN=1", "-DENABLE_OTA_AUTO=1", str(cpp),
-                        "-o", str(binary)], check=True, capture_output=True, text=True)
+        subprocess.run(
+            [
+                compiler,
+                "-std=c++17",
+                f"-DBAMBU_MONITOR_ONLY={monitor}",
+                "-DHAS_CLOUD_LOGIN=1",
+                "-DENABLE_OTA_AUTO=1",
+                str(cpp),
+                "-o",
+                str(binary),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
 
@@ -36,8 +49,9 @@ class MonitorPolicyTests(unittest.TestCase):
         src = (REPO / "src/web_server.cpp").read_text()
         init = function_span(src, "void initWebServer() {", "void handleWebServer()")
         handlers = set(re.findall(r"\b(handle\w+)\b", init))
-        declarations = "\n".join("void " + h + "() {}" for h in sorted(handlers)
-                                 if h != "handleMonitorBlocked")
+        declarations = "\n".join(
+            "void " + h + "() {}" for h in sorted(handlers) if h != "handleMonitorBlocked"
+        )
         denied = function_span(src, "static void handleMonitorBlocked() {", "\n#endif")
         harness = r'''
 #include <cassert>

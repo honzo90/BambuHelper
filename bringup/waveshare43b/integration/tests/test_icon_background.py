@@ -1,12 +1,20 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class IconBackground(unittest.TestCase):
- def test_dirty_restore_matches_full_frame(self):
-  src=(ROOT/'src/display_ws43b.cpp').read_text()
-  water=src[src.index('uint16_t waterColor('):src.index('bool clockHasProgress(')]
-  background=src[src.index('void drawClockBackground(bool, int, uint32_t now) {'):src.index('void clockWeatherIcon(const BambuMonitorTelemetry &,bool,uint32_t now) {')]
-  code=r'''
+    def test_dirty_restore_matches_full_frame(self):
+        src = (ROOT / 'src/display_ws43b.cpp').read_text()
+        water = src[src.index('uint16_t waterColor(') : src.index('bool clockHasProgress(')]
+        background = src[
+            src.index('void drawClockBackground(bool, int, uint32_t now) {') : src.index(
+                'void clockWeatherIcon(const BambuMonitorTelemetry &,bool,uint32_t now) {'
+            )
+        ]
+        code = (
+            r'''
 #include <cstdint>
 #include <cmath>
 #include <vector>
@@ -21,7 +29,10 @@ struct Surface {
  void drawFastHLine(int x,int y,int w,uint16_t c){for(int i=0;i<w;++i)dot(x+i,y,c);}
  void fillRect(int x,int y,int w,int h,uint16_t c){for(int j=0;j<h;++j)drawFastHLine(x,y+j,w,c);}
 }tft;
-'''+water+background+r'''
+'''
+            + water
+            + background
+            + r'''
 int main(){
  for(bool valid:{false,true})for(int progress:{0,1,45,46,50,56,60,63,99,100})for(unsigned now:{0u,500u,1234u,65000u}){
   tft.cx=0;tft.cy=0;tft.cw=800;tft.ch=480;drawClockBackground(valid,progress,now);auto full=tft.p;
@@ -31,7 +42,21 @@ int main(){
  }
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)

@@ -1,12 +1,16 @@
 """Real production pending-row/copy helpers: alternating scanout consistency."""
+
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+
 ROOT = Path(__file__).resolve().parents[4]
+
+
 class PartialFramesTest(unittest.TestCase):
     def test_alternating_buffers_keep_all_previous_changes(self):
-        code=r'''
+        code = r'''
 #include "ws43b_frame_copy.h"
 #include "ws43b_water_clock.h"
 #include <cassert>
@@ -41,6 +45,24 @@ int main() {
 }
 '''
         with tempfile.TemporaryDirectory() as folder:
-            p=Path(folder)/'test.cpp';p.write_text(code);binary=Path(folder)/'test'
-            subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'src'),'-I',str(ROOT/'include'),str(p),'-o',str(binary)],check=True)
-            subprocess.run([str(binary)],check=True)
+            p = Path(folder) / 'test.cpp'
+            p.write_text(code)
+            binary = Path(folder) / 'test'
+            subprocess.run(
+                [
+                    'c++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'src'),
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p),
+                    '-o',
+                    str(binary),
+                ],
+                check=True,
+            )
+            subprocess.run([str(binary)], check=True)

@@ -1,14 +1,22 @@
 """Exercise production header patches and icon animation for both header layouts."""
+
 from pathlib import Path
 import subprocess, tempfile, unittest
+
 ROOT = Path(__file__).resolve().parents[4]
 
+
 class WeatherHeaderAnimation(unittest.TestCase):
- def test_actual_patch_bounds_motion_and_missing_data(self):
-  source = (ROOT/'src/display_ws43b.cpp').read_text()
-  function = source[source.index('bool weatherHeaderVisible=false;'):source.index('bool dashboardCooling=false')]
-  clear = source[source.index('void v2Clear('):source.index('int v2Text(')]
-  code = r'''
+    def test_actual_patch_bounds_motion_and_missing_data(self):
+        source = (ROOT / 'src/display_ws43b.cpp').read_text()
+        function = source[
+            source.index('bool weatherHeaderVisible=false;') : source.index(
+                'bool dashboardCooling=false'
+            )
+        ]
+        clear = source[source.index('void v2Clear(') : source.index('int v2Text(')]
+        code = (
+            r'''
 #include "ws43b_weather_icons.h"
 #include "fonts/ws43b_dashboard_v2.h"
 #include <cassert>
@@ -96,7 +104,10 @@ struct Canvas {
   return right;
  }
 }tft;
-''' + clear + function + r'''
+'''
+            + clear
+            + function
+            + r'''
 int main(){
  for(Page destination:{Page::Dashboard,Page::Ams,Page::Details,Page::Settings}) {
   page=destination;data={};config.enabled=true;tft.clears=0;tft.image.fill(0xdead);
@@ -124,7 +135,26 @@ int main(){
  }
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code);(p/'pgmspace.h').write_text('#pragma once\n#define PROGMEM\n')
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(p),'-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True)
-   subprocess.run([str(p/'test')],check=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            (p / 'pgmspace.h').write_text('#pragma once\n#define PROGMEM\n')
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(p),
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

@@ -9,11 +9,22 @@ ROOT = Path(__file__).resolve().parents[4]
 class DetailsLastReading(unittest.TestCase):
     def test_related_deltas_retain_readings_but_silence_and_offline_show_age(self):
         source = (ROOT / 'src/display_ws43b.cpp').read_text()
-        functions = source[source.index('template <class Field>\nconst char *missing'):source.index('void temperature(')]
-        functions += source[source.index('void detailCard('):source.index('void levelCard(')]
-        functions += source[source.index('template<class Field>\nvoid amsReadingAge'):source.index('void amsView(')]
-        functions += source[source.index('// Match the dashboard/AMS policy:'):source.index('void settingRow(')]
-        code = r'''
+        functions = source[
+            source.index('template <class Field>\nconst char *missing') : source.index(
+                'void temperature('
+            )
+        ]
+        functions += source[source.index('void detailCard(') : source.index('void levelCard(')]
+        functions += source[
+            source.index('template<class Field>\nvoid amsReadingAge') : source.index(
+                'void amsView('
+            )
+        ]
+        functions += source[
+            source.index('// Match the dashboard/AMS policy:') : source.index('void settingRow(')
+        ]
+        code = (
+            r'''
 #include "bambu_monitor_parser.h"
 #include <cassert>
 #include <cstdio>
@@ -34,7 +45,9 @@ struct Canvas {
  void loadFont(int){}void unloadFont(){}
  int textWidth(const char*s){return strlen(s)*9;}
 }tft;
-''' + functions + r'''
+'''
+            + functions
+            + r'''
 bool at(int x,int y,const char*s,int color){for(auto &t:texts)if(t.x==x&&t.y==y&&t.value==s&&t.color==color)return true;return false;}
 bool contains(const char*s){for(auto &t:texts)if(t.value.find(s)!=std::string::npos)return true;return false;}
 void draw(const BambuMonitorTelemetry&m,bool online,uint32_t now){texts.clear();bars.clear();detailsScreen(m,online,now);}
@@ -74,12 +87,25 @@ int main(){
  m.speedLevel.set(2,0xffffff00u);draw(m,true,0x100u);assert(at(552,257,"Standard",INK)&&!contains("temu"));
 }
 '''
+        )
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp)
             (p / 'test.cpp').write_text(code)
-            subprocess.run([
-                'clang++', '-std=c++17', '-Wno-deprecated-declarations',
-                '-I', str(ROOT / 'include'), '-I', str(ROOT / 'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),
-                str(p / 'test.cpp'), '-o', str(p / 'test')], check=True, capture_output=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wno-deprecated-declarations',
+                    '-I',
+                    str(ROOT / 'include'),
+                    '-I',
+                    str(ROOT / 'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
             result = subprocess.run([str(p / 'test')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

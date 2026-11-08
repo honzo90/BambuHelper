@@ -1,11 +1,14 @@
 """Live-screen scheduling and stale recovery without falsifying observations."""
+
 from pathlib import Path
 import re, subprocess, tempfile, unittest
-ROOT=Path(__file__).resolve().parents[4]
+
+ROOT = Path(__file__).resolve().parents[4]
+
 
 class LiveView(unittest.TestCase):
- def test_humidity_recovery_tracks_the_displayed_sensor(self):
-  code=r'''
+    def test_humidity_recovery_tracks_the_displayed_sensor(self):
+        code = r'''
 #include "ws43b_live_view.h"
 #include <cassert>
 using namespace ws43b_live;
@@ -62,15 +65,29 @@ int main(){
  u.humidity.set(3,10);assert(!amsHumidityUsesRaw(u,100000));
 }
 '''
-  with tempfile.TemporaryDirectory() as t:
-   p=Path(t);(p/'test.cpp').write_text('#include <initializer_list>\n'+code)
-   r=subprocess.run(['clang++','-std=c++17','-fsanitize=address,undefined','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],capture_output=True,text=True)
-   self.assertEqual(r.returncode,0,r.stderr)
-   r=subprocess.run([str(p/'test')],capture_output=True,text=True)
-   self.assertEqual(r.returncode,0,r.stderr)
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t)
+            (p / 'test.cpp').write_text('#include <initializer_list>\n' + code)
+            r = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(p / 'test')], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
 
- def test_priority_delta_stale_and_request_budget(self):
-  code=r'''
+    def test_priority_delta_stale_and_request_budget(self):
+        code = r'''
 #include "ws43b_live_view.h"
 #include <cassert>
 using namespace ws43b_live;
@@ -115,23 +132,56 @@ int main(){
  m.newSession();assert(!needsRefresh(m,View::Dashboard,0,true,60200)&&!m.nozzleTemp.valid);
 }
 '''
-  with tempfile.TemporaryDirectory() as t:
-   p=Path(t);(p/'test.cpp').write_text(code)
-   r=subprocess.run(['clang++','-std=c++17','-fsanitize=address,undefined','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],capture_output=True,text=True)
-   self.assertEqual(r.returncode,0,r.stderr)
-   r=subprocess.run([str(p/'test')],capture_output=True,text=True)
-   self.assertEqual(r.returncode,0,r.stderr)
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t)
+            (p / 'test.cpp').write_text(code)
+            r = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(p / 'test')], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
 
- def test_effective_loop_order_and_single_service(self):
-  source=(ROOT/'src/main.cpp').read_text();source=source[source.index('void loop() {'):]
-  source=re.sub(r'^\s*#include[^\n]*\n','',source,flags=re.M)
-  for board in (False,True):
-   r=subprocess.run(['clang++','-E','-P','-x','c++','-DBAMBU_MONITOR_ONLY=0',*(['-DBOARD_IS_WS43B=1'] if board else []),'-'],input=source,text=True,capture_output=True)
-   self.assertEqual(r.returncode,0,r.stderr);s=r.stdout
-   self.assertEqual(s.count('handleBambuMqtt();'),1)
-   self.assertEqual(s.count('handleWakeButton();'),1)
-   self.assertLess(s.index('handleWakeButton();'),s.index('handleBambuMqtt();'))
-   if board:
-    self.assertLess(s.index('handleBambuMqtt();'),s.index('updateDisplayedPrinterScreenState();'))
-    self.assertLess(s.index('handleBambuMqtt();'),s.index('updateDisplay();'))
-   else:self.assertLess(s.index('updateDisplay();'),s.index('handleBambuMqtt();'))
+    def test_effective_loop_order_and_single_service(self):
+        source = (ROOT / 'src/main.cpp').read_text()
+        source = source[source.index('void loop() {') :]
+        source = re.sub(r'^\s*#include[^\n]*\n', '', source, flags=re.M)
+        for board in (False, True):
+            r = subprocess.run(
+                [
+                    'clang++',
+                    '-E',
+                    '-P',
+                    '-x',
+                    'c++',
+                    '-DBAMBU_MONITOR_ONLY=0',
+                    *(['-DBOARD_IS_WS43B=1'] if board else []),
+                    '-',
+                ],
+                input=source,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            s = r.stdout
+            self.assertEqual(s.count('handleBambuMqtt();'), 1)
+            self.assertEqual(s.count('handleWakeButton();'), 1)
+            self.assertLess(s.index('handleWakeButton();'), s.index('handleBambuMqtt();'))
+            if board:
+                self.assertLess(
+                    s.index('handleBambuMqtt();'), s.index('updateDisplayedPrinterScreenState();')
+                )
+                self.assertLess(s.index('handleBambuMqtt();'), s.index('updateDisplay();'))
+            else:
+                self.assertLess(s.index('updateDisplay();'), s.index('handleBambuMqtt();'))

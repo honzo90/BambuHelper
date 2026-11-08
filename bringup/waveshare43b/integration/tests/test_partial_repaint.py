@@ -3,6 +3,7 @@
 Glyphs and decorative shapes use simple host marks. This verifies paint routing,
 clearing and text retention; it does not claim device-font or artwork fidelity.
 """
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -14,14 +15,20 @@ ROOT = Path(__file__).resolve().parents[4]
 class PartialRepaint(unittest.TestCase):
     def test_real_grouped_render_matches_complete_composition(self):
         source = (ROOT / 'src/display_ws43b.cpp').read_text()
-        ams = source[source.index('const MonitorAmsUnit *amsUnit('):
-                     source.index('void dashboardTemperature(')]
-        dashboard = source[source.index('uint16_t dashboardSlotBg('):
-                           source.index('// Match the dashboard/AMS policy:')]
-        clear = source[source.index('void v2Clear('):source.index('int v2Text(')]
-        panel_icon = source[source.index('using UiAsset='):
-                            source.index('void v2Clear(')]
-        code = r'''
+        ams = source[
+            source.index('const MonitorAmsUnit *amsUnit(') : source.index(
+                'void dashboardTemperature('
+            )
+        ]
+        dashboard = source[
+            source.index('uint16_t dashboardSlotBg(') : source.index(
+                '// Match the dashboard/AMS policy:'
+            )
+        ]
+        clear = source[source.index('void v2Clear(') : source.index('int v2Text(')]
+        panel_icon = source[source.index('using UiAsset=') : source.index('void v2Clear(')]
+        code = (
+            r'''
 #include "bambu_monitor.h"
 #include "ws43b_dashboard_policy.h"
 #include "ws43b_repaint_plan.h"
@@ -137,7 +144,15 @@ void dashboardTemperature(int,int y,const char *name,const MonitorField<float> &
   char text[60];snprintf(text,sizeof text,"%.0f/%.0f/%d",double(actual.value),double(target.value),online&&actual.fresh(now));
   dashText(text,649,y+12,121,29,online?INK:DIM);
 }
-''' + panel_icon + '\n' + clear + '\n' + ams + '\n' + dashboard + r'''
+'''
+            + panel_icon
+            + '\n'
+            + clear
+            + '\n'
+            + ams
+            + '\n'
+            + dashboard
+            + r'''
 bool has(const char *needle){for(const auto &text:tft.texts)if(text.value.find(needle)!=std::string::npos)return true;return false;}
 bool exact(const char *needle){for(const auto &text:tft.texts)if(text.value==needle)return true;return false;}
 bool fillsRect(int x,int y,int w,int h,int color){
@@ -350,13 +365,24 @@ int main(){
   }
 }
 '''
+        )
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory)
             (p / 'test.cpp').write_text(code)
-            result = subprocess.run([
-                'clang++', '-std=c++17', '-fsanitize=address,undefined',
-                '-I', str(ROOT / 'include'), str(p / 'test.cpp'), '-o', str(p / 'test'),
-            ], capture_output=True, text=True)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(p / 'test')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

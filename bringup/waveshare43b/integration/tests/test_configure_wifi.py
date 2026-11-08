@@ -1,4 +1,5 @@
 """Synthetic Improv protocol/privacy tests. These never open a serial port."""
+
 import contextlib
 import importlib.util
 import io
@@ -24,7 +25,12 @@ def reply(command, values):
     return setup.frame(setup.RPC_RESPONSE, bytes((command, len(data))) + data)
 
 
-def info(firmware=setup.FIRMWARE, version=setup.FIRMWARE_VERSION, chip=setup.CHIP, name=b"BambuHelper-ABCD"):
+def info(
+    firmware=setup.FIRMWARE,
+    version=setup.FIRMWARE_VERSION,
+    chip=setup.CHIP,
+    name=b"BambuHelper-ABCD",
+):
     return reply(setup.GET_DEVICE_INFO, [firmware, version, chip, name])
 
 
@@ -33,7 +39,12 @@ def state(value):
 
 
 def success():
-    return state(3) + setup.frame(setup.ERROR_STATE, b"\0") + state(4) + reply(1, [b"http://192.168.1.123/"])
+    return (
+        state(3)
+        + setup.frame(setup.ERROR_STATE, b"\0")
+        + state(4)
+        + reply(1, [b"http://192.168.1.123/"])
+    )
 
 
 class Port:
@@ -72,7 +83,6 @@ def commands(port):
 
 
 class ImprovTests(unittest.TestCase):
-
     def test_actual_vendored_parser_accepts_host_frames_in_sequence(self):
         compiler = shutil.which("c++") or shutil.which("clang++")
         if not compiler:
@@ -80,15 +90,24 @@ class ImprovTests(unittest.TestCase):
         repo = PATH.parents[3]
         vendor = repo / "lib/ImprovWiFi/src"
         source = (vendor / "ImprovWiFiLibrary.cpp").read_text()
+
         def section(start, end):
             begin = source.index(start)
-            return source[begin:source.index(end, begin)]
+            return source[begin : source.index(end, begin)]
+
         methods = section("void ImprovWiFi::handleSerial()", "void ImprovWiFi::onErrorCallback")
-        methods += section("bool ImprovWiFi::parseImprovSerial(", "ImprovTypes::ImprovCommand ImprovWiFi::parseImprovData(const std::vector")
-        methods += section("ImprovTypes::ImprovCommand ImprovWiFi::parseImprovData(const uint8_t", "void ImprovWiFi::setState(")
+        methods += section(
+            "bool ImprovWiFi::parseImprovSerial(",
+            "ImprovTypes::ImprovCommand ImprovWiFi::parseImprovData(const std::vector",
+        )
+        methods += section(
+            "ImprovTypes::ImprovCommand ImprovWiFi::parseImprovData(const uint8_t",
+            "void ImprovWiFi::setState(",
+        )
         ssid, password = b"n" * 32, b"a" * 64
         traffic = setup.rpc(3) + setup.rpc(2) + setup.rpc(1, (ssid, password)) + setup.rpc(3)
-        harness = r'''
+        harness = (
+            r'''
 #include <cassert>
 #include <deque>
 #include "ImprovTypes.h"
@@ -110,8 +129,12 @@ public:
   bool onCommandCallback(ImprovTypes::ImprovCommand cmd) { received.push_back(cmd);return true; }
   void onErrorCallback(ImprovTypes::Error) { ++errors; }
 };
-''' + methods
-        harness += "\nint main(){FakeStream s; s.bytes={" + ",".join(str(b) for b in traffic) + "};\n"
+'''
+            + methods
+        )
+        harness += (
+            "\nint main(){FakeStream s; s.bytes={" + ",".join(str(b) for b in traffic) + "};\n"
+        )
         harness += r'''
 ImprovWiFi library; library.serial=&s;
 while(s.available()) library.handleSerial();
@@ -128,8 +151,12 @@ assert(library._position==0);
         with tempfile.TemporaryDirectory(prefix="bambu-improv-vendor-") as folder:
             cpp, binary = Path(folder) / "vendor.cpp", Path(folder) / "vendor"
             cpp.write_text(harness)
-            subprocess.run([compiler, "-std=c++20", "-I", str(vendor), str(cpp), "-o", str(binary)],
-                           check=True, capture_output=True, text=True)
+            subprocess.run(
+                [compiler, "-std=c++20", "-I", str(vendor), str(cpp), "-o", str(binary)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_golden_get_commands_and_separator(self):
@@ -160,8 +187,10 @@ assert(library._position==0);
         self.assertLessEqual(len(decoder.buffer), 5)
 
     def test_bad_checksum_version_type_and_state_length(self):
-        corrupt = bytearray(state(2)); corrupt[-1] ^= 1
-        wrong_version = bytearray(state(2)); wrong_version[6] = 2
+        corrupt = bytearray(state(2))
+        corrupt[-1] ^= 1
+        wrong_version = bytearray(state(2))
+        wrong_version[6] = 2
         wrong_type = setup.frame(setup.RPC, b"\3\0")
         bad_length = setup.frame(setup.CURRENT_STATE, b"\2\2")
         for value in (corrupt, wrong_version, wrong_type, bad_length):
@@ -174,8 +203,12 @@ assert(library._position==0);
                 setup.response(data, 3)
 
     def test_strict_application_version_chip_identity(self):
-        for raw in (info(firmware=b"BambuHelper"), info(version=b"v3.8.4"),
-                    info(chip=b"ESP32"), info(name=b"injected\n" + PASSWORD.encode())):
+        for raw in (
+            info(firmware=b"BambuHelper"),
+            info(version=b"v3.8.4"),
+            info(chip=b"ESP32"),
+            info(name=b"injected\n" + PASSWORD.encode()),
+        ):
             c, p = client([raw])
             with self.assertRaises(setup.SetupError) as error:
                 c.configure(SSID, PASSWORD)
@@ -196,7 +229,8 @@ assert(library._position==0);
         c, p = client([info(), state(2), info(), state(2), success()])
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-            c.identify(); self.assertIsNone(c.current_state())
+            c.identify()
+            self.assertIsNone(c.current_state())
             self.assertEqual(c.configure(SSID, PASSWORD), "http://192.168.1.123/")
         self.assertEqual(commands(p), [3, 2, 3, 2, 1])
         self.assertEqual(output.getvalue(), "")
@@ -216,9 +250,11 @@ assert(library._position==0);
             with self.assertRaises(setup.SetupError):
                 c.configure(SSID, PASSWORD)
             self.assertNotIn(1, commands(p))
-        for result in (state(4) + reply(1, [b"http://192.168.1.2/"]),
-                       state(3) + state(0) + setup.frame(2, b"\3"),
-                       state(3) + setup.frame(2, b"\0") + state(4) + reply(2, [b"http://192.168.1.2/"])):
+        for result in (
+            state(4) + reply(1, [b"http://192.168.1.2/"]),
+            state(3) + state(0) + setup.frame(2, b"\3"),
+            state(3) + setup.frame(2, b"\0") + state(4) + reply(2, [b"http://192.168.1.2/"]),
+        ):
             c, p = client([info(), state(2), result])
             with self.assertRaises(setup.SetupError):
                 c.configure(SSID, PASSWORD)
@@ -239,18 +275,32 @@ assert(library._position==0);
         self.assertEqual(commands(p), [3, 3])
 
     def test_credential_limits_control_characters_and_exact_bytes(self):
-        for name, secret in (("", PASSWORD), ("ą" * 17, PASSWORD), ("a\n", PASSWORD),
-                             (SSID, "short"), (SSID, "x" * 64), (SSID, "pass\0word")):
+        for name, secret in (
+            ("", PASSWORD),
+            ("ą" * 17, PASSWORD),
+            ("a\n", PASSWORD),
+            (SSID, "short"),
+            (SSID, "x" * 64),
+            (SSID, "pass\0word"),
+        ):
             with self.assertRaises(setup.SetupError) as error:
                 setup.credentials(name, secret)
             self.assertNotIn(PASSWORD, str(error.exception))
-        self.assertEqual(setup.credentials("  ssid  ", "  password  "), (b"  ssid  ", b"  password  "))
+        self.assertEqual(
+            setup.credentials("  ssid  ", "  password  "), (b"  ssid  ", b"  password  ")
+        )
         self.assertEqual(setup.credentials("a" * 32, "f" * 64), (b"a" * 32, b"f" * 64))
         self.assertEqual(setup.credentials(SSID, "")[1], b"")
 
     def test_url_is_numeric_http_only_and_not_an_instruction(self):
-        for value in (b"https://example.com/", b"http://user:secret@192.168.1.2/", b"http://192.168.1.2/?" + PASSWORD.encode(),
-                      b"http://127.0.0.1/", b"http://0.0.0.0/", b"http://192.168.1.2/\n" + PASSWORD.encode()):
+        for value in (
+            b"https://example.com/",
+            b"http://user:secret@192.168.1.2/",
+            b"http://192.168.1.2/?" + PASSWORD.encode(),
+            b"http://127.0.0.1/",
+            b"http://0.0.0.0/",
+            b"http://192.168.1.2/\n" + PASSWORD.encode(),
+        ):
             with self.assertRaises(setup.SetupError) as error:
                 setup.portal_url(reply(1, [value])[9:-1], 1)
             self.assertNotIn(PASSWORD, str(error.exception))
@@ -265,7 +315,9 @@ assert(library._position==0);
     def test_non_private_terminal_fails_before_fallback_input(self):
         def warn(_):
             import warnings
+
             warnings.warn("hidden-test", setup.getpass.GetPassWarning)
+
         with patch.object(setup.getpass, "getpass", warn), self.assertRaises(setup.SetupError):
             setup.private_input("prompt")
 

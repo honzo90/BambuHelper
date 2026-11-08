@@ -1,9 +1,12 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class WeatherDataTests(unittest.TestCase):
- def test_validation_staleness_solar_boundaries(self):
-  code=r'''#include "ws43b_weather_data.h"
+    def test_validation_staleness_solar_boundaries(self):
+        code = r'''#include "ws43b_weather_data.h"
 #include <cassert>
 using namespace ws43b_weather;
 int main(){
@@ -33,15 +36,36 @@ int main(){
  assert(solarNight(d,1700030000,1700000000,1700082800,night)&&!night); // 23-hour DST day
  assert(solarNight(d,1700070000,1700000000,1700090000,night)&&night); // 25-hour DST day
 }'''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),str(p/'test.cpp'),'-o',str(p/'test')],check=True)
-   subprocess.run([str(p/'test')],check=True)
- def test_atomic_nvs_failure_and_roundtrip(self):
-  source=(ROOT/'src/ws43b_weather.cpp').read_text()
-  helper=source[source.index('void configJson('):source.index('class BoundedBody')]
-  storage=source[source.index('void loadWs43bWeather()'):source.index('void tickWs43bWeather()')]
-  code=r'''#include "ws43b_weather_data.h"
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    '-I',
+                    str(ROOT / 'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)
+
+    def test_atomic_nvs_failure_and_roundtrip(self):
+        source = (ROOT / 'src/ws43b_weather.cpp').read_text()
+        helper = source[source.index('void configJson(') : source.index('class BoundedBody')]
+        storage = source[
+            source.index('void loadWs43bWeather()') : source.index('void tickWs43bWeather()')
+        ]
+        code = (
+            r'''#include "ws43b_weather_data.h"
 #include <cassert>
 #include <string>
 using String=std::string;
@@ -58,7 +82,10 @@ struct Preferences {
  String getString(const char *key,const char*){assert(!strcmp(key,"w43_weather"));return persisted;}
  size_t putString(const char *key,const String &v){assert(!strcmp(key,"w43_weather"));++writes;if(!writeOk)return 0;persisted=v;return v.length();}
 };
-''' + helper + storage + r'''
+'''
+            + helper
+            + storage
+            + r'''
 int main(){
  loadWs43bWeather();assert(!config.enabled);
  auto c=config;c.enabled=true;c.solar=true;c.latitude=52;c.longitude=13;strcpy(c.city,"Example");
@@ -72,7 +99,25 @@ int main(){
  persisted="broken";config={};loadWs43bWeather();assert(!config.enabled);
  openOk=false;c.nightSeconds=60;assert(!saveWs43bWeather(c)&&writes==n);
 }'''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),str(p/'test.cpp'),'-o',str(p/'test')],check=True)
-   subprocess.run([str(p/'test')],check=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    '-I',
+                    str(ROOT / 'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

@@ -3,6 +3,7 @@
 The existing PL/EN 40-case test remains unchanged. This adds German coverage
 without editing the preview renderer or drawing a replacement implementation.
 """
+
 import importlib.util
 import json
 import os
@@ -13,7 +14,9 @@ import unittest
 
 ROOT = Path(os.environ.get('BAMBUHELPER_TEST_ROOT', Path(__file__).resolve().parents[4]))
 HERE = ROOT / 'bringup/waveshare43b/integration'
-spec = importlib.util.spec_from_file_location('german_render_boot', HERE / 'previews/render_boot.py')
+spec = importlib.util.spec_from_file_location(
+    'german_render_boot', HERE / 'previews/render_boot.py'
+)
 renderer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(renderer)
 
@@ -35,17 +38,36 @@ class GermanBoot(unittest.TestCase):
             source = source.replace(old, 'for(bool pl:{false})')
             marker = '  const ws43b_boot::Palette palettes[]='
             self.assertEqual(source.count(marker), 1)
-            source = source.replace(marker, '''  for(unsigned phase=0;phase<4;++phase) {
+            source = source.replace(
+                marker,
+                '''  for(unsigned phase=0;phase<4;++phase) {
     assert(std::strcmp(ws43b_boot::title(P(phase),false,true),ws43b_boot::title(P(phase),false))!=0);
     assert(std::strcmp(ws43b_boot::subtitle(P(phase),false,true),ws43b_boot::subtitle(P(phase),false))!=0);
   }
-''' + marker)
+'''
+                + marker,
+            )
             (directory / 'boot_german.cpp').write_text(source)
             binary = directory / 'boot_german'
-            compiled = subprocess.run(['clang++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
-                                       '-I', str(directory), '-I', str(ROOT / 'include'),
-                                       str(directory / 'boot_german.cpp'), '-o', str(binary)],
-                                      capture_output=True, text=True)
+            compiled = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O2',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(directory),
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(directory / 'boot_german.cpp'),
+                    '-o',
+                    str(binary),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             run = subprocess.run([str(binary), '--verify'], capture_output=True, text=True)
             self.assertEqual(run.returncode, 0, run.stderr)

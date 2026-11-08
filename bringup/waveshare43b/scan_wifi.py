@@ -4,6 +4,7 @@
 Only STATUS and SCAN are sent. Numeric aggregate results cannot prove Wi-Fi
 connection, correct credentials, or the ten-minute hardware acceptance test.
 """
+
 import argparse
 import getpass
 import os
@@ -55,7 +56,9 @@ def identify_v4(port, log, timeout=10):
         current_boot = line_boot(line)
         if current_boot is not None:
             if boot is not None and current_boot != boot:
-                raise RuntimeError('Zmiana identyfikatora rozruchu podczas identyfikacji; nie wysłano SSID.')
+                raise RuntimeError(
+                    'Zmiana identyfikatora rozruchu podczas identyfikacji; nie wysłano SSID.'
+                )
             boot = current_boot
         if line.startswith('FATAL '):
             record(log, line)
@@ -99,25 +102,35 @@ def wait_scan(port, log, boot, timeout=30):
             record(log, line)
             if not begun:
                 raise RuntimeError('Wynik bez SCAN_BEGIN; wynik odrzucony.')
-            return {key: int(value) if key != 'boot' else value
-                    for key, value in (item.split('=', 1) for item in line.split()[1:])}
+            return {
+                key: int(value) if key != 'boot' else value
+                for key, value in (item.split('=', 1) for item in line.split()[1:])
+            }
         elif line.startswith('SCAN_REJECTED '):
             record(log, line)
             if line.endswith('reason=BUSY'):
-                raise RuntimeError('Skan odrzucony: użyto już skanu lub rozpoczęto Wi-Fi w tym rozruchu. Wymagany świeży rozruch.')
+                raise RuntimeError(
+                    'Skan odrzucony: użyto już skanu lub rozpoczęto Wi-Fi w tym rozruchu. Wymagany świeży rozruch.'
+                )
             raise RuntimeError('Skan odrzucony: nieprawidłowy SSID.')
         elif line.startswith('SCAN_ERROR '):
             record(log, line)
             values = dict(item.split('=', 1) for item in line.split()[1:])
-            raise RuntimeError(f"Błąd skanu: etap={values['stage']}, kod={values['code']}; brak wyniku widoczności.")
+            raise RuntimeError(
+                f"Błąd skanu: etap={values['stage']}, kod={values['code']}; brak wyniku widoczności."
+            )
         elif line.startswith(('BOOT ', 'DIAG ', 'WIFI_DIAG ', 'WIFI_EVENT ', 'WIFI_TRACE ')):
             record(log, line)
-    raise RuntimeError('Brak pełnego wyniku skanu w wyznaczonym czasie; widoczność sieci nieustalona.')
+    raise RuntimeError(
+        'Brak pełnego wyniku skanu w wyznaczonym czasie; widoczność sieci nieustalona.'
+    )
 
 
 def run_scan(port, log, ssid):
     if not valid_ssid(ssid):
-        raise RuntimeError('Nieprawidłowy SSID: wymagane 1–32 bajty UTF-8, bez tabulatora, NUL i nowej linii.')
+        raise RuntimeError(
+            'Nieprawidłowy SSID: wymagane 1–32 bajty UTF-8, bez tabulatora, NUL i nowej linii.'
+        )
     record(log, 'PHASE name=scan_identify')
     boot = identify_v4(port, log)
     # Firmware allows SCAN only once per fresh boot and before WIFI. Clear any
@@ -134,15 +147,21 @@ def run_scan(port, log, ssid):
 def describe_result(result):
     total, matches = result['total'], result['matches']
     if total == 0:
-        detail = ('Skan nie wykrył żadnego punktu dostępu 2,4 GHz. '
-                  'Sam ten wynik nie rozstrzyga między otoczeniem radiowym a torem antenowym.')
+        detail = (
+            'Skan nie wykrył żadnego punktu dostępu 2,4 GHz. '
+            'Sam ten wynik nie rozstrzyga między otoczeniem radiowym a torem antenowym.'
+        )
     elif matches == 0:
-        detail = (f'Wykryto punktów dostępu 2,4 GHz: {total}; zgodnych z podanym SSID: 0. '
-                  'Radio odbiera inne punkty, ale w tym skanie nie znalazło dokładnie tej nazwy.')
+        detail = (
+            f'Wykryto punktów dostępu 2,4 GHz: {total}; zgodnych z podanym SSID: 0. '
+            'Radio odbiera inne punkty, ale w tym skanie nie znalazło dokładnie tej nazwy.'
+        )
     else:
-        detail = (f"Wykryto punktów dostępu 2,4 GHz: {total}; zgodnych z podanym SSID: {matches}. "
-                  f"Najsilniejszy zgodny: RSSI={result['best_rssi']} dBm, kanał={result['best_channel']}, "
-                  f"tryb zabezpieczeń (kod sterownika)={result['best_auth']}.")
+        detail = (
+            f"Wykryto punktów dostępu 2,4 GHz: {total}; zgodnych z podanym SSID: {matches}. "
+            f"Najsilniejszy zgodny: RSSI={result['best_rssi']} dBm, kanał={result['best_channel']}, "
+            f"tryb zabezpieczeń (kod sterownika)={result['best_auth']}."
+        )
     return detail + (
         f" Czas skanu: {result['elapsed_ms']} ms. Licznik dotyczy punktów dostępu, nie unikalnych nazw. "
         'Skan ESP32-S3 dotyczy 2,4 GHz; brak dopasowania nie wyklucza sieci ukrytej ani emisji tylko w 5 GHz. '
@@ -165,7 +184,9 @@ def main():
     args = ap.parse_args()
     if args.list:
         for port_info in list_ports.comports():
-            print(f'{port_info.device}  {port_info.description}  VID={port_info.vid!s} PID={port_info.pid!s}')
+            print(
+                f'{port_info.device}  {port_info.description}  VID={port_info.vid!s} PID={port_info.pid!s}'
+            )
         return
     if not args.port:
         ap.error('Use --port /dev/cu... or --list.')
@@ -184,7 +205,9 @@ def main():
     with log:
         try:
             with port:
-                print('Masz teraz 10 sekund: wróć na iPhonie do Ustawienia → Hotspot osobisty i pozostaw ten ekran otwarty.')
+                print(
+                    'Masz teraz 10 sekund: wróć na iPhonie do Ustawienia → Hotspot osobisty i pozostaw ten ekran otwarty.'
+                )
                 # Identify only after this pause, so the target is never sent
                 # based on a BOOT observed before a possible intervening reset.
                 time.sleep(10)
@@ -194,7 +217,9 @@ def main():
             record(log, 'SCAN_HOST_ERROR code=SCAN_STAGE_FAILED')
             if isinstance(error, RuntimeError):
                 raise SystemExit(str(error)) from None
-            raise SystemExit('Skan przerwany lub błąd portu; brak potwierdzonego wyniku. Szczegóły bez danych sieci w logu.') from None
+            raise SystemExit(
+                'Skan przerwany lub błąd portu; brak potwierdzonego wyniku. Szczegóły bez danych sieci w logu.'
+            ) from None
         finally:
             del ssid
     print(describe_result(result))

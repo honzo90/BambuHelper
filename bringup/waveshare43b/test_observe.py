@@ -1,4 +1,5 @@
 """Synthetic host-side Wi-Fi tests; no serial ports, networks or real secrets."""
+
 from contextlib import redirect_stdout
 import io
 import unittest
@@ -41,6 +42,7 @@ class FakeClock:
 
 class FakePort:
     """Each read takes five simulated seconds, including an empty read."""
+
     def __init__(self, lines, clock):
         self.lines = iter(lines)
         self.clock = clock
@@ -81,9 +83,14 @@ class WaitWifiTest(unittest.TestCase):
             self.assertFalse(observe.safe_record(line))
 
     def test_success_requires_confirmation_then_connected_diagnostic(self):
-        failure, log, output, reads = self.run_wait([
-            diag(wifi=1), 'WIFI_ACCEPTED', diag(wifi=0), diag(wifi=1),
-        ])
+        failure, log, output, reads = self.run_wait(
+            [
+                diag(wifi=1),
+                'WIFI_ACCEPTED',
+                diag(wifi=0),
+                diag(wifi=1),
+            ]
+        )
         self.assertIsNone(failure)
         self.assertEqual(reads, 4, 'An old connected record or ACK alone is insufficient')
         self.assertIn('WIFI_ACCEPTED', log)
@@ -104,10 +111,16 @@ class WaitWifiTest(unittest.TestCase):
         self.assertEqual(log.count('DIAG '), 6)
 
     def test_v2_begin_or_wifi_diag_never_replace_connected_diag(self):
-        failure, log, output, reads = self.run_wait([
-            'WIFI_ACCEPTED', 'WIFI_BEGIN boot=12345678 status=3',
-            wifi_diag(status=3, reason=-1, age=-1), diag(), diag(), diag(),
-        ])
+        failure, log, output, reads = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                'WIFI_BEGIN boot=12345678 status=3',
+                wifi_diag(status=3, reason=-1, age=-1),
+                diag(),
+                diag(),
+                diag(),
+            ]
+        )
         self.assertIsNotNone(failure)
         self.assertIn('nadal wifi=0', failure)
         self.assertEqual(reads, 6)
@@ -116,16 +129,26 @@ class WaitWifiTest(unittest.TestCase):
         self.assertIn('nie końcowy wynik', output)
 
     def test_v2_without_ack_cannot_connect(self):
-        failure, _, _, _ = self.run_wait([
-            'WIFI_BEGIN boot=12345678 status=3', wifi_diag(status=3),
-            diag(wifi=1), diag(wifi=1), diag(wifi=1), diag(wifi=1),
-        ])
+        failure, _, _, _ = self.run_wait(
+            [
+                'WIFI_BEGIN boot=12345678 status=3',
+                wifi_diag(status=3),
+                diag(wifi=1),
+                diag(wifi=1),
+                diag(wifi=1),
+                diag(wifi=1),
+            ]
+        )
         self.assertIn('Brak WIFI_ACCEPTED', failure)
 
     def test_historical_reason_does_not_override_later_connection(self):
-        failure, log, output, reads = self.run_wait([
-            'WIFI_ACCEPTED', wifi_diag(status=3, reason=202, age=55000), diag(wifi=1),
-        ])
+        failure, log, output, reads = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                wifi_diag(status=3, reason=202, age=55000),
+                diag(wifi=1),
+            ]
+        )
         self.assertIsNone(failure)
         self.assertEqual(reads, 3)
         self.assertIn('last_reason=202', log)
@@ -134,10 +157,16 @@ class WaitWifiTest(unittest.TestCase):
         self.assertIn('zapis historyczny, nie bieżący stan', output)
 
     def test_v2_timeout_includes_fresh_diagnostic_without_password_verdict(self):
-        failure, log, output, _ = self.run_wait([
-            'WIFI_ACCEPTED', 'WIFI_BEGIN boot=12345678 status=0',
-            diag(), wifi_diag(age=55000), diag(), wifi_diag(age=65000),
-        ])
+        failure, log, output, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                'WIFI_BEGIN boot=12345678 status=0',
+                diag(),
+                wifi_diag(age=55000),
+                diag(),
+                wifi_diag(age=65000),
+            ]
+        )
         self.assertIn('nadal wifi=0', failure)
         self.assertIn('AUTH_FAIL', failure)
         self.assertIn('kod nie rozstrzyga, czy hasło jest błędne', failure)
@@ -148,9 +177,16 @@ class WaitWifiTest(unittest.TestCase):
         self.assertIn('WiFi.begin zwróciło 0', output)
 
     def test_expired_wifi_diag_does_not_claim_current_reason_at_timeout(self):
-        failure, log, _, _ = self.run_wait([
-            'WIFI_ACCEPTED', wifi_diag(reason=202), diag(), diag(), diag(), diag(),
-        ])
+        failure, log, _, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                wifi_diag(reason=202),
+                diag(),
+                diag(),
+                diag(),
+                diag(),
+            ]
+        )
         self.assertIn('Brak aktualnego WIFI_DIAG', failure)
         self.assertNotIn('AUTH_FAIL', failure)
         self.assertIn('last_reason=202', log)
@@ -183,9 +219,13 @@ class WaitWifiTest(unittest.TestCase):
                 self.assertEqual(reads, 1)
 
     def test_boot_change_aborts_even_when_new_boot_reports_connected(self):
-        failure, log, _, _ = self.run_wait([
-            'WIFI_ACCEPTED', diag(), diag(wifi=1, boot='87654321'),
-        ])
+        failure, log, _, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                diag(),
+                diag(wifi=1, boot='87654321'),
+            ]
+        )
         self.assertIn('Restart', failure)
         self.assertIn('boot=12345678', log)
         self.assertIn('boot=87654321', log)
@@ -193,9 +233,14 @@ class WaitWifiTest(unittest.TestCase):
     def test_v2_boot_change_aborts_during_wifi_preflight(self):
         for line in ('WIFI_BEGIN boot=87654321 status=0', wifi_diag(boot='87654321')):
             with self.subTest(line=line):
-                failure, log, _, reads = self.run_wait([
-                    'WIFI_ACCEPTED', wifi_diag(), line, diag(wifi=1),
-                ])
+                failure, log, _, reads = self.run_wait(
+                    [
+                        'WIFI_ACCEPTED',
+                        wifi_diag(),
+                        line,
+                        diag(wifi=1),
+                    ]
+                )
                 self.assertIn('Restart', failure)
                 self.assertIn(line, log)
                 self.assertEqual(reads, 3)
@@ -225,7 +270,8 @@ class WaitWifiTest(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertFalse(observe.safe_record(line))
         failure, log, output, _ = self.run_wait(
-            untrusted + ['WIFI_ACCEPTED', diag(wifi=1)], timeout=90,
+            untrusted + ['WIFI_ACCEPTED', diag(wifi=1)],
+            timeout=90,
         )
         self.assertIsNone(failure)
         self.assertNotIn(secret, log)
@@ -235,7 +281,8 @@ class WaitWifiTest(unittest.TestCase):
     def test_v2_whitelist_rejects_malformed_fields(self):
         for line in (
             'WIFI_BEGIN boot=12345678 status=-1',
-            wifi_diag(reason=-2), wifi_diag(age=-2),
+            wifi_diag(reason=-2),
+            wifi_diag(age=-2),
             wifi_diag().replace('status=6', 'status=６'),
             wifi_diag().replace('disconnects=4', 'disconnects=-1'),
             wifi_diag().replace('associations=1', 'associations=one'),
@@ -259,9 +306,16 @@ class WaitWifiTest(unittest.TestCase):
 
     def test_v3_first_disconnect_survives_later_leaving_events_and_summary(self):
         first, later = wifi_event(), wifi_event(seq=2, reason=36, uptime=2500)
-        failure, log, output, _ = self.run_wait([
-            'WIFI_ACCEPTED', first, later, diag(), wifi_diag(reason=36), diag(),
-        ])
+        failure, log, output, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                first,
+                later,
+                diag(),
+                wifi_diag(reason=36),
+                diag(),
+            ]
+        )
         self.assertIn(first, log)
         self.assertIn(later, log)
         self.assertLess(log.index(first), log.index(later))
@@ -273,19 +327,29 @@ class WaitWifiTest(unittest.TestCase):
         self.assertEqual(output.count('Późniejsze rozłączenie: 36'), 1)
 
     def test_v3_trace_overflow_is_reported_without_claiming_wifi_failure(self):
-        failure, log, output, _ = self.run_wait([
-            'WIFI_ACCEPTED', wifi_event(), wifi_trace(dropped=3), diag(),
-            wifi_diag(), diag(),
-        ])
+        failure, log, output, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                wifi_event(),
+                wifi_trace(dropped=3),
+                diag(),
+                wifi_diag(),
+                diag(),
+            ]
+        )
         self.assertIn('queued_dropped=3', log)
         self.assertIn('Niepełny ślad zdarzeń', failure)
         self.assertIn('utracone rekordy kolejki/USB=3', failure)
         self.assertIn('utrata diagnostyki, nie licznik rozłączeń Wi-Fi', failure)
         self.assertIn('Niepełny ślad zdarzeń', output)
         # A subsequent connected DIAG remains usable despite incomplete diagnostic trace.
-        failure, _, output, _ = self.run_wait([
-            'WIFI_ACCEPTED', wifi_trace(dropped=3), diag(wifi=1),
-        ])
+        failure, _, output, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                wifi_trace(dropped=3),
+                diag(wifi=1),
+            ]
+        )
         self.assertIsNone(failure)
         self.assertIn('Niepełny ślad zdarzeń', output)
 
@@ -303,13 +367,21 @@ class WaitWifiTest(unittest.TestCase):
     def test_v3_event_and_trace_boot_change_abort_in_both_phases(self):
         for line in (wifi_event(boot='87654321'), wifi_trace(boot='87654321')):
             with self.subTest(line=line):
-                failure, log, _, reads = self.run_wait([
-                    'WIFI_ACCEPTED', wifi_event(), line, diag(wifi=1),
-                ])
+                failure, log, _, reads = self.run_wait(
+                    [
+                        'WIFI_ACCEPTED',
+                        wifi_event(),
+                        line,
+                        diag(wifi=1),
+                    ]
+                )
                 self.assertIn('Restart', failure)
                 self.assertEqual(reads, 3)
                 self.assertIn(line, log)
-                with redirect_stdout(io.StringIO()), self.assertRaisesRegex(RuntimeError, 'Restart'):
+                with (
+                    redirect_stdout(io.StringIO()),
+                    self.assertRaisesRegex(RuntimeError, 'Restart'),
+                ):
                     observe.record_observation(io.StringIO(), line, '12345678', observe.WifiTrace())
 
     def test_v3_strict_numeric_enum_and_reason_validation(self):
@@ -319,14 +391,22 @@ class WaitWifiTest(unittest.TestCase):
         for reason in (0, 201, 255):
             self.assertTrue(observe.safe_record(wifi_event(reason=reason)))
         malformed = [
-            wifi_event(reason=-1), wifi_event(reason=256), wifi_event(reason=-2),
-            wifi_event(event='CUSTOM_SECRET'), wifi_event(seq=0), wifi_event(seq=-1),
-            wifi_event(seq=4294967296), wifi_event(uptime=-1), wifi_event(uptime=4294967296),
+            wifi_event(reason=-1),
+            wifi_event(reason=256),
+            wifi_event(reason=-2),
+            wifi_event(event='CUSTOM_SECRET'),
+            wifi_event(seq=0),
+            wifi_event(seq=-1),
+            wifi_event(seq=4294967296),
+            wifi_event(uptime=-1),
+            wifi_event(uptime=4294967296),
             wifi_event().replace('reason=201', 'reason=２０１'),
             wifi_event().replace('seq=1', 'seq=１'),
             wifi_event().replace('boot=12345678', 'boot=SECRET'),
-            wifi_trace(dropped=-1), wifi_trace(dropped=4294967296),
-            wifi_trace(dropped='３'), wifi_trace() + ' password=SYNTHETIC-SECRET',
+            wifi_trace(dropped=-1),
+            wifi_trace(dropped=4294967296),
+            wifi_trace(dropped='３'),
+            wifi_trace() + ' password=SYNTHETIC-SECRET',
             wifi_event() + ' SSID=SYNTHETIC-SECRET',
             wifi_event().replace(' reason=201', ''),
         ]
@@ -334,7 +414,8 @@ class WaitWifiTest(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertFalse(observe.safe_record(line))
         failure, log, output, _ = self.run_wait(
-            malformed + ['WIFI_ACCEPTED', diag(wifi=1)], timeout=120,
+            malformed + ['WIFI_ACCEPTED', diag(wifi=1)],
+            timeout=120,
         )
         self.assertIsNone(failure)
         self.assertNotIn('SECRET', log + output)
@@ -345,7 +426,8 @@ class WaitWifiTest(unittest.TestCase):
         with redirect_stdout(output):
             for line in (wifi_event(), wifi_trace(dropped=1)):
                 self.assertEqual(
-                    observe.record_observation(log, line, '12345678', trace), '12345678',
+                    observe.record_observation(log, line, '12345678', trace),
+                    '12345678',
                 )
         self.assertIn('WIFI_EVENT boot=', log.getvalue())
         self.assertIn('WIFI_TRACE boot=', log.getvalue())
@@ -354,17 +436,25 @@ class WaitWifiTest(unittest.TestCase):
         self.assertIn('kod 201', output.getvalue())
 
     def test_v3_stale_diag_still_retains_first_event_and_trace_loss(self):
-        failure, _, _, _ = self.run_wait([
-            'WIFI_ACCEPTED', wifi_event(), wifi_trace(dropped=1),
-        ])
+        failure, _, _, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                wifi_event(),
+                wifi_trace(dropped=1),
+            ]
+        )
         self.assertIn('brak aktualnej diagnostyki DIAG', failure)
         self.assertIn('kod 201', failure)
         self.assertIn('Niepełny ślad zdarzeń', failure)
 
     def test_disconnected_preflight_does_not_invalidate_later_complete_run(self):
-        failure, preflight, _, _ = self.run_wait([
-            'WIFI_ACCEPTED', diag(wifi=0), diag(wifi=1),
-        ])
+        failure, preflight, _, _ = self.run_wait(
+            [
+                'WIFI_ACCEPTED',
+                diag(wifi=0),
+                diag(wifi=1),
+            ]
+        )
         self.assertIsNone(failure)
         lines = [preflight.rstrip(), '20.000 RUN_BEGIN boot=12345678']
         for index in range(1, 133):

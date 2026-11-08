@@ -1,4 +1,5 @@
 """Printer TLS connect waits for a quiet WebUI and free internal RAM (max 20 s)."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -38,15 +39,32 @@ int main(){
 class ConnectGate(unittest.TestCase):
     def test_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / 'g.cpp'; src.write_text(CODE); exe = Path(tmp) / 'g'
-            subprocess.run(['clang++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'include'),
-                            str(src), '-o', str(exe)], check=True, capture_output=True, text=True)
+            src = Path(tmp) / 'g.cpp'
+            src.write_text(CODE)
+            exe = Path(tmp) / 'g'
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(src),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(exe)], check=True)
 
     def test_wired_in(self):
         mqtt = (ROOT / 'src/bambu_mqtt.cpp').read_text()
-        body = mqtt[mqtt.index('static void reconnectConn'):]
-        body = body[:body.index('c.diag.lastAttemptMs = now;')]
+        body = mqtt[mqtt.index('static void reconnectConn') :]
+        body = body[: body.index('c.diag.lastAttemptMs = now;')]
         self.assertIn('ws43b_gate::allowConnect(', body)  # gate sits before the attempt is recorded
         web = (ROOT / 'src/web_server.cpp').read_text()
         self.assertIn('server.addMiddleware(', web)

@@ -6,6 +6,7 @@ flashing, reset command, network request, raw serial output or credential file.
 The application's own successful Improv callback saves Wi-Fi and restarts it.
 Protocol source: lib/ImprovWiFi/src/{ImprovTypes.h,ImprovWiFiLibrary.cpp}.
 """
+
 import argparse
 from collections import deque
 import getpass
@@ -57,6 +58,7 @@ def rpc(command, values=()):
 
 class Decoder:
     """Bounded binary decoder; discards interleaved console text without echo."""
+
     def __init__(self):
         self.buffer = bytearray()
 
@@ -77,7 +79,11 @@ class Decoder:
                 del self.buffer[:start]
             if len(self.buffer) < 9:
                 break
-            if self.buffer[6] != VERSION or self.buffer[7] not in (CURRENT_STATE, ERROR_STATE, RPC_RESPONSE):
+            if self.buffer[6] != VERSION or self.buffer[7] not in (
+                CURRENT_STATE,
+                ERROR_STATE,
+                RPC_RESPONSE,
+            ):
                 raise SetupError("Nieprawidłowy nagłówek odpowiedzi Improv.")
             size = 10 + self.buffer[8]
             if len(self.buffer) < size:
@@ -102,16 +108,21 @@ def response(payload, expected_command):
         offset += 1
         if offset + length > len(payload):
             raise SetupError("Nieprawidłowa długość pola odpowiedzi Improv.")
-        values.append(payload[offset:offset + length])
+        values.append(payload[offset : offset + length])
         offset += length
     return values
 
 
 def identity(payload):
     values = response(payload, GET_DEVICE_INFO)
-    if (len(values) != 4 or values[:3] != [FIRMWARE, FIRMWARE_VERSION, CHIP]
-            or not re.fullmatch(rb"BambuHelper-[0-9A-F]{4}", values[3])):
-        raise SetupError("Nie potwierdzono BambuHelper WS43B Monitor v3.8.3. Nie wysłano danych Wi-Fi.")
+    if (
+        len(values) != 4
+        or values[:3] != [FIRMWARE, FIRMWARE_VERSION, CHIP]
+        or not re.fullmatch(rb"BambuHelper-[0-9A-F]{4}", values[3])
+    ):
+        raise SetupError(
+            "Nie potwierdzono BambuHelper WS43B Monitor v3.8.3. Nie wysłano danych Wi-Fi."
+        )
     return tuple(values)
 
 
@@ -120,18 +131,29 @@ def portal_url(payload, command):
     if len(values) != 1:
         raise SetupError("Brak jednoznacznego adresu panelu w odpowiedzi Improv.")
     if not re.fullmatch(rb"http://(?:[0-9]{1,3}\.){3}[0-9]{1,3}/?", values[0]):
-        raise SetupError("Odrzucono nieprawidłowy adres panelu; jego treść nie została wyświetlona.")
+        raise SetupError(
+            "Odrzucono nieprawidłowy adres panelu; jego treść nie została wyświetlona."
+        )
     try:
         url = urlsplit(values[0].decode("ascii"))
         address = ipaddress.IPv4Address(url.hostname)
-        valid = (url.scheme == "http" and url.netloc == str(address)
-                 and url.path in ("", "/") and not url.query and not url.fragment
-                 and not address.is_multicast and not address.is_unspecified
-                 and not address.is_loopback and str(address) != "255.255.255.255")
+        valid = (
+            url.scheme == "http"
+            and url.netloc == str(address)
+            and url.path in ("", "/")
+            and not url.query
+            and not url.fragment
+            and not address.is_multicast
+            and not address.is_unspecified
+            and not address.is_loopback
+            and str(address) != "255.255.255.255"
+        )
     except (ValueError, UnicodeError, TypeError):
         valid = False
     if not valid:
-        raise SetupError("Odrzucono nieprawidłowy adres panelu; jego treść nie została wyświetlona.")
+        raise SetupError(
+            "Odrzucono nieprawidłowy adres panelu; jego treść nie została wyświetlona."
+        )
     return "http://" + str(address) + "/"
 
 
@@ -142,10 +164,15 @@ def credentials(ssid, password):
         raise SetupError("Dane Wi-Fi muszą być poprawnym UTF-8.") from None
     if not 1 <= len(name) <= 32 or any(ord(c) < 32 or ord(c) == 127 for c in ssid):
         raise SetupError("SSID musi mieć 1–32 bajty UTF-8, bez znaków sterujących.")
-    valid_password = (len(secret) == 0 or 8 <= len(secret) <= 63
-                      or (len(secret) == 64 and re.fullmatch(rb"[0-9A-Fa-f]{64}", secret)))
+    valid_password = (
+        len(secret) == 0
+        or 8 <= len(secret) <= 63
+        or (len(secret) == 64 and re.fullmatch(rb"[0-9A-Fa-f]{64}", secret))
+    )
     if not valid_password or any(ord(c) < 32 or ord(c) == 127 for c in password):
-        raise SetupError("Hasło musi mieć 8–63 bajty, 64 cyfry hex albo być puste dla sieci otwartej.")
+        raise SetupError(
+            "Hasło musi mieć 8–63 bajty, 64 cyfry hex albo być puste dla sieci otwartej."
+        )
     return name, secret
 
 
@@ -186,7 +213,9 @@ class Client:
         kind, payload = frame_value
         if kind == ERROR_STATE:
             # Even a forged/unknown error byte can never add text to the output.
-            raise SetupError("Płytka odrzuciła żądanie Improv; sprawdź stan konfiguracji na ekranie.")
+            raise SetupError(
+                "Płytka odrzuciła żądanie Improv; sprawdź stan konfiguracji na ekranie."
+            )
         return kind, payload
 
     def identify(self, timeout=15):
@@ -225,11 +254,16 @@ class Client:
         self.send(WIFI_SETTINGS, values)
         del values, ssid, password
         deadline = self.clock() + timeout
-        expected = [(CURRENT_STATE, bytes((PROVISIONING,))),
-                    (ERROR_STATE, b"\0"), (CURRENT_STATE, bytes((PROVISIONED,)))]
+        expected = [
+            (CURRENT_STATE, bytes((PROVISIONING,))),
+            (ERROR_STATE, b"\0"),
+            (CURRENT_STATE, bytes((PROVISIONED,))),
+        ]
         for item in expected:
             if self.read(deadline) != item:
-                raise SetupError("Połączenie Wi-Fi nie zostało potwierdzone. Nie ponowiono wysyłania danych.")
+                raise SetupError(
+                    "Połączenie Wi-Fi nie zostało potwierdzone. Nie ponowiono wysyłania danych."
+                )
         kind, payload = self.checked(self.read(deadline))
         if kind != RPC_RESPONSE:
             raise SetupError("Brak odpowiedzi końcowej konfiguracji Wi-Fi.")
@@ -239,7 +273,10 @@ class Client:
 class PrivateArgumentParser(argparse.ArgumentParser):
     def error(self, message):
         # argparse would otherwise echo unknown arguments (possibly a password).
-        self.exit(2, "Nieprawidłowe argumenty. Użyj --port PORT albo --list. Dane Wi-Fi wpisuje się prywatnie.\n")
+        self.exit(
+            2,
+            "Nieprawidłowe argumenty. Użyj --port PORT albo --list. Dane Wi-Fi wpisuje się prywatnie.\n",
+        )
 
 
 def private_input(prompt):
@@ -248,11 +285,15 @@ def private_input(prompt):
         try:
             return getpass.getpass(prompt)
         except getpass.GetPassWarning:
-            raise SetupError("Terminal nie zapewnia ukrytego wpisywania. Uruchom program w interaktywnym SSH.") from None
+            raise SetupError(
+                "Terminal nie zapewnia ukrytego wpisywania. Uruchom program w interaktywnym SSH."
+            ) from None
 
 
 def main(argv=None):
-    parser = PrivateArgumentParser(description="Prywatna konfiguracja Wi-Fi przez Improv; bez flashowania i logowania sekretów.")
+    parser = PrivateArgumentParser(
+        description="Prywatna konfiguracja Wi-Fi przez Improv; bez flashowania i logowania sekretów."
+    )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--port")
     group.add_argument("--list", action="store_true")
@@ -261,7 +302,9 @@ def main(argv=None):
         import serial
         from serial.tools import list_ports
     except ImportError:
-        print("Brak pyserial. Użyj środowiska Python przygotowanego do testu płytki.", file=sys.stderr)
+        print(
+            "Brak pyserial. Użyj środowiska Python przygotowanego do testu płytki.", file=sys.stderr
+        )
         return 2
     if args.list:
         for port in list_ports.comports():
@@ -273,8 +316,12 @@ def main(argv=None):
     try:
         print("Konfigurator wymaga wgranego BambuHelper WS43B Monitor, nie programu smoke v4.")
         print("Improv działa przez pierwsze 3 minuty rozruchu bez zapisanej sieci Wi-Fi.")
-        print("Otwarcie USB może zresetować płytkę. Program nie wysyła komendy resetu ani flashowania.")
-        port = serial.Serial(port=None, baudrate=115200, timeout=0.1, write_timeout=3, exclusive=True)
+        print(
+            "Otwarcie USB może zresetować płytkę. Program nie wysyła komendy resetu ani flashowania."
+        )
+        port = serial.Serial(
+            port=None, baudrate=115200, timeout=0.1, write_timeout=3, exclusive=True
+        )
         port.dtr, port.rts = False, False
         port.port = args.port
         port.open()
@@ -293,14 +340,19 @@ def main(argv=None):
         finally:
             del ssid, password
         print("Płytka zgłosiła połączenie Wi-Fi. Portal: " + address)
-        print("Aplikacja zapisuje konfigurację i sama restartuje panel. Potwierdź adres na ekranie po restarcie.")
+        print(
+            "Aplikacja zapisuje konfigurację i sama restartuje panel. Potwierdź adres na ekranie po restarcie."
+        )
         print("To nie potwierdza połączenia z drukarką, telemetrii ani testu sprzętowego.")
         return 0
     except SetupError as error:
         print(str(error), file=sys.stderr)
         return 1
     except (serial.SerialException, OSError):
-        print("Błąd dostępu USB. Zamknij inne programy używające portu i sprawdź wskazany port.", file=sys.stderr)
+        print(
+            "Błąd dostępu USB. Zamknij inne programy używające portu i sprawdź wskazany port.",
+            file=sys.stderr,
+        )
         return 1
     except (EOFError, KeyboardInterrupt):
         print("Przerwano konfigurację. Dane Wi-Fi nie zostaną wysłane ponownie.", file=sys.stderr)

@@ -1,4 +1,5 @@
 """Exercise the shared display mode through real storage, HTTP and backup code."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -13,22 +14,36 @@ class DisplayModeSettings(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='bambu-display-mode-') as directory:
             p = Path(directory)
             (p / 'test.cpp').write_text(code)
-            result = subprocess.run(['clang++', '-std=c++17', '-DBOARD_IS_WS43B',
-                                     '-fsanitize=address,undefined', '-Wno-deprecated-declarations',
-                                     '-I', str(ROOT / 'src'), '-I', str(JSON_INCLUDE),
-                                     str(p / 'test.cpp'), '-o', str(p / 'test')],
-                                    capture_output=True, text=True)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-DBOARD_IS_WS43B',
+                    '-fsanitize=address,undefined',
+                    '-Wno-deprecated-declarations',
+                    '-I',
+                    str(ROOT / 'src'),
+                    '-I',
+                    str(JSON_INCLUDE),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(p / 'test')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_atomic_record_and_strict_http(self):
         storage = (ROOT / 'src/ws43b_display_mode.cpp').read_text()
-        storage = storage[storage.index('static bool advancedDisplay'):storage.rindex('#endif')]
+        storage = storage[storage.index('static bool advancedDisplay') : storage.rindex('#endif')]
         source = (ROOT / 'src/web_server.cpp').read_text()
         start = source.index('static void handleMonitorDisplayModeGet() {')
-        handlers = source[start:source.index('\n#endif', start)]
-        code = r'''
+        handlers = source[start : source.index('\n#endif', start)]
+        code = (
+            r'''
 #include <cassert>
 #include <cstring>
 #include <string>
@@ -55,7 +70,10 @@ struct Server {
  void sendHeader(const char *key,const char *value){assert(String(key)=="Cache-Control");cache=value;}
  void send(int status,const char *type,const String&value){assert(String(type)=="application/json");code=status;body=value;}
 }server;
-''' + storage + handlers + r'''
+'''
+            + storage
+            + handlers
+            + r'''
 void get(const char *expected){
  const auto before=writes;server={};handleMonitorDisplayModeGet();
  assert(server.code==200&&server.cache=="no-store"&&writes==before);
@@ -93,14 +111,18 @@ int main(){
  for(const auto&pair:unrelated)assert(store.at(pair.first)==pair.second);
 }
 '''
+        )
         self.compile_run(code)
 
     def test_backup_optional_validation_and_roundtrip(self):
         source = (ROOT / 'src/web_server.cpp').read_text()
         export = next(line for line in source.splitlines() if 'native["display_mode"] =' in line)
-        start = source.index('    // Optional for older backups: omission preserves the current presentation.')
-        imported = source[start:source.index('    if (!native["language"].isNull())', start)]
-        code = r'''
+        start = source.index(
+            '    // Optional for older backups: omission preserves the current presentation.'
+        )
+        imported = source[start : source.index('    if (!native["language"].isNull())', start)]
+        code = (
+            r'''
 #include <cassert>
 #include <cstring>
 #include <ArduinoJson.h>
@@ -108,10 +130,14 @@ bool advanced=false;
 bool ws43bAdvancedDisplay(){return advanced;}
 struct Server{int code=0;void send(int status,const char*,const char*){code=status;}}server;
 void exportMode(JsonObject native){
-''' + export + r'''
+'''
+            + export
+            + r'''
 }
 void importMode(JsonObject native,bool &importedAdvancedDisplay){
-''' + imported + r'''
+'''
+            + imported
+            + r'''
 }
 int main(){
  for(bool initial:{false,true}){
@@ -130,6 +156,7 @@ int main(){
  }
 }
 '''
+        )
         self.compile_run(code)
 
 

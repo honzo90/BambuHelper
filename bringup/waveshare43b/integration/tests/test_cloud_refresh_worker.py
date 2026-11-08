@@ -1,6 +1,7 @@
 """Run actual automatic renewal lifecycle with a stalled detached HTTPS stub.
 No account/network/USB access. Native ASan/UBSan checks cancellation and ownership.
 """
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,15 +12,23 @@ ROOT = Path(__file__).resolve().parents[4]
 
 def section(source, start, end):
     begin = source.index(start)
-    return source[begin:source.index(end, begin)]
+    return source[begin : source.index(end, begin)]
 
 
 class CloudRefreshWorker(unittest.TestCase):
     def test_detached_response_manual_cancel_config_and_second_factor(self):
         src = (ROOT / 'src/cloud_login.cpp').read_text()
-        lifecycle = section(src, 'struct StoredRefreshJob {', '\n#endif // BOARD_MQTT_ASYNC_CONNECT')
-        finalize = section(src, 'static bool finishStoredRefresh(', '\nbool cloudLoginRefreshStored()')
-        reset = section(src, 'void cloudLoginReset() {', '\n// ---------------------------------------------------------------------------')
+        lifecycle = section(
+            src, 'struct StoredRefreshJob {', '\n#endif // BOARD_MQTT_ASYNC_CONNECT'
+        )
+        finalize = section(
+            src, 'static bool finishStoredRefresh(', '\nbool cloudLoginRefreshStored()'
+        )
+        reset = section(
+            src,
+            'void cloudLoginReset() {',
+            '\n// ---------------------------------------------------------------------------',
+        )
         stub = r'''
 #include <atomic>
 #include <thread>
@@ -131,7 +140,11 @@ int main(){
 
     def test_mqtt_automatic_path_is_scheduled_and_rate_limited(self):
         src = (ROOT / 'src/bambu_mqtt.cpp').read_text()
-        function = section(src, 'static bool tryStoredPasswordRelogin(', '\n#endif\n\n// ---------------------------------------------------------------------------')
+        function = section(
+            src,
+            'static bool tryStoredPasswordRelogin(',
+            '\n#endif\n\n// ---------------------------------------------------------------------------',
+        )
         stub = r'''
 #include <cstdint>
 #include <cassert>
@@ -155,10 +168,23 @@ int main(){assert(tryStoredPasswordRelogin(0));assert(!tryStoredPasswordRelogin(
         with tempfile.TemporaryDirectory() as folder:
             p = Path(folder)
             (p / 'test.cpp').write_text(source)
-            subprocess.run(['clang++', '-std=c++17', '-pthread', '-fsanitize=address,undefined',
-                            str(p / 'test.cpp'), '-o', str(p / 'test')],
-                           check=True, capture_output=True, text=True)
-            subprocess.run([str(p / 'test')], check=True, capture_output=True, text=True, timeout=15)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-pthread',
+                    '-fsanitize=address,undefined',
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [str(p / 'test')], check=True, capture_output=True, text=True, timeout=15
+            )
 
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@
 No server or sockets are opened. Stubs provide only time, connection flags,
 heap/reset/render counters and capture of the HTTP response.
 """
+
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,12 +19,15 @@ class StatusEndpointTests(unittest.TestCase):
         compiler = shutil.which('clang++') or shutil.which('c++')
         if not compiler:
             self.skipTest('Native C++ compiler required')
-        self.assertTrue((JSON_INCLUDE / 'ArduinoJson.h').is_file(), 'Pinned ArduinoJson 7.4.3 required')
+        self.assertTrue(
+            (JSON_INCLUDE / 'ArduinoJson.h').is_file(), 'Pinned ArduinoJson 7.4.3 required'
+        )
         source = (REPO / 'src/web_server.cpp').read_text()
         begin = source.index('static void handleStatus() {')
         end = source.index('// Clean reboot', begin)
         handler = source[begin:end]
-        harness = r'''
+        harness = (
+            r'''
 #include <cassert>
 #include <cstring>
 #include <string>
@@ -80,7 +84,9 @@ struct ServerStub {
  void sendHeader(const char* key,const char* value){assert(std::string(key)=="Cache-Control");cache=value;}
  void send(int status,const char* contentType,const String& content){code=status;type=contentType;body=content;}
 } server;
-''' + handler
+'''
+            + handler
+        )
         harness += r'''
 JsonDocument status() {
  server={};handleStatus();
@@ -163,13 +169,31 @@ int main() {
             tmp = Path(folder)
             # Actual state/config/telemetry headers are used; Arduino types map
             # to native equivalents while pinned JSON uses its std::string writer.
-            (tmp / 'Arduino.h').write_text('#pragma once\n#include <cstdint>\n#include <cstddef>\n#include <cstring>\n#include <string>\nusing String=std::string;\n')
+            (tmp / 'Arduino.h').write_text(
+                '#pragma once\n#include <cstdint>\n#include <cstddef>\n#include <cstring>\n#include <string>\nusing String=std::string;\n'
+            )
             cpp, binary = tmp / 'status.cpp', tmp / 'status'
             cpp.write_text(harness)
-            args = [compiler, '-std=c++17', '-DBAMBU_MONITOR_ONLY=1', '-DBOARD_IS_WS43B=1',
-                    '-DDISPLAY_800x480=1', '-DBOARD_HAS_PSRAM=1', '-DBACKLIGHT_PIN=-1',
-                    '-I', str(tmp), '-I', str(REPO / 'include'), '-I', str(REPO / 'src'),
-                    '-I', str(JSON_INCLUDE), str(cpp), '-o', str(binary)]
+            args = [
+                compiler,
+                '-std=c++17',
+                '-DBAMBU_MONITOR_ONLY=1',
+                '-DBOARD_IS_WS43B=1',
+                '-DDISPLAY_800x480=1',
+                '-DBOARD_HAS_PSRAM=1',
+                '-DBACKLIGHT_PIN=-1',
+                '-I',
+                str(tmp),
+                '-I',
+                str(REPO / 'include'),
+                '-I',
+                str(REPO / 'src'),
+                '-I',
+                str(JSON_INCLUDE),
+                str(cpp),
+                '-o',
+                str(binary),
+            ]
             compile_result = subprocess.run(args, capture_output=True, text=True)
             self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
             result = subprocess.run([str(binary)], capture_output=True, text=True)

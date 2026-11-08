@@ -1,15 +1,20 @@
 """Execute the real worker/handoff code with a stalled fake transport and ASan.
 Hardware tests separately cover FreeRTOS/TLS and physical touch responsiveness.
 """
+
 from pathlib import Path
 import subprocess, tempfile, unittest
-ROOT=Path(__file__).resolve().parents[4]
+
+ROOT = Path(__file__).resolve().parents[4]
+
 
 class ConnectWorker(unittest.TestCase):
- def test_stall_cancel_handoff_failure_and_config_snapshot(self):
-  src=(ROOT/'src/bambu_mqtt.cpp').read_text()
-  worker=src[src.index('struct ConnectJob {'):src.index('\n#endif\n\nstatic void reconnectConn')]
-  stub=r'''
+    def test_stall_cancel_handoff_failure_and_config_snapshot(self):
+        src = (ROOT / 'src/bambu_mqtt.cpp').read_text()
+        worker = src[
+            src.index('struct ConnectJob {') : src.index('\n#endif\n\nstatic void reconnectConn')
+        ]
+        stub = r'''
 #include <atomic>
 #include <thread>
 #include <cassert>
@@ -53,7 +58,7 @@ int sessions=0;void acceptMqttSession(MqttConn&c){++sessions;printers[c.slotInde
 void vTaskDelete(void*){}unsigned uxTaskGetStackHighWaterMark(void*){return 4096;}
 int xTaskCreatePinnedToCore(void(*fn)(void*),const char*,int,void*,int,void*,int){if(!taskOk)return 0;task=std::thread([fn]{fn(nullptr);});return 1;}
 '''
-  case=r'''
+        case = r'''
 void waitWorker(){for(int i=0;i<1000&&!entered;++i)std::this_thread::sleep_for(std::chrono::milliseconds(1));assert(entered);}
 int main(){
  auto&c=conns[0];c.active=true;auto&cfg=printers[0].config;strcpy(cfg.ip,"10.0.0.1");strcpy(cfg.accessCode,"ORIGINAL");
@@ -74,9 +79,22 @@ int main(){
  startConnectJob(c,cfg);task.join();c.active=false;finishConnectJob();assert(bundles==0&&sessions==1);
 }
 '''
-  with tempfile.TemporaryDirectory() as t:
-   p=Path(t);(p/'test.cpp').write_text(stub+worker+case)
-   r=subprocess.run(['clang++','-std=c++17','-pthread','-fsanitize=address,undefined',str(p/'test.cpp'),'-o',str(p/'test')],capture_output=True,text=True)
-   self.assertEqual(r.returncode,0,r.stderr)
-   r=subprocess.run([str(p/'test')],capture_output=True,text=True,timeout=15)
-   self.assertEqual(r.returncode,0,r.stderr)
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t)
+            (p / 'test.cpp').write_text(stub + worker + case)
+            r = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-pthread',
+                    '-fsanitize=address,undefined',
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run([str(p / 'test')], capture_output=True, text=True, timeout=15)
+            self.assertEqual(r.returncode, 0, r.stderr)

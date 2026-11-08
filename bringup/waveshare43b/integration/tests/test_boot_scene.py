@@ -1,4 +1,5 @@
 """Run actual boot composition, firmware text fitting, assets and VLW masks."""
+
 import importlib.util
 import json
 from pathlib import Path
@@ -16,8 +17,9 @@ class BootSceneTest(unittest.TestCase):
     def test_stages_fonts_bounds_and_partial_frame_equivalence(self):
         with tempfile.TemporaryDirectory(prefix='ws43b-boot-test-') as directory:
             binary = renderer.compile_preview(directory)
-            result = subprocess.run([str(binary), '--verify'], check=True,
-                                    capture_output=True, text=True)
+            result = subprocess.run(
+                [str(binary), '--verify'], check=True, capture_output=True, text=True
+            )
             evidence = json.loads(result.stdout)
             self.assertEqual(evidence['result'], 'PASS')
             self.assertEqual(evidence['full_cases'], 40)

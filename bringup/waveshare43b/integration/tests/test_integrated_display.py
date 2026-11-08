@@ -1,20 +1,25 @@
 """Exercise integrated forms in both languages, including failed loads/saves."""
+
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-HERE=Path(__file__).resolve().parents[1];ROOT=HERE.parents[2]
-sys.path.insert(0,str(HERE))
+
+HERE = Path(__file__).resolve().parents[1]
+ROOT = HERE.parents[2]
+sys.path.insert(0, str(HERE))
 import localize_web
 from test_full_webui import function
 
+
 class IntegratedDisplay(unittest.TestCase):
     def test_clock_toggle_keeps_native_idle_and_reports_write_failure(self):
-        source=(ROOT/'src/web_server.cpp').read_text()
-        start=source.index('  else if (key == "use24h") {')
-        branch=source[start:source.index('\n#else',start)].replace('else if','if',1)
-        harness=r'''#include <cassert>
+        source = (ROOT / 'src/web_server.cpp').read_text()
+        start = source.index('  else if (key == "use24h") {')
+        branch = source[start : source.index('\n#else', start)].replace('else if', 'if', 1)
+        harness = (
+            r'''#include <cassert>
 #include <string>
 struct Clock {int idleMinutes=15;bool screenOff=true;bool use24h=true;} clockState;
 const Clock& ws43bClockSettings(){return clockState;}
@@ -24,20 +29,33 @@ bool saveWs43bClockSettings(int idle,bool off,bool format){
 }
 struct Server {int code=0;void send(int c,const char*,const char*){code=c;}} server;
 void toggle(bool on){std::string key="use24h";
-''' + branch + r'''}
+'''
+            + branch
+            + r'''}
 int main(){toggle(false);assert(!clockState.use24h && server.code==0);
 writeOk=false;toggle(true);assert(!clockState.use24h && server.code==500);}
 '''
+        )
         with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp);(p/'test.cpp').write_text(harness)
-            subprocess.run(['clang++','-std=c++17',str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-            subprocess.run([str(p/'test')],check=True)
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(harness)
+            subprocess.run(
+                ['clang++', '-std=c++17', str(p / 'test.cpp'), '-o', str(p / 'test')],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)
 
     def test_load_save_failure_and_retry_pl_en(self):
-        original=(ROOT/'web/app.js').read_text()
-        for source in (original,localize_web.javascript(original)):
-            code=function(source,'function ws43bDisplaySettingsMarkup()')+'\n'+function(source,'function setupWs43bDisplaySettings()')
-            harness=r'''
+        original = (ROOT / 'web/app.js').read_text()
+        for source in (original, localize_web.javascript(original)):
+            code = (
+                function(source, 'function ws43bDisplaySettingsMarkup()')
+                + '\n'
+                + function(source, 'function setupWs43bDisplaySettings()')
+            )
+            harness = (
+                r'''
 const assert=require('assert');let fields={}, requests=[], toasts=[], reloaded=0,failLoad=true,failSave=false,badMode=false,card=null;
 function element(id){return fields[id] ||= {value:'',checked:false,disabled:false,style:{},textContent:'',querySelector(){return this.button ||= {disabled:true};}};}
 const nightCard={style:{display:'none'},querySelector(){return {};}};
@@ -59,7 +77,9 @@ async function fetch(path,options){
  return {ok:true,json:async()=>path==='/monitor/display'?{theme:2,fan_match_printer:true}:path==='/monitor/display-mode'?{mode:badMode?'unknown':'advanced'}:{idle_minutes:15,screen_off:1,use24h:0}};
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-''' + code + r'''
+'''
+                + code
+                + r'''
 (async()=>{
  setupWs43bDisplaySettings();await tick();
  assert.equal(nightCard.style.display,'');assert.equal(fields.nbright.value,'255');
@@ -104,7 +124,10 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
  assert.equal(toasts.length,5);
 })().catch(e=>{console.error(e);process.exit(1);});
 '''
-            with self.subTest(polish=source!=original):
-                subprocess.run(['node','-e',harness],check=True,capture_output=True)
+            )
+            with self.subTest(polish=source != original):
+                subprocess.run(['node', '-e', harness], check=True, capture_output=True)
 
-if __name__=='__main__':unittest.main()
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,4 +1,5 @@
 """Validate the actual dashboard-v2 VLW payloads without requiring Pillow."""
+
 from pathlib import Path
 import hashlib
 import re
@@ -10,8 +11,15 @@ import unittest
 ROOT = Path(__file__).resolve().parents[4]
 HEADER = ROOT / 'include/fonts/ws43b_dashboard_v2.h'
 GENERATOR = ROOT / 'bringup/waveshare43b/integration/generate_dashboard_fonts.py'
-FULL = {'ws43b_v2_12', 'ws43b_v2_13', 'ws43b_v2_b14', 'ws43b_v2_b15',
-        'ws43b_v2_b16', 'ws43b_v2_b17', 'ws43b_v2_b25'}
+FULL = {
+    'ws43b_v2_12',
+    'ws43b_v2_13',
+    'ws43b_v2_b14',
+    'ws43b_v2_b15',
+    'ws43b_v2_b16',
+    'ws43b_v2_b17',
+    'ws43b_v2_b25',
+}
 RESTRICTED = {
     'ws43b_v2_b23': '0123456789%- ',
     'ws43b_v2_b28': '0123456789:.,-+ hmind',
@@ -23,8 +31,10 @@ RESTRICTED = {
 
 def tables():
     text = HEADER.read_text()
-    return {name: bytes(int(value, 16) for value in re.findall(r'0x([0-9a-f]{2})', data))
-            for name, data in re.findall(r'const uint8_t (\w+)\[\] PROGMEM = \{(.*?)\};', text, re.S)}
+    return {
+        name: bytes(int(value, 16) for value in re.findall(r'0x([0-9a-f]{2})', data))
+        for name, data in re.findall(r'const uint8_t (\w+)\[\] PROGMEM = \{(.*?)\};', text, re.S)
+    }
 
 
 def records(data):
@@ -52,7 +62,7 @@ class DashboardFontTest(unittest.TestCase):
                 self.assertTrue(all(r[6] == 0 for r in glyphs))
                 # Existing renderer's conservative glyph alpha+row working set.
                 self.assertLess(max(r[1] * r[2] + r[2] * 3 for r in glyphs), 4096)
-                self.assertTrue(any(0 < byte < 255 for byte in data[24 + count * 28:]))
+                self.assertTrue(any(0 < byte < 255 for byte in data[24 + count * 28 :]))
                 if name in RESTRICTED:
                     self.assertEqual(set(map(chr, points)), set(RESTRICTED[name]))
                 else:
@@ -63,11 +73,25 @@ class DashboardFontTest(unittest.TestCase):
     def test_polish_labels_numeric_placeholders_and_layout_fit(self):
         fonts = {name: {chr(r[0]): r for r in records(data)} for name, data in tables().items()}
         for name in FULL:
-            for phrase in ['Postęp wydruku', 'Pozostało', 'Szczegóły', 'Ustawienia',
-                           'Dysza · Stół · Komora', 'W użyciu', 'Łączenie z drukarką',
-                           'Świeże dane', 'Wilgotność', 'Ilość nieznana', 'Bambu P2S',
-                           'Pogoda chwilowo niedostępna', 'Jürgen · Élodie · Rafał', '– — …']:
-                self.assertTrue(all(character in fonts[name] for character in phrase), (name, phrase))
+            for phrase in [
+                'Postęp wydruku',
+                'Pozostało',
+                'Szczegóły',
+                'Ustawienia',
+                'Dysza · Stół · Komora',
+                'W użyciu',
+                'Łączenie z drukarką',
+                'Świeże dane',
+                'Wilgotność',
+                'Ilość nieznana',
+                'Bambu P2S',
+                'Pogoda chwilowo niedostępna',
+                'Jürgen · Élodie · Rafał',
+                '– — …',
+            ]:
+                self.assertTrue(
+                    all(character in fonts[name] for character in phrase), (name, phrase)
+                )
         for name, phrase, width in [
             ('ws43b_v2_b64', '100', 160),
             ('ws43b_v2_b64', '--', 160),
@@ -89,7 +113,9 @@ class DashboardFontTest(unittest.TestCase):
     def test_font_and_generator_provenance(self):
         text = HEADER.read_text()
         self.assertIn('// Pillow: 12.3.0;', text)
-        self.assertIn(f'// Generator SHA256: {hashlib.sha256(GENERATOR.read_bytes()).hexdigest()}', text)
+        self.assertIn(
+            f'// Generator SHA256: {hashlib.sha256(GENERATOR.read_bytes()).hexdigest()}', text
+        )
         for relative in ['fonts/Inter-Regular.ttf', 'fonts/Inter-Bold.ttf']:
             digest = hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
             self.assertIn(f'// {relative} SHA256: {digest}', text)
@@ -106,27 +132,34 @@ class DashboardVlwRenderingTest(unittest.TestCase):
     initial header line height; text_width reads the explicit glyph record.
     No Pillow, screen, hardware, generated mock font, or network is required.
     """
+
     @classmethod
     def setUpClass(cls):
         display = (ROOT / 'src/display_ws43b.cpp').read_text()
-        implementation = display[display.index('int v2Text('):display.index('void footer(')]
+        implementation = display[display.index('int v2Text(') : display.index('void footer(')]
         clock_match = re.search(
             r'snprintf\(header,sizeof\(header\),"%02d:%02d %s"[^\n]*\n\s*'
-            r'(v2Text\(header,[^\n]+;)', display)
+            r'(v2Text\(header,[^\n]+;)',
+            display,
+        )
         if clock_match is None:
             raise AssertionError('The native twelve-hour clock call was not found')
         # Exercise the actual weather choice and actual clock call, so changing
         # either font, clip width, alignment, or fallback is covered as well.
-        weather = display[display.index('void menuWeatherHeader('):display.index('bool dashboardCooling=')]
+        weather = display[
+            display.index('void menuWeatherHeader(') : display.index('bool dashboardCooling=')
+        ]
         weather_start = weather.index('    ::setFont(tft,FONT_NONE);')
         weather_end = weather.index('\n  }', weather_start)
         weather_call = weather[weather_start:weather_end]
         slot_match = re.search(
             r'v2Text\(empty\?ws43bText\("Pusty","Empty"(?:,\s*"(?:[^"\\]|\\.)*")?\):ws43bText\("Brak odczytu","No reading"(?:,\s*"(?:[^"\\]|\\.)*")?\),[^\n]+;',
-            display)
+            display,
+        )
         if slot_match is None:
             raise AssertionError('The native missing/empty slot call was not found')
-        source = r"""
+        source = (
+            r"""
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -217,7 +250,9 @@ struct TestCanvas {
   }
 } tft;
 void setFont(TestCanvas &,int){}
-""" + implementation + r"""
+"""
+            + implementation
+            + r"""
 void complete(const char *text) {
   if(tft.clipped||tft.drawn!=text) {
     fprintf(stderr,"Clipped or abbreviated: %s (clip %d,%d %dx%d; drawn %s)\n",text,tft.cx,tft.cy,tft.cw,tft.ch,tft.drawn.c_str());
@@ -230,7 +265,9 @@ int main(int argc,char **argv) {
     char header[32];unsigned count=0;
     for(int hour=0;hour<24;++hour)for(int minute=0;minute<60;++minute) {
       snprintf(header,sizeof(header),"%02d:%02d %s",hour%12?hour%12:12,minute,hour<12?"AM":"PM");
-""" + clock_match[1] + r"""
+"""
+            + clock_match[1]
+            + r"""
       complete(header);++count;
     }
     assert(count==1440);
@@ -241,7 +278,9 @@ int main(int argc,char **argv) {
     for(int temperature=-100;temperature<=101;++temperature) {
       if(temperature==101)snprintf(value,sizeof(value),"--°C");
       else snprintf(value,sizeof(value),"%d°C",temperature);
-""" + weather_call + r"""
+"""
+            + weather_call
+            + r"""
       complete(value);
     }
   } else if(!strcmp(argv[1],"slots")) {
@@ -250,7 +289,9 @@ int main(int argc,char **argv) {
                         {false,true,"Empty"},{false,false,"No reading"}};
     for(const auto &test:cases)for(int slot=0;slot<4;++slot) {
       polish=test.pl;const bool empty=test.empty;const int x=16+194*slot;
-""" + slot_match[0] + r"""
+"""
+            + slot_match[0]
+            + r"""
       complete(test.expected); // No ellipsis is acceptable in these state labels.
     }
   } else if(!strcmp(argv[1],"height")) {
@@ -276,19 +317,36 @@ int main(int argc,char **argv) {
   } else assert(false&&"Unknown test case");
 }
 """
+        )
         cls.temp = tempfile.TemporaryDirectory(prefix='ws43b-vlw-render-')
         cls.addClassCleanup(cls.temp.cleanup)
         directory = Path(cls.temp.name)
         (directory / 'pgmspace.h').write_text(
             '#pragma once\n#define PROGMEM\n'
-            '#define pgm_read_byte(p) (*static_cast<const uint8_t *>(p))\n')
+            '#define pgm_read_byte(p) (*static_cast<const uint8_t *>(p))\n'
+        )
         cpp = directory / 'test.cpp'
         cpp.write_text(source)
         cls.binary = directory / 'test'
-        subprocess.run(['c++', '-std=c++17', '-O1', '-Wall', '-Wextra',
-                        '-I', str(directory), '-I', str(ROOT / 'include'),
-                        str(cpp), '-o', str(cls.binary)], check=True,
-                       capture_output=True, text=True)
+        subprocess.run(
+            [
+                'c++',
+                '-std=c++17',
+                '-O1',
+                '-Wall',
+                '-Wextra',
+                '-I',
+                str(directory),
+                '-I',
+                str(ROOT / 'include'),
+                str(cpp),
+                '-o',
+                str(cls.binary),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
     def test_all_twelve_hour_clock_values_fit_with_actual_space_advance(self):
         subprocess.run([str(self.binary), 'clock'], check=True)

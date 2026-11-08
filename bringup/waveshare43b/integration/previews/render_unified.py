@@ -1,13 +1,20 @@
 """Host review of actual dashboard/AMS render functions, synthetic data only.
 Text uses the firmware VLW glyph masks and advances. Host shapes and hardware blending may differ.
 """
+
 from pathlib import Path
-import subprocess,tempfile,re,struct
-from PIL import Image,ImageDraw,ImageFont
-ROOT=Path(__file__).resolve().parents[4]
-SRC=(ROOT/'src/display_ws43b.cpp').read_text()
-def section(a,b):return SRC[SRC.index(a):SRC.index(b,SRC.index(a))]
-PRE=r'''
+import subprocess, tempfile, re, struct
+from PIL import Image, ImageDraw, ImageFont
+
+ROOT = Path(__file__).resolve().parents[4]
+SRC = (ROOT / 'src/display_ws43b.cpp').read_text()
+
+
+def section(a, b):
+    return SRC[SRC.index(a) : SRC.index(b, SRC.index(a))]
+
+
+PRE = r'''
 #include "bambu_monitor.h"
 #include "ws43b_dashboard_policy.h"
 #include "ws43b_style.h"
@@ -60,9 +67,19 @@ auto &displayedPrinter(){return slot;}bool isWiFiConnected(){return true;}
 bool getLocalTime(tm *t,int){*t={};t->tm_hour=20;t->tm_min=4;return true;}
 void dashboardCoolingCard(const BambuMonitorTelemetry&,unsigned,bool){}
 '''
-parts=[section('template <class Field>\nconst char *missing','void temperature('),section('const char *statusText(','void detailCard('),section('void levelCard(','void dashboardTemperature('),section('void dashboardTemperature(','// Solar data'),section('uint16_t saverFilamentColor(const BambuMonitorTelemetry &m','void saverAnimation('),section('void dashboardActivityIcon(','void dashboardCoolingCard('),section('void dashboardScreen(','void detailsScreen('),section('void settingRow(','void connectedWifiName('),section('void clockSettingsScreen()','#if WS43B_FULL_WEBUI\nbool gaugeDataFresh')]
-parts=[p.replace('time(nullptr)', 'time_t(1791741840)') for p in parts]
-END=r'''
+parts = [
+    section('template <class Field>\nconst char *missing', 'void temperature('),
+    section('const char *statusText(', 'void detailCard('),
+    section('void levelCard(', 'void dashboardTemperature('),
+    section('void dashboardTemperature(', '// Solar data'),
+    section('uint16_t saverFilamentColor(const BambuMonitorTelemetry &m', 'void saverAnimation('),
+    section('void dashboardActivityIcon(', 'void dashboardCoolingCard('),
+    section('void dashboardScreen(', 'void detailsScreen('),
+    section('void settingRow(', 'void connectedWifiName('),
+    section('void clockSettingsScreen()', '#if WS43B_FULL_WEBUI\nbool gaugeDataFresh'),
+]
+parts = [p.replace('time(nullptr)', 'time_t(1791741840)') for p in parts]
+END = r'''
 int main(int argc,char**argv){
  auto &m=slot.state.monitor;m.hasUsefulData=true;m.lastUsefulMs=100;
  m.status.set("RUNNING",100);m.progress.set(68,100);m.remainingMinutes.set(92,100);
@@ -106,55 +123,137 @@ int main(int argc,char**argv){
 }
 '''
 # Decode the actual linked firmware font bytes rather than substitute a TTF.
-FONTS={}
-for name,table in re.findall(r'const uint8_t (\w+)\[\].*?\{(.*?)\};',(ROOT/'include/fonts/ws43b_modern.h').read_text(),re.S):
- data=bytes(int(v,16) for v in re.findall(r'0x([0-9a-f]{2})',table))
- n,version,size,_,asc,desc=struct.unpack_from('>6I',data);offset=24+n*28;glyphs={}
- for i in range(n):
-  cp,h,w,advance,dy,dx,_=struct.unpack_from('>IIIIiiI',data,24+i*28)
-  glyphs[chr(cp)]=(h,w,advance,dy,dx,data[offset:offset+w*h]);offset+=w*h
- FONTS[name]=(asc,glyphs)
+FONTS = {}
+for name, table in re.findall(
+    r'const uint8_t (\w+)\[\].*?\{(.*?)\};',
+    (ROOT / 'include/fonts/ws43b_modern.h').read_text(),
+    re.S,
+):
+    data = bytes(int(v, 16) for v in re.findall(r'0x([0-9a-f]{2})', table))
+    n, version, size, _, asc, desc = struct.unpack_from('>6I', data)
+    offset = 24 + n * 28
+    glyphs = {}
+    for i in range(n):
+        cp, h, w, advance, dy, dx, _ = struct.unpack_from('>IIIIiiI', data, 24 + i * 28)
+        glyphs[chr(cp)] = (h, w, advance, dy, dx, data[offset : offset + w * h])
+        offset += w * h
+    FONTS[name] = (asc, glyphs)
+
+
 def font_for(size):
- return FONTS['ws43b_dash_large' if size==72 else f'ws43b_dash_{size}']
-def firmware_text(im,text,x,y,width,size,color):
- asc,glyphs=font_for(size);scale=1
- def length(t):return sum(glyphs.get(ch,(0,0,0,0,0,b''))[2]*scale for ch in t)
- if size==72 and length(text)>width:
-  asc,glyphs=font_for(30);scale=2
- if length(text)>width:
-  while text and length(text+'...')>width:text=text[:-1]
-  text+='...'
- layer=Image.new('RGBA',(width,size+10))
- cursor=0
- for ch in text:
-  h,w,advance,dy,dx,pixels=glyphs.get(ch,(0,0,0,0,0,b''))
-  if w and h:
-   mask=Image.frombytes('L',(w,h),pixels).resize((w*scale,h*scale),Image.Resampling.NEAREST)
-   layer.paste(color,(cursor+dx*scale,(asc-dy)*scale),mask)
-  cursor+=advance*scale
- layer=layer.resize((width*2,(size+10)*2),Image.Resampling.NEAREST)
- im.paste(layer,(x*2,y*2),layer)
-def color(c):return ((c>>11)*255//31,((c>>5)&63)*255//63,(c&31)*255//31)
-def render(ops,path):
- im=Image.new('RGB',(1600,960),color(0x0084));d=ImageDraw.Draw(im)
- for line in ops.splitlines():
-  left,_,text=line.partition('|');args=left.split();op=args[0];v=list(map(int,args[1:]));c=color(v[-1]);v=v[:-1]
-  if op=='text':
-   x,y,w,size=v;firmware_text(im,text,x,y,w,size,c);continue
-  if op in ('ellipse','ring'):
-   x,y,rx,ry=v;box=((x-rx)*2,(y-ry)*2,(x+rx)*2,(y+ry)*2);d.ellipse(box,fill=c if op=='ellipse' else None,outline=c,width=2)
-  elif op=='triangle':d.polygon(tuple((v[i]*2,v[i+1]*2) for i in (0,2,4)),fill=c)
-  elif op=='line':d.line(tuple(n*2 for n in v),fill=c,width=2)
-  else:
-   x,y,w,h=v[:4];box=(x*2,y*2,(x+w-1)*2,(y+h-1)*2)
-   if w<=0 or h<=0:continue
-   if op in ('round','outline'):d.rounded_rectangle(box,radius=v[4]*2,fill=c if op=='round' else None,outline=c,width=2)
-   else:d.rectangle(box,fill=c if op=='rect' else None,outline=c,width=2)
- im.resize((800,480),Image.Resampling.LANCZOS).save(path)
+    return FONTS['ws43b_dash_large' if size == 72 else f'ws43b_dash_{size}']
+
+
+def firmware_text(im, text, x, y, width, size, color):
+    asc, glyphs = font_for(size)
+    scale = 1
+
+    def length(t):
+        return sum(glyphs.get(ch, (0, 0, 0, 0, 0, b''))[2] * scale for ch in t)
+
+    if size == 72 and length(text) > width:
+        asc, glyphs = font_for(30)
+        scale = 2
+    if length(text) > width:
+        while text and length(text + '...') > width:
+            text = text[:-1]
+        text += '...'
+    layer = Image.new('RGBA', (width, size + 10))
+    cursor = 0
+    for ch in text:
+        h, w, advance, dy, dx, pixels = glyphs.get(ch, (0, 0, 0, 0, 0, b''))
+        if w and h:
+            mask = Image.frombytes('L', (w, h), pixels).resize(
+                (w * scale, h * scale), Image.Resampling.NEAREST
+            )
+            layer.paste(color, (cursor + dx * scale, (asc - dy) * scale), mask)
+        cursor += advance * scale
+    layer = layer.resize((width * 2, (size + 10) * 2), Image.Resampling.NEAREST)
+    im.paste(layer, (x * 2, y * 2), layer)
+
+
+def color(c):
+    return ((c >> 11) * 255 // 31, ((c >> 5) & 63) * 255 // 63, (c & 31) * 255 // 31)
+
+
+def render(ops, path):
+    im = Image.new('RGB', (1600, 960), color(0x0084))
+    d = ImageDraw.Draw(im)
+    for line in ops.splitlines():
+        left, _, text = line.partition('|')
+        args = left.split()
+        op = args[0]
+        v = list(map(int, args[1:]))
+        c = color(v[-1])
+        v = v[:-1]
+        if op == 'text':
+            x, y, w, size = v
+            firmware_text(im, text, x, y, w, size, c)
+            continue
+        if op in ('ellipse', 'ring'):
+            x, y, rx, ry = v
+            box = ((x - rx) * 2, (y - ry) * 2, (x + rx) * 2, (y + ry) * 2)
+            d.ellipse(box, fill=c if op == 'ellipse' else None, outline=c, width=2)
+        elif op == 'triangle':
+            d.polygon(tuple((v[i] * 2, v[i + 1] * 2) for i in (0, 2, 4)), fill=c)
+        elif op == 'line':
+            d.line(tuple(n * 2 for n in v), fill=c, width=2)
+        else:
+            x, y, w, h = v[:4]
+            box = (x * 2, y * 2, (x + w - 1) * 2, (y + h - 1) * 2)
+            if w <= 0 or h <= 0:
+                continue
+            if op in ('round', 'outline'):
+                d.rounded_rectangle(
+                    box, radius=v[4] * 2, fill=c if op == 'round' else None, outline=c, width=2
+                )
+            else:
+                d.rectangle(box, fill=c if op == 'rect' else None, outline=c, width=2)
+    im.resize((800, 480), Image.Resampling.LANCZOS).save(path)
+
+
 def main():
- out=Path(__file__).parent
- with tempfile.TemporaryDirectory() as temp:
-  p=Path(temp);(p/'draw.cpp').write_text(PRE+'\n'.join(parts)+END)
-  subprocess.run(['clang++','-std=c++17','-I',str(ROOT/'include'),str(p/'draw.cpp'),'-o',str(p/'draw')],check=True)
-  for name,args in [('print',[]),('cleaning',['cleaning']),('leveling',['leveling']),('calibration',['calibration']),('stale',['stale']),('ams',['ams']),*[(name,[name]) for name in ['settings','appearance','language','system','reset','clock','weather']]]:render(subprocess.check_output([str(p/'draw'),*args],text=True),out/(name+'-native-layout.png'))
-if __name__=='__main__':main()
+    out = Path(__file__).parent
+    with tempfile.TemporaryDirectory() as temp:
+        p = Path(temp)
+        (p / 'draw.cpp').write_text(PRE + '\n'.join(parts) + END)
+        subprocess.run(
+            [
+                'clang++',
+                '-std=c++17',
+                '-I',
+                str(ROOT / 'include'),
+                str(p / 'draw.cpp'),
+                '-o',
+                str(p / 'draw'),
+            ],
+            check=True,
+        )
+        for name, args in [
+            ('print', []),
+            ('cleaning', ['cleaning']),
+            ('leveling', ['leveling']),
+            ('calibration', ['calibration']),
+            ('stale', ['stale']),
+            ('ams', ['ams']),
+            *[
+                (name, [name])
+                for name in [
+                    'settings',
+                    'appearance',
+                    'language',
+                    'system',
+                    'reset',
+                    'clock',
+                    'weather',
+                ]
+            ],
+        ]:
+            render(
+                subprocess.check_output([str(p / 'draw'), *args], text=True),
+                out / (name + '-native-layout.png'),
+            )
+
+
+if __name__ == '__main__':
+    main()

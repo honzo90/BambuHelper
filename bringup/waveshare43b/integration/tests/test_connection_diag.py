@@ -1,10 +1,14 @@
 """Verify diagnostic TLS split fails closed and measures each bounded stage."""
+
 from pathlib import Path
 import subprocess, tempfile, unittest
-ROOT=Path(__file__).resolve().parents[4]
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class ConnectionTiming(unittest.TestCase):
- def test_tls_failure_never_reports_ready_and_wraparound_is_safe(self):
-  code=r'''
+    def test_tls_failure_never_reports_ready_and_wraparound_is_safe(self):
+        code = r'''
 #include "ws43b_connection_diag.h"
 #include <cassert>
 uint32_t now=0;
@@ -30,7 +34,20 @@ int main(){
  assert(!t.tlsReady&&tlsFail.stopped&&tlsFail.tlsCalls==1);
 }
 '''
-  with tempfile.TemporaryDirectory() as d:
-   p=Path(d);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-DWS43B_CONNECT_DIAG=1','-I'+str(ROOT/'src'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-DWS43B_CONNECT_DIAG=1',
+                    '-I' + str(ROOT / 'src'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)

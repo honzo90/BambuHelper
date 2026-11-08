@@ -1,9 +1,12 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class WeatherIcons(unittest.TestCase):
- def test_codes_geometry_and_day_night(self):
-  code=r'''
+    def test_codes_geometry_and_day_night(self):
+        code = r'''
 #include "ws43b_weather_icons.h"
 #include "ws43b_weather_background.h"
 #include <cassert>
@@ -36,13 +39,29 @@ int main(){
  Surface day,night;draw(day,Symbol::Clear,0,0,1,false,1,2,3);draw(night,Symbol::Clear,0,0,1,true,1,2,3);assert(day.pixels!=night.pixels);
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)
 
- def test_native_pixels_transparency_shading_and_fixed_bounds(self):
-  code=r'''
+    def test_native_pixels_transparency_shading_and_fixed_bounds(self):
+        code = r'''
 #include "ws43b_weather_icons.h"
 #include <algorithm>
 #include <array>
@@ -111,8 +130,24 @@ int main(){
  for(int code:{-1,4,100,32767})assert(classify(true,code)==Symbol::Unknown);
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror',
-    '-fsanitize=address,undefined','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)

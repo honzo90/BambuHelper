@@ -1,4 +1,5 @@
 """Native backpressure model: logs never wait; Improv retains packet allowance."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -50,7 +51,19 @@ int main() {
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
             (path / 'test.cpp').write_text(code)
-            subprocess.run(['clang++', '-std=c++11', '-Wall', '-Wextra', '-Werror',
-                            '-I' + str(ROOT / 'src'), str(path / 'test.cpp'),
-                            '-o', str(path / 'test')], check=True, capture_output=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++11',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I' + str(ROOT / 'src'),
+                    str(path / 'test.cpp'),
+                    '-o',
+                    str(path / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
             subprocess.run([str(path / 'test')], check=True, capture_output=True)

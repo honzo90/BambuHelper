@@ -1,9 +1,13 @@
 """Host check of actual water geometry and clock formatting boundaries."""
+
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+
 ROOT = Path(__file__).resolve().parents[4]
+
+
 class WaterClockTest(unittest.TestCase):
     def test_geometry_and_time(self):
         code = r'''
@@ -31,7 +35,11 @@ int main() {
 }
 '''
         with tempfile.TemporaryDirectory() as folder:
-            source=Path(folder)/'check.cpp'; source.write_text(code)
-            binary=Path(folder)/'check'
-            subprocess.run(['c++','-std=c++11','-I',str(ROOT/'include'),str(source),'-o',str(binary)],check=True)
-            subprocess.run([str(binary)],check=True)
+            source = Path(folder) / 'check.cpp'
+            source.write_text(code)
+            binary = Path(folder) / 'check'
+            subprocess.run(
+                ['c++', '-std=c++11', '-I', str(ROOT / 'include'), str(source), '-o', str(binary)],
+                check=True,
+            )
+            subprocess.run([str(binary)], check=True)

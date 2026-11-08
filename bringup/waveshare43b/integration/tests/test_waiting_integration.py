@@ -5,6 +5,7 @@ Run directly or discover with unittest; the repository root is derived from this
 The firmware and repository tests are read-only. Temporary C++ executables are
 the existing host fixtures, extended with real routing/cache lifecycle cases.
 """
+
 from pathlib import Path
 import unittest
 
@@ -15,7 +16,9 @@ TESTS = ROOT / "bringup/waveshare43b/integration/tests"
 def replace_once(text, before, after):
     count = text.count(before)
     if count != 1:
-        raise AssertionError(f"Fixture marker drift: expected one occurrence, found {count}: {before[:110]!r}")
+        raise AssertionError(
+            f"Fixture marker drift: expected one occurrence, found {count}: {before[:110]!r}"
+        )
     return text.replace(before, after, 1)
 
 
@@ -146,19 +149,29 @@ class WaitingIntegration(unittest.TestCase):
         text = replace_once(text, marker, "\n" + IDLE_CASES + marker)
         namespace = {"__file__": str(path), "__name__": "waiting_view_fixture"}
         exec(compile(text, str(path) + " [in-memory Waiting extension]", "exec"), namespace)
-        print("PASS: real updateIdleView/saverView, fresh-state separation, night, terminal/offline/session gates")
+        print(
+            "PASS: real updateIdleView/saverView, fresh-state separation, night, terminal/offline/session gates"
+        )
 
     def test_real_dispatcher_waiting_cache_lifecycle(self):
         self._run_dispatcher_cases(CACHE_CASES)
-        print("PASS: real dispatcher full redraws Print/Waiting/Clock without changing the clock minute")
+        print(
+            "PASS: real dispatcher full redraws Print/Waiting/Clock without changing the clock minute"
+        )
 
     def test_waiting_historical_validity_cache(self):
         marker = "  // Only upstream corePrinting changes."
         for field in ("progress", "remainingMinutes"):
             for restored in (False, True):
-                with self.subTest(field=field, transition="invalid-to-valid" if restored else "valid-to-invalid"):
-                    before = (f"job.{field}.valid=false;tick(true);" if restored else "")
-                    mutation = f"job.{field}.valid=true;" if restored else f"job.{field}.invalidate(currentMs);"
+                with self.subTest(
+                    field=field, transition="invalid-to-valid" if restored else "valid-to-invalid"
+                ):
+                    before = f"job.{field}.valid=false;tick(true);" if restored else ""
+                    mutation = (
+                        f"job.{field}.valid=true;"
+                        if restored
+                        else f"job.{field}.invalidate(currentMs);"
+                    )
                     case = f"""
   // Historical validity changes alone must redraw the label. The reverse
   // transition restores the existing stale sample, not a fresh job update.
@@ -172,16 +185,20 @@ class WaitingIntegration(unittest.TestCase):
 
 """
                     self._run_dispatcher_cases(replace_once(CACHE_CASES, marker, case + marker))
-        print("CHECKED: historical progress/remaining validity redraws in both directions while still Waiting")
+        print(
+            "CHECKED: historical progress/remaining validity redraws in both directions while still Waiting"
+        )
 
     def _run_dispatcher_cases(self, cases):
         path = TESTS / "test_repaint_integration.py"
         text = path.read_text()
-        text = replace_once(text,
-                            "'clang++', '-std=c++17',",
-                            "'clang++', '-std=c++17', '-Werror=format',")
+        text = replace_once(
+            text, "'clang++', '-std=c++17',", "'clang++', '-std=c++17', '-Werror=format',"
+        )
         old_state = "struct {bool connected=true;BambuMonitorTelemetry monitor;} state;"
-        new_state = "struct {bool connected=true;bool printing=false;BambuMonitorTelemetry monitor;} state;"
+        new_state = (
+            "struct {bool connected=true;bool printing=false;BambuMonitorTelemetry monitor;} state;"
+        )
         if old_state in text:
             text = replace_once(text, old_state, new_state)
         elif new_state not in text:
@@ -192,7 +209,9 @@ class WaitingIntegration(unittest.TestCase):
             text = replace_once(text, old_saver, new_saver)
         elif new_saver not in text:
             raise AssertionError("Repaint saverView drift: core printing must be passed explicitly")
-        marker = ' cool.status.set("FINISH",currentMs);tick();assert(dashboardCooling&&bodyCount==1);\n}'
+        marker = (
+            ' cool.status.set("FINISH",currentMs);tick();assert(dashboardCooling&&bodyCount==1);\n}'
+        )
         text = replace_once(text, marker, marker[:-1] + cases + "}")
         namespace = {"__file__": str(path), "__name__": "waiting_cache_fixture"}
         exec(compile(text, str(path) + " [in-memory Waiting extension]", "exec"), namespace)

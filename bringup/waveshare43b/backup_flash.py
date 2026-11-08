@@ -3,6 +3,7 @@
 The ROM download-mode reset temporarily stops the running firmware. Disconnect
 other ESP boards and verify the port before invoking. Backups may contain secrets.
 """
+
 import argparse
 import hashlib
 from pathlib import Path
@@ -13,8 +14,14 @@ import os
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--port', required=True)
-    ap.add_argument('--output', type=Path, required=True, help='New directory OUTSIDE every Git worktree')
-    ap.add_argument('--esptool', type=Path, default=Path.home() / 'Library/Arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool')
+    ap.add_argument(
+        '--output', type=Path, required=True, help='New directory OUTSIDE every Git worktree'
+    )
+    ap.add_argument(
+        '--esptool',
+        type=Path,
+        default=Path.home() / 'Library/Arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool',
+    )
     args = ap.parse_args()
     dest = args.output.expanduser().resolve()
     if dest.exists():
@@ -24,8 +31,20 @@ def main():
     if not args.esptool.is_file():
         ap.error('Pinned esptool 5.3.1 is missing.')
     os.umask(0o077)
-    base = [str(args.esptool), '--chip', 'esp32s3', '--port', args.port, '--baud', '115200', '--after', 'no-reset']
-    result = subprocess.run(base + ['flash-id'], check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    base = [
+        str(args.esptool),
+        '--chip',
+        'esp32s3',
+        '--port',
+        args.port,
+        '--baud',
+        '115200',
+        '--after',
+        'no-reset',
+    ]
+    result = subprocess.run(
+        base + ['flash-id'], check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
     print(result.stdout)
     if 'Detected flash size: 16MB' not in result.stdout:
         raise SystemExit('Nie potwierdzono Flash 16MB. Przerwano; niczego nie zapisano w Flash.')
@@ -39,7 +58,9 @@ def main():
         if file.stat().st_size != 16 * 1024 * 1024:
             raise SystemExit(f'Błędny rozmiar kopii: {file}. Kopie pozostawiono do oceny.')
         digests.append(hashlib.sha256(file.read_bytes()).hexdigest())
-    (dest / 'SHA256SUMS').write_text(''.join(f'{d}  flash-read{i+1}.bin\n' for i, d in enumerate(digests)))
+    (dest / 'SHA256SUMS').write_text(
+        ''.join(f'{d}  flash-read{i + 1}.bin\n' for i, d in enumerate(digests))
+    )
     if digests[0] != digests[1]:
         raise SystemExit('BACKUP_FAIL: dwa odczyty mają różne SHA256. Nie wgrywaj nowego firmware.')
     print('BACKUP_OK:', dest)

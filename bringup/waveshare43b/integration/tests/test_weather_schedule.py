@@ -1,9 +1,12 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class WeatherSchedule(unittest.TestCase):
- def test_readiness_retry_configuration_and_wrap(self):
-  code=r'''
+    def test_readiness_retry_configuration_and_wrap(self):
+        code = r'''
 #include "ws43b_weather_schedule.h"
 #include <cassert>
 int main(){
@@ -27,7 +30,22 @@ int main(){
  assert(s.waitMs(uint32_t(0xfffffff0u+20000u),1,true)==0);
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True)
-   subprocess.run([str(p/'test')],check=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

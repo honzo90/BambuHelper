@@ -1,12 +1,19 @@
 from pathlib import Path
-import json,subprocess,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import json, subprocess, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
 
 class WifiSetup(unittest.TestCase):
- def test_scan_selection_safe_labels_and_failed_save(self):
-  html=(ROOT/'include/web_pages.h').read_text().split('static const char PAGE_AP_HTML[]',1)[1].split(')rawliteral";',1)[0]
-  script=html.split('<script>',1)[1].split('</script>',1)[0]
-  harness=r'''
+    def test_scan_selection_safe_labels_and_failed_save(self):
+        html = (
+            (ROOT / 'include/web_pages.h')
+            .read_text()
+            .split('static const char PAGE_AP_HTML[]', 1)[1]
+            .split(')rawliteral";', 1)[0]
+        )
+        script = html.split('<script>', 1)[1].split('</script>', 1)[0]
+        harness = r'''
 const vm=require('vm'),assert=require('assert');
 const ids={};for(const id of ['networks','scan','scanmsg','ssid','pass','msg'])ids[id]={value:'',textContent:'',style:{},disabled:false,options:[],length:1,appendChild(o){this.options.push(o)},focus(){this.focused=true}};
 let body={innerHTML:''},calls=[],fail=false;
@@ -29,13 +36,15 @@ setImmediate(async()=>{
  fail=true;await context.scanWifi();assert.equal(ids.scan.disabled,false);assert(ids.scanmsg.textContent.includes('Scan failed'));
  ids.networks.value='';context.chooseNetwork();assert(ids.ssid.focused);
 });
-'''.replace('SCRIPT',json.dumps(script))
-  subprocess.run(['node','-e',harness],check=True,capture_output=True)
+'''.replace('SCRIPT', json.dumps(script))
+        subprocess.run(['node', '-e', harness], check=True, capture_output=True)
 
- def test_full_webui_scan_does_not_save_and_preserves_exact_ssid(self):
-  source=(ROOT/'web/app.js').read_text()
-  script=source.split('/* ============ WiFi network selection ============ */',1)[1].split('/* ============ Save WiFi ============ */',1)[0]
-  harness=r'''
+    def test_full_webui_scan_does_not_save_and_preserves_exact_ssid(self):
+        source = (ROOT / 'web/app.js').read_text()
+        script = source.split('/* ============ WiFi network selection ============ */', 1)[1].split(
+            '/* ============ Save WiFi ============ */', 1
+        )[0]
+        harness = r'''
 const vm=require('vm'),assert=require('assert');
 const ids={};for(const id of ['networks','scan','scanmsg','ssid','pass'])ids[id]={value:'',defaultValue:'Home',textContent:'',disabled:false,length:1,options:[],appendChild(o){this.options.push(o)},focus(){this.focused=true}};
 ids.ssid.value='Home';ids.pass.value='typed-secret';let calls=[],failed=false,transient=0,radioFailures=0,posts=0;
@@ -58,5 +67,5 @@ vm.createContext(context);vm.runInContext(SCRIPT,context);
  radioFailures=1;const beforePosts=posts;await context.scanWifi();assert.equal(posts,beforePosts+2);assert(ids.scanmsg.textContent.includes('Select a network'));
  failed=true;await context.scanWifi();assert.equal(ids.scan.disabled,false);assert(ids.scanmsg.textContent.includes('Scan failed'));
 })().catch(e=>{console.error(e);process.exit(1)});
-'''.replace('SCRIPT',json.dumps(script))
-  subprocess.run(['node','-e',harness],check=True,capture_output=True)
+'''.replace('SCRIPT', json.dumps(script))
+        subprocess.run(['node', '-e', harness], check=True, capture_output=True)

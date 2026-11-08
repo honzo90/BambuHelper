@@ -1,4 +1,5 @@
 """A new OTA image stays on probation until it runs healthily; failures roll back and are skipped."""
+
 from pathlib import Path
 import json
 import subprocess
@@ -50,9 +51,26 @@ int main(){
 class OtaHealth(unittest.TestCase):
     def test_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / 'o.cpp'; src.write_text(CODE); exe = Path(tmp) / 'o'
-            subprocess.run(['clang++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'include'),
-                            str(src), '-o', str(exe)], check=True, capture_output=True, text=True)
+            src = Path(tmp) / 'o.cpp'
+            src.write_text(CODE)
+            exe = Path(tmp) / 'o'
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(src),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(exe)], check=True)
 
     def test_wired_in(self):
@@ -63,40 +81,53 @@ class OtaHealth(unittest.TestCase):
         self.assertIn('esp_ota_get_last_invalid_partition()', status)
         self.assertIn('ESP_RST_BROWNOUT', status)
         main = (ROOT / 'src/main.cpp').read_text()
-        setup = main[main.index('void setup()'):main.index('void loop()')]
-        self.assertLess(setup.index('recordBootSlotVersion();'), setup.index('ws43b_ota_status::begin();'))
-        self.assertIn('ws43b_ota_status::tick();', main[main.index('void loop()'):])
+        setup = main[main.index('void setup()') : main.index('void loop()')]
+        self.assertLess(
+            setup.index('recordBootSlotVersion();'), setup.index('ws43b_ota_status::begin();')
+        )
+        self.assertIn('ws43b_ota_status::tick();', main[main.index('void loop()') :])
         web = (ROOT / 'src/web_server.cpp').read_text()
-        restart = web[web.index('if (pendingRestartAt && millis() >= pendingRestartAt)'):]
-        self.assertLess(restart.index('ws43b_ota_status::confirmBeforeRestart();'), restart.index('ESP.restart();'))
-        auto = web[web.index('static void handleOtaAuto()'):]
+        restart = web[web.index('if (pendingRestartAt && millis() >= pendingRestartAt)') :]
+        self.assertLess(
+            restart.index('ws43b_ota_status::confirmBeforeRestart();'),
+            restart.index('ESP.restart();'),
+        )
+        auto = web[web.index('static void handleOtaAuto()') :]
         self.assertLess(auto.index('urlIsFailedVersion('), auto.index('disconnectBambuMqtt();'))
         settings = (ROOT / 'src/settings.cpp').read_text()
-        reset = settings[settings.index('prefs.clear();'):]
-        self.assertLess(reset.index('ws43b_ota_status::confirmBeforeRestart();'), reset.index('ESP.restart();'))
+        reset = settings[settings.index('prefs.clear();') :]
+        self.assertLess(
+            reset.index('ws43b_ota_status::confirmBeforeRestart();'), reset.index('ESP.restart();')
+        )
 
     def test_webui_skips_failed_version(self):
         pages = (ROOT / 'include/web_pages.h').read_text()
         self.assertIn("otaFailed:'%OTAFAILED%'", pages)
         self.assertIn('"OTAFAILED"', (ROOT / 'src/web_template.cpp').read_text())
         app = (ROOT / 'web/app.js').read_text()
-        body = app[app.index('function checkWs43bUpdates'):app.index('function checkForUpdates')]
+        body = app[app.index('function checkWs43bUpdates') : app.index('function checkForUpdates')]
         skip = body.index('picked.release.tag_name === DEV.otaFailed')
         self.assertLess(skip, body.index("installBtn.style.display = 'inline-block'"))
-        msg = ('This version failed to start on this panel and was rolled back. '
-               'Use the manual upload only if you want to try it again.')
+        msg = (
+            'This version failed to start on this panel and was rolled back. '
+            'Use the manual upload only if you want to try it again.'
+        )
         self.assertIn(msg, body)
         for lang in ('pl', 'de'):
-            catalog = json.loads((ROOT / f'bringup/waveshare43b/integration/locale/{lang}.json').read_text())
+            catalog = json.loads(
+                (ROOT / f'bringup/waveshare43b/integration/locale/{lang}.json').read_text()
+            )
             self.assertIn(msg, catalog)
 
     def test_panel_shows_health(self):
         display = (ROOT / 'src/display_ws43b.cpp').read_text()
         self.assertIn('const char *panelHealthNotice(bool shortForm)', display)
-        general = display[display.index('void generalSettingsScreen()'):]
-        general = general[:general.index('\n}\n')]
+        general = display[display.index('void generalSettingsScreen()') :]
+        general = general[: general.index('\n}\n')]
         self.assertIn('panelHealthNotice(false)', general)
-        tiles = display[display.index('void settingsScreen()'):display.index('void systemSettingsScreen()')]
+        tiles = display[
+            display.index('void settingsScreen()') : display.index('void systemSettingsScreen()')
+        ]
         self.assertIn('panelHealthNotice(true)', tiles)
 
 

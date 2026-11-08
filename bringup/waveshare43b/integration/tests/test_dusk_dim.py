@@ -1,4 +1,5 @@
 """Dusk dimming: solar night only dims; manual hours alone decide the night."""
+
 from pathlib import Path
 import re
 import subprocess
@@ -46,15 +47,29 @@ class DuskDim(unittest.TestCase):
             source = Path(tmp) / 'dusk.cpp'
             source.write_text(HARNESS)
             binary = Path(tmp) / 'dusk'
-            subprocess.run(['clang++', '-std=c++17', '-Wall', '-Wextra', '-Werror',
-                            '-I', str(ROOT / 'include'), str(source), '-o', str(binary)],
-                           check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(source),
+                    '-o',
+                    str(binary),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_night_hours_ignore_solar_data(self):
         source = (ROOT / 'src/display_ui.cpp').read_text()
-        body = source[source.index('static bool isNightHour()'):]
-        body = body[:body.index('\n}\n')]
+        body = source[source.index('static bool isNightHour()') :]
+        body = body[: body.index('\n}\n')]
         self.assertNotIn('ws43bSolarNight', body)
         self.assertIn('dpSettings.nightStartHour', body)
 

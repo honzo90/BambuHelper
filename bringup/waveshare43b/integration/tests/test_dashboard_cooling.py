@@ -1,9 +1,12 @@
 from pathlib import Path
-import tempfile,subprocess,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import tempfile, subprocess, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class DashboardCooling(unittest.TestCase):
- def test_eligibility_trend_staleness_and_sessions(self):
-  code=r'''#include "ws43b_dashboard_policy.h"
+    def test_eligibility_trend_staleness_and_sessions(self):
+        code = r'''#include "ws43b_dashboard_policy.h"
 #include <cassert>
 int main(){
  BambuMonitorTelemetry m;ws43b_view::FinishCoolingPolicy p;
@@ -43,7 +46,23 @@ int main(){
  p={};refresh(UINT32_MAX-20,40);assert(!p.update(m,true,UINT32_MAX-20));
  refresh(10,39);assert(p.update(m,true,10));
 }'''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

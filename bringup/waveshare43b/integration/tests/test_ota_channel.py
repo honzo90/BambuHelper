@@ -1,4 +1,5 @@
 """Synthetic integration checks; no GitHub/device requests or firmware writes."""
+
 from pathlib import Path
 import subprocess
 import unittest
@@ -15,16 +16,32 @@ NO = 'No stable release has been published for this channel yet.'
 YES = 'Update available!'
 
 
-
 class OtaChannel(unittest.TestCase):
     def test_js_channel(self):
         source = (ROOT / 'web/app.js').read_text()
         for lang in ('en', 'pl'):
             with self.subTest(lang=lang):
                 src = localize_web.javascript(source) if lang == 'pl' else source
-                js = '\n'.join(function(src, 'function ' + name + '(') for name in ('compareWs43bVersions', 'selectWs43bRelease', 'changeWs43bOtaChannel', 'checkWs43bUpdates', 'checkForUpdates'))
-                expected = [NO, YES] if lang == 'en' else [localize_web.catalog()[NO], localize_web.catalog()[YES]]
-                harness = 'const labels=' + json.dumps(expected) + ';\n' + r'''
+                js = '\n'.join(
+                    function(src, 'function ' + name + '(')
+                    for name in (
+                        'compareWs43bVersions',
+                        'selectWs43bRelease',
+                        'changeWs43bOtaChannel',
+                        'checkWs43bUpdates',
+                        'checkForUpdates',
+                    )
+                )
+                expected = (
+                    [NO, YES]
+                    if lang == 'en'
+                    else [localize_web.catalog()[NO], localize_web.catalog()[YES]]
+                )
+                harness = (
+                    'const labels='
+                    + json.dumps(expected)
+                    + ';\n'
+                    + r'''
 const assert=require('assert');
 let fields={}, release={}, lastUrl='', _autoOtaUrl='', status=200;
 let DEV={board:'ws_lcd_43b',fw:'v3.9.0',otaSlot:'3145728',flashMb:'16'};
@@ -34,7 +51,9 @@ const fetch=async(url)=>{
  if(status===-1) throw new Error('fetch failed');
  return {ok:status===200,status,json:async()=>release};
 };
-''' + js + r'''
+'''
+                    + js
+                    + r'''
 async function check(nextStatus){
  status=nextStatus;
  release={tag_name:'v3.9.1',draft:false,prerelease:false,assets:[{name:'BambuHelper-ws_lcd_43b-v3.9.1-ota.bin',size:2400000,browser_download_url:'https://github.com/honzo90/BambuHelper/releases/download/v3.9.1/BambuHelper-ws_lcd_43b-v3.9.1-ota.bin'}],published_at:'2026-10-11'};
@@ -72,6 +91,7 @@ async function check(nextStatus){
  assert.equal(fields.updateResult.style.color, 'var(--danger)');
 })().catch(e=>{console.error(e);process.exit(1)});
 '''
+                )
                 subprocess.run(['node', '-e', harness], check=True)
 
 
@@ -80,11 +100,11 @@ class OtaBackend(unittest.TestCase):
         import tempfile
 
         actual = function(
-            (ROOT / 'src/web_server.cpp').read_text(),
-            'static bool isExpectedOtaAssetUrl('
+            (ROOT / 'src/web_server.cpp').read_text(), 'static bool isExpectedOtaAssetUrl('
         )
 
-        harness = r"""
+        harness = (
+            r"""
 #include <string>
 #include <algorithm>
 #include <cstdlib>
@@ -123,27 +143,34 @@ struct String : std::string {
     }
 };
 
-""" + actual + r"""
+"""
+            + actual
+            + r"""
 
 int main(int argc, char** argv) {
     if (argc != 2) return 2;
     return isExpectedOtaAssetUrl(String(argv[1])) ? 0 : 1;
 }
 """
+        )
 
         P = "https://github.com/honzo90/BambuHelper/releases/download/"
         F = "BambuHelper-ws_lcd_43b-v3.9.1-ota.bin"
 
-        ws_valid = [P + "v3.9.1/" + F,
-                    P + "v3.9.1-alpha.1/" + "BambuHelper-ws_lcd_43b-v3.9.1-alpha.1-ota.bin",
-                    P + "v3.9.1-beta.1/" + "BambuHelper-ws_lcd_43b-v3.9.1-beta.1-ota.bin"]
+        ws_valid = [
+            P + "v3.9.1/" + F,
+            P + "v3.9.1-alpha.1/" + "BambuHelper-ws_lcd_43b-v3.9.1-alpha.1-ota.bin",
+            P + "v3.9.1-beta.1/" + "BambuHelper-ws_lcd_43b-v3.9.1-beta.1-ota.bin",
+        ]
         ws_invalid = [
             "https://github.com/Keralots/BambuHelper/releases/download/v3.9.1/" + F,
             "https://github.com/honzo90/Other/releases/download/v3.9.1/" + F,
             "http://github.com/honzo90/BambuHelper/releases/download/v3.9.1/" + F,
             "https://example.com/honzo90/BambuHelper/releases/download/v3.9.1/" + F,
-            "https://objects.githubusercontent.com/honzo90/BambuHelper/releases/download/v3.9.1/" + F,
-            "https://release-assets.githubusercontent.com/honzo90/BambuHelper/releases/download/v3.9.1/" + F,
+            "https://objects.githubusercontent.com/honzo90/BambuHelper/releases/download/v3.9.1/"
+            + F,
+            "https://release-assets.githubusercontent.com/honzo90/BambuHelper/releases/download/v3.9.1/"
+            + F,
             P + "v3.9.1/" + F + "?x=1",
             P + "v3.9.1/" + F + "#frag",
             P + "v3.9.1/" + F + "%20",

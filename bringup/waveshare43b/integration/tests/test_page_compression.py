@@ -1,4 +1,5 @@
 """Compressed WebUI pages: lossless chunks, preserved #if blocks, host inflater."""
+
 from pathlib import Path
 import re
 import subprocess
@@ -16,9 +17,12 @@ def chunks(body):
     data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-f]{2})', body))
     pos, out = 0, []
     while pos < len(data):
-        c = int.from_bytes(data[pos:pos + 4], 'little'); r = int.from_bytes(data[pos + 4:pos + 8], 'little')
-        raw = zlib.decompress(data[pos + 8:pos + 8 + c]); assert len(raw) == r
-        out.append(raw); pos += 8 + c
+        c = int.from_bytes(data[pos : pos + 4], 'little')
+        r = int.from_bytes(data[pos + 4 : pos + 8], 'little')
+        raw = zlib.decompress(data[pos + 8 : pos + 8 + c])
+        assert len(raw) == r
+        out.append(raw)
+        pos += 8 + c
     return out
 
 
@@ -28,11 +32,16 @@ class PageCompression(unittest.TestCase):
         out = L.compress_pages(src)
         for name in L.COMPRESSED_PAGES:
             decl = 'static const char ' + name + '[] PROGMEM ='
-            start = src.index(decl); end = src.index(')rawliteral";', start)
-            original = src[start:end + len(')rawliteral";')]
-            raw = [m.encode() for m in re.findall(r'R"rawliteral\((.*?)\)rawliteral"', original, re.S)]
+            start = src.index(decl)
+            end = src.index(')rawliteral";', start)
+            original = src[start : end + len(')rawliteral";')]
+            raw = [
+                m.encode() for m in re.findall(r'R"rawliteral\((.*?)\)rawliteral"', original, re.S)
+            ]
             pre = [l for l in original.splitlines() if l.startswith('#')]
-            m = re.search(r'static const uint8_t ' + name + r'_Z\[\] PROGMEM = \{(.*?)\n\};', out, re.S)
+            m = re.search(
+                r'static const uint8_t ' + name + r'_Z\[\] PROGMEM = \{(.*?)\n\};', out, re.S
+            )
             self.assertIsNotNone(m, name)
             self.assertEqual(chunks(m.group(1)), raw, name)
             self.assertEqual([l for l in m.group(1).splitlines() if l.startswith('#')], pre, name)
@@ -44,15 +53,19 @@ class PageCompression(unittest.TestCase):
     def test_serve_main_page_is_patched(self):
         template = (ROOT / 'src/web_template.cpp').read_text()
         self.assertIn(L.SERVE_MAIN_RAW, template)  # the build replaces exactly this block
-        self.assertIn('/ota/upload', L.SERVE_MAIN_Z)    # emergency firmware upload
+        self.assertIn('/ota/upload', L.SERVE_MAIN_Z)  # emergency firmware upload
         self.assertIn('name=firmware', L.SERVE_MAIN_Z)
 
     def test_host_inflater(self):
         import random
+
         random.seed(3)
         parts = [bytes(random.choice(b'abc<>%XY ') for _ in range(n)) for n in (1, 500, 40000, 7)]
-        blob = b''.join(len(z).to_bytes(4, 'little') + len(p).to_bytes(4, 'little') + z
-                        for p in parts for z in [zlib.compress(p, 9)])
+        blob = b''.join(
+            len(z).to_bytes(4, 'little') + len(p).to_bytes(4, 'little') + z
+            for p in parts
+            for z in [zlib.compress(p, 9)]
+        )
         expected = b''.join(parts)
         code = r'''
 #include <cassert>
@@ -79,9 +92,27 @@ int main(){
 }
 '''.replace('BLOB', ','.join(str(b) for b in blob)).replace('EXPECTED', str(len(expected)))
         with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / 'inf.cpp'; src.write_text(code); exe = Path(tmp) / 'inf'
-            subprocess.run(['clang++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'include'),
-                            str(src), '-lz', '-o', str(exe)], check=True, capture_output=True, text=True)
+            src = Path(tmp) / 'inf.cpp'
+            src.write_text(code)
+            exe = Path(tmp) / 'inf'
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(src),
+                    '-lz',
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             result = subprocess.run([str(exe)], check=True, capture_output=True)
             self.assertEqual(result.stdout, expected)
 

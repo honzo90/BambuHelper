@@ -1,4 +1,5 @@
 """Offline full portal tests. No device, network, credentials or real commands."""
+
 import json
 from pathlib import Path
 import re
@@ -7,6 +8,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[4]
+
 
 def function(source, signature):
     start = source.index(signature)
@@ -17,23 +19,30 @@ def function(source, signature):
         end += 1
     return source[start:end]
 
+
 class FullWebUI(unittest.TestCase):
     def test_partition_migration_preserves_existing_regions(self):
         def rows(path):
-            return {v[0]: v[1:5] for line in path.read_text().splitlines()
-                    if line and not line.startswith('#') and (v := line.split(','))}
-        old = rows(ROOT/'bringup/waveshare43b/smoke/partitions.csv')
-        new = rows(ROOT/'bringup/waveshare43b/integration/partitions.csv')
-        for name in old: self.assertEqual(old[name], new[name])
-        self.assertEqual(new['app1'], ['app','ota_1','0x310000','0x300000'])
-        intervals = sorted((int(v[2],0),int(v[2],0)+int(v[3],0)) for v in new.values())
-        self.assertTrue(all(a[1] <= b[0] for a,b in zip(intervals,intervals[1:])))
-        self.assertLessEqual(intervals[-1][1],16*1024*1024)
+            return {
+                v[0]: v[1:5]
+                for line in path.read_text().splitlines()
+                if line and not line.startswith('#') and (v := line.split(','))
+            }
+
+        old = rows(ROOT / 'bringup/waveshare43b/smoke/partitions.csv')
+        new = rows(ROOT / 'bringup/waveshare43b/integration/partitions.csv')
+        for name in old:
+            self.assertEqual(old[name], new[name])
+        self.assertEqual(new['app1'], ['app', 'ota_1', '0x310000', '0x300000'])
+        intervals = sorted((int(v[2], 0), int(v[2], 0) + int(v[3], 0)) for v in new.values())
+        self.assertTrue(all(a[1] <= b[0] for a, b in zip(intervals, intervals[1:])))
+        self.assertLessEqual(intervals[-1][1], 16 * 1024 * 1024)
 
     def test_browser_capabilities_are_board_scoped(self):
-        js = (ROOT/'web/app.js').read_text()
-        setup = function(js,'function setupWs43bPortal()')
-        harness = r'''
+        js = (ROOT / 'web/app.js').read_text()
+        setup = function(js, 'function setupWs43bPortal()')
+        harness = (
+            r'''
 const assert=require('assert');
 let fields={}, buttons=[], card=null;
 function setupWs43bDisplaySettings(){card={integrated:true};}
@@ -45,7 +54,11 @@ const document={
  querySelectorAll(selector){return selector==='[onclick]'?buttons:[];}
 };
 let DEV={board:'esp32s3'};
-''' + setup + '\n' + function(js,'function toggleAfterPrint()') + r'''
+'''
+            + setup
+            + '\n'
+            + function(js, 'function toggleAfterPrint()')
+            + r'''
 setupWs43bPortal(); assert.equal(card,null);assert.deepEqual(fields,{});
 DEV.board='ws_lcd_43b';
 buttons=[{getAttribute(){return 'ledTestEffect()';}},{getAttribute(){return 'saveLightConfig()';}}];
@@ -58,15 +71,17 @@ assert(!fields.nighten && !fields.pong); // Supported native scheduled off and p
 document.getElementById('afterfin').value='off';toggleAfterPrint();assert(!fields.pong.disabled);
 DEV.board='esp32s3';toggleAfterPrint();assert(fields.pong.disabled);
 '''
-        subprocess.run(['node','-e',harness],check=True,capture_output=True)
+        )
+        subprocess.run(['node', '-e', harness], check=True, capture_output=True)
 
     def test_custom_palette_survives_loading_legacy_theme(self):
-        source=(ROOT/'src/settings.cpp').read_text()
-        start=source.index('static uint8_t ws43bTheme')
-        helpers=source[start:source.index('\n#endif\n\n// ---',start)]
-        start=source.index('  uint16_t view = prefs.getUShort("w43_view"')
-        load=source[start:source.index('  prefs.end();',start)]
-        harness=r'''
+        source = (ROOT / 'src/settings.cpp').read_text()
+        start = source.index('static uint8_t ws43bTheme')
+        helpers = source[start : source.index('\n#endif\n\n// ---', start)]
+        start = source.index('  uint16_t view = prefs.getUShort("w43_view"')
+        load = source[start : source.index('  prefs.end();', start)]
+        harness = (
+            r'''
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
@@ -81,7 +96,11 @@ struct Preferences {
 }prefs;
 void saveSettings(){custom=true;++saves;}
 void sanitizeWs43bHardwareSettings(){}
-''' + helpers + '\nvoid load(){\n#if defined(BOARD_IS_WS43B)\n' + load + r'''
+'''
+            + helpers
+            + '\nvoid load(){\n#if defined(BOARD_IS_WS43B)\n'
+            + load
+            + r'''
 }
 int main(){
  load();assert(ws43bViewTheme()==1&&dispSettings.bgColor==0x0084);
@@ -92,15 +111,31 @@ int main(){
  load();assert(ws43bViewTheme()==2&&dispSettings.progressBarColor==0xF5CB);
 }
 '''
+        )
         with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp)/'test.cpp';p.write_text(harness);exe=Path(tmp)/'test'
-            subprocess.run(['clang++','-std=c++17','-DBOARD_IS_WS43B=1','-DWS43B_FULL_WEBUI=1',str(p),'-o',str(exe)],check=True,capture_output=True)
-            subprocess.run([str(exe)],check=True,capture_output=True)
+            p = Path(tmp) / 'test.cpp'
+            p.write_text(harness)
+            exe = Path(tmp) / 'test'
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-DBOARD_IS_WS43B=1',
+                    '-DWS43B_FULL_WEBUI=1',
+                    str(p),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(exe)], check=True, capture_output=True)
 
     def test_upload_rejects_wrong_board_and_chip_and_handles_abort(self):
-        source=(ROOT/'src/web_server.cpp').read_text()
-        handler=function(source,'static void handleOtaUpload()')
-        harness=r'''
+        source = (ROOT / 'src/web_server.cpp').read_text()
+        handler = function(source, 'static void handleOtaUpload()')
+        harness = (
+            r'''
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -124,7 +159,9 @@ namespace ws43b { bool displayAllowed=true; bool beginOtaDisplay(){return displa
 int disconnects=0;void disconnectBambuMqtt(){++disconnects;}
 bool isUnderPartitioned(){return false;}const char* REPARTITION_HINT="";
 String otaError;bool otaInProgress=false,otaFirstChunk=false,otaMqttReinitPending=false;
-''' + handler + r'''
+'''
+            + handler
+            + r'''
 void start(const char*name){uploadData={};uploadData.filename=name;handleOtaUpload();}
 void data(int chip,size_t size){uploadData.status=UPLOAD_FILE_WRITE;uploadData.currentSize=size;uploadData.buf[0]=0xE9;uploadData.buf[12]=chip;handleOtaUpload();}
 int main(){
@@ -140,9 +177,26 @@ int main(){
  start("BambuHelper-ws_lcd_43b-v1-ota.bin");uploadData.status=UPLOAD_FILE_ABORTED;handleOtaUpload();assert(!otaInProgress&&otaMqttReinitPending);
 }
 '''
+        )
         with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp)/'test.cpp';p.write_text(harness);exe=Path(tmp)/'test'
-            subprocess.run(['clang++','-std=c++17','-DBOARD_IS_WS43B=1','-fsanitize=address,undefined',str(p),'-o',str(exe)],check=True,capture_output=True)
-            subprocess.run([str(exe)],check=True,capture_output=True)
+            p = Path(tmp) / 'test.cpp'
+            p.write_text(harness)
+            exe = Path(tmp) / 'test'
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-DBOARD_IS_WS43B=1',
+                    '-fsanitize=address,undefined',
+                    str(p),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(exe)], check=True, capture_output=True)
 
-if __name__=='__main__':unittest.main()
+
+if __name__ == '__main__':
+    unittest.main()

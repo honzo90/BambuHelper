@@ -2,6 +2,7 @@
 
 No sockets, serial ports, payload captures or printer credentials are used.
 """
+
 import re
 import subprocess
 import unittest
@@ -16,9 +17,23 @@ def preprocess(monitor, board=False):
     # includes lets us inspect every own-code path with both feature variants.
     source = re.sub(r'^\s*#include[^\n]*\n', '', SOURCE.read_text(), flags=re.M)
     result = subprocess.run(
-        ['clang++', '-E', '-P', '-x', 'c++', f'-DBAMBU_MONITOR_ONLY={monitor}',
-         '-DHAS_HMS_UI=1', '-DBOARD_HAS_PSRAM=1', *(['-DBOARD_IS_WS43B=1'] if board else []), '-'],
-        input=source, text=True, capture_output=True, check=True)
+        [
+            'clang++',
+            '-E',
+            '-P',
+            '-x',
+            'c++',
+            f'-DBAMBU_MONITOR_ONLY={monitor}',
+            '-DHAS_HMS_UI=1',
+            '-DBOARD_HAS_PSRAM=1',
+            *(['-DBOARD_IS_WS43B=1'] if board else []),
+            '-',
+        ],
+        input=source,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
     return result.stdout
 
 
@@ -33,7 +48,7 @@ def function_body(source, signature):
         elif source[end] == '}':
             depth -= 1
         end += 1
-    return source[brace + 1:end - 1]
+    return source[brace + 1 : end - 1]
 
 
 class MonitorSafety(unittest.TestCase):
@@ -68,26 +83,37 @@ class MonitorSafety(unittest.TestCase):
     def test_only_explicit_slot_zero_can_connect(self):
         enabled = function_body(self.monitor, 'static bool isPrinterSlotEnabled(')
         self.assertIn('if (slot != 0) return false', enabled)
-        self.assertNotIn('if (slot != 0) return false', function_body(self.normal, 'static bool isPrinterSlotEnabled('))
+        self.assertNotIn(
+            'if (slot != 0) return false',
+            function_body(self.normal, 'static bool isPrinterSlotEnabled('),
+        )
 
     def test_monitor_cannot_relogin_using_an_old_stored_password(self):
-        for symbol in ('tryStoredPasswordRelogin(', 'cloudLoginCanAutoRefresh(',
-                       'cloudLoginRefreshStored('):
+        for symbol in (
+            'tryStoredPasswordRelogin(',
+            'cloudLoginCanAutoRefresh(',
+            'cloudLoginRefreshStored(',
+        ):
             self.assertNotIn(symbol, self.monitor)
             self.assertIn(symbol, self.normal)
 
     def test_session_reset_before_connected_exposed(self):
-        self.assertIn('acceptMqttSession(c)', function_body(self.monitor, 'static void reconnectConn('))
+        self.assertIn(
+            'acceptMqttSession(c)', function_body(self.monitor, 'static void reconnectConn(')
+        )
         reconnect = function_body(self.monitor, 'static void acceptMqttSession(')
-        self.assertLess(reconnect.index('.monitor.newSession()'), reconnect.index('.state.connected = true'))
+        self.assertLess(
+            reconnect.index('.monitor.newSession()'), reconnect.index('.state.connected = true')
+        )
         self.assertNotIn('.monitor.newSession()', self.normal)
 
 
 if __name__ == '__main__':
     unittest.main()
 
+
 class Ws43bReconnect(unittest.TestCase):
     def test_native_cache_is_reset_before_new_connection_exposed(self):
-        body=function_body(preprocess(0,True),'static void acceptMqttSession(')
-        self.assertLess(body.index('.monitor.newSession()'),body.index('.state.connected = true'))
-        self.assertNotIn('.state.printing = false',body)
+        body = function_body(preprocess(0, True), 'static void acceptMqttSession(')
+        self.assertLess(body.index('.monitor.newSession()'), body.index('.state.connected = true'))
+        self.assertNotIn('.state.printing = false', body)

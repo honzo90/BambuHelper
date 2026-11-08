@@ -1,9 +1,12 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class SaverDelta(unittest.TestCase):
- def test_job_deltas_keep_print_but_not_temperature_or_disconnection(self):
-  code=r'''
+    def test_job_deltas_keep_print_but_not_temperature_or_disconnection(self):
+        code = r'''
 #include "ws43b_dashboard_policy.h"
 #include <cassert>
 using namespace ws43b_view;
@@ -26,20 +29,53 @@ int main(){
  assert(!progressCurrent(m,true,150000));
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
- def test_weather_description_uses_same_classification_as_icon(self):
-  s=(ROOT/'src/ws43b_weather.cpp').read_text();a=s.index('const char *ws43bWeatherDescription(');b=s.index('// Completion',a)
-  code='#include "ws43b_weather_background.h"\n#include <cassert>\n#include <cstring>\nconst char* ws43bText(const char*,const char*en,const char* = nullptr){return en;}\n'+s[a:b]+r'''
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)
+
+    def test_weather_description_uses_same_classification_as_icon(self):
+        s = (ROOT / 'src/ws43b_weather.cpp').read_text()
+        a = s.index('const char *ws43bWeatherDescription(')
+        b = s.index('// Completion', a)
+        code = (
+            '#include "ws43b_weather_background.h"\n#include <cassert>\n#include <cstring>\nconst char* ws43bText(const char*,const char*en,const char* = nullptr){return en;}\n'
+            + s[a:b]
+            + r'''
 int main(){
  assert(!strcmp(ws43bWeatherDescription(0),"Clear"));assert(!strcmp(ws43bWeatherDescription(1),"Mainly clear"));
  assert(!strcmp(ws43bWeatherDescription(2),"Partly cloudy"));assert(!strcmp(ws43bWeatherDescription(3),"Cloudy"));
  assert(!strcmp(ws43bWeatherDescription(-1),"Weather"));assert(!strcmp(ws43bWeatherDescription(99),"Thunderstorm with heavy hail"));
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)

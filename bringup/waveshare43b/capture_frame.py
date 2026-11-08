@@ -5,6 +5,7 @@ The diagnostic firmware gates this endpoint to an already published monitor
 frame. Images may contain the printer name and visible telemetry. They remain
 in a private, Git-ignored local directory. A buffer snapshot is not an LCD PASS.
 """
+
 import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -69,17 +70,17 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def download_direct(host):
     """Child-process-only network operation; parent enforces a hard deadline.
 
-Socket timeout alone would not bound a slow HTTP header/body. The parent kills
-this single-use process after OVERALL_TIMEOUT, including connection/headers.
-No environment proxy, redirect, retry, authentication or configuration request.
-"""
+    Socket timeout alone would not bound a slow HTTP header/body. The parent kills
+    this single-use process after OVERALL_TIMEOUT, including connection/headers.
+    No environment proxy, redirect, retry, authentication or configuration request.
+    """
     host = validate_host(host)
-    opener = urllib.request.build_opener(
-        urllib.request.ProxyHandler({}), NoRedirect())
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     request = urllib.request.Request(
         f'http://{host}/diagnostics/frame',
         headers={'Accept': 'application/octet-stream', 'Connection': 'close'},
-        method='GET')
+        method='GET',
+    )
     try:
         with opener.open(request, timeout=NETWORK_TIMEOUT) as response:
             if response.status != 200:
@@ -88,7 +89,10 @@ No environment proxy, redirect, retry, authentication or configuration request.
                 raise CaptureError('Odrzucono nieprawidłowy typ odpowiedzi HTTP.')
             if response.headers.get_all('Content-Length') != [str(TOTAL_BYTES)]:
                 raise CaptureError('Odrzucono nieprawidłową długość odpowiedzi HTTP.')
-            if response.headers.get('Transfer-Encoding') is not None or response.headers.get('Content-Encoding') is not None:
+            if (
+                response.headers.get('Transfer-Encoding') is not None
+                or response.headers.get('Content-Encoding') is not None
+            ):
                 raise CaptureError('Kodowana odpowiedź HTTP nie jest dozwolona.')
             result = bytearray()
             while len(result) <= TOTAL_BYTES:
@@ -115,13 +119,20 @@ def download(host):
     try:
         process = subprocess.run(
             [sys.executable, '-B', str(Path(__file__).resolve()), '--_download', host],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=OVERALL_TIMEOUT, check=False)
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=OVERALL_TIMEOUT,
+            check=False,
+        )
     except subprocess.TimeoutExpired:
-        raise CaptureError('Przekroczono 12 s na pobranie; proces odczytu został zakończony.') from None
+        raise CaptureError(
+            'Przekroczono 12 s na pobranie; proces odczytu został zakończony.'
+        ) from None
     if process.returncode != 0:
         # Child messages are fixed, but avoid forwarding arbitrary stderr.
-        raise CaptureError('Odczyt odrzucony lub niedostępny; nie zapisano obrazu. Sprawdź, czy działa firmware z diagnostyką klatki.')
+        raise CaptureError(
+            'Odczyt odrzucony lub niedostępny; nie zapisano obrazu. Sprawdź, czy działa firmware z diagnostyką klatki.'
+        )
     if len(process.stdout) != TOTAL_BYTES:
         raise CaptureError('Odrzucono niepełną lub zbyt długą klatkę.')
     return process.stdout, time.monotonic() - started
@@ -130,31 +141,58 @@ def download(host):
 def decode_capture(raw):
     if len(raw) != TOTAL_BYTES:
         raise CaptureError('Odrzucono niepełną lub zbyt długą klatkę.')
-    magic, width, height, frame, uptime, pixel_format, row_bytes, payload_bytes, front_index, reset_reason = HEADER.unpack_from(raw)
+    (
+        magic,
+        width,
+        height,
+        frame,
+        uptime,
+        pixel_format,
+        row_bytes,
+        payload_bytes,
+        front_index,
+        reset_reason,
+    ) = HEADER.unpack_from(raw)
     if (magic, width, height, pixel_format, row_bytes, payload_bytes) != (
-            MAGIC, WIDTH, HEIGHT, 1, ROW_BYTES, PAYLOAD_BYTES):
+        MAGIC,
+        WIDTH,
+        HEIGHT,
+        1,
+        ROW_BYTES,
+        PAYLOAD_BYTES,
+    ):
         raise CaptureError('Nagłówek nie pasuje do protokołu W43CAP01, RGB565, 800 × 480.')
     if front_index not in (0, 1):
         raise CaptureError('Nieprawidłowy indeks bufora wyświetlacza.')
     canvas, front = bytearray(), bytearray()
     for y in range(HEIGHT):
         offset = HEADER.size + y * ROW_BYTES * 2
-        canvas.extend(raw[offset:offset + ROW_BYTES])
-        front.extend(raw[offset + ROW_BYTES:offset + ROW_BYTES * 2])
+        canvas.extend(raw[offset : offset + ROW_BYTES])
+        front.extend(raw[offset + ROW_BYTES : offset + ROW_BYTES * 2])
     return Frame(frame, uptime, front_index, reset_reason, bytes(canvas), bytes(front))
 
 
 def compare_pixels(frame):
     mismatch_count, first = 0, []
-    for index, ((canvas,), (front,)) in enumerate(zip(
-            struct.iter_unpack('<H', frame.canvas), struct.iter_unpack('<H', frame.front))):
+    for index, ((canvas,), (front,)) in enumerate(
+        zip(struct.iter_unpack('<H', frame.canvas), struct.iter_unpack('<H', frame.front))
+    ):
         if canvas != front:
             mismatch_count += 1
             if len(first) < 20:
-                first.append({'x': index % WIDTH, 'y': index // WIDTH,
-                              'canvas_rgb565': canvas, 'front_rgb565': front})
-    return {'mismatch_pixels': mismatch_count, 'first_mismatches': first,
-            'first_mismatches_limit': 20}
+                first.append(
+                    {
+                        'x': index % WIDTH,
+                        'y': index // WIDTH,
+                        'canvas_rgb565': canvas,
+                        'front_rgb565': front,
+                    }
+                )
+    return {
+        'mismatch_pixels': mismatch_count,
+        'first_mismatches': first,
+        'first_mismatches_limit': 20,
+    }
 
 
 def png_rgb565(pixels):
@@ -164,18 +202,23 @@ def png_rgb565(pixels):
     scanlines = bytearray()
     for y in range(HEIGHT):
         scanlines.append(0)  # PNG filter None; no rotation or transpose.
-        for (value,) in struct.iter_unpack('<H', pixels[y * ROW_BYTES:(y + 1) * ROW_BYTES]):
+        for (value,) in struct.iter_unpack('<H', pixels[y * ROW_BYTES : (y + 1) * ROW_BYTES]):
             red, green, blue = (value >> 11) & 31, (value >> 5) & 63, value & 31
-            scanlines.extend(((red << 3) | (red >> 2),
-                              (green << 2) | (green >> 4),
-                              (blue << 3) | (blue >> 2)))
+            scanlines.extend(
+                ((red << 3) | (red >> 2), (green << 2) | (green >> 4), (blue << 3) | (blue >> 2))
+            )
 
     def chunk(kind, data):
-        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+        return (
+            struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+        )
 
-    return (b'\x89PNG\r\n\x1a\n' +
-            chunk(b'IHDR', struct.pack('>IIBBBBB', WIDTH, HEIGHT, 8, 2, 0, 0, 0)) +
-            chunk(b'IDAT', zlib.compress(bytes(scanlines), 6)) + chunk(b'IEND', b''))
+    return (
+        b'\x89PNG\r\n\x1a\n'
+        + chunk(b'IHDR', struct.pack('>IIBBBBB', WIDTH, HEIGHT, 8, 2, 0, 0, 0))
+        + chunk(b'IDAT', zlib.compress(bytes(scanlines), 6))
+        + chunk(b'IEND', b'')
+    )
 
 
 def sha256(value):
@@ -188,15 +231,21 @@ def save_capture(raw, download_seconds, output_root=LOCAL_DIR):
     comparison = compare_pixels(frame)
     canvas_png, front_png = png_rgb565(frame.canvas), png_rgb565(frame.front)
     metadata = {
-        'protocol': MAGIC.decode('ascii'), 'width': WIDTH, 'height': HEIGHT,
-        'pixel_format': 'RGB565_LE', 'frame': frame.frame,
-        'uptime_ms': frame.uptime_ms, 'reset_reason': frame.reset_reason,
+        'protocol': MAGIC.decode('ascii'),
+        'width': WIDTH,
+        'height': HEIGHT,
+        'pixel_format': 'RGB565_LE',
+        'frame': frame.frame,
+        'uptime_ms': frame.uptime_ms,
+        'reset_reason': frame.reset_reason,
         'front_buffer_index': frame.front_index,
         'download_seconds': round(download_seconds, 3),
         **comparison,
-        'capture_sha256': sha256(raw), 'canvas_rgb565_sha256': sha256(frame.canvas),
+        'capture_sha256': sha256(raw),
+        'canvas_rgb565_sha256': sha256(frame.canvas),
         'front_rgb565_sha256': sha256(frame.front),
-        'canvas_png_sha256': sha256(canvas_png), 'front_png_sha256': sha256(front_png),
+        'canvas_png_sha256': sha256(canvas_png),
+        'front_png_sha256': sha256(front_png),
         'hardware_pass': False,
     }
     output_root = Path(output_root)
@@ -206,8 +255,14 @@ def save_capture(raw, download_seconds, output_root=LOCAL_DIR):
     prefix = datetime.now(timezone.utc).strftime('frame-capture-%Y%m%dT%H%M%SZ-')
     directory = Path(tempfile.mkdtemp(prefix=prefix, dir=output_root))
     os.chmod(directory, 0o700)
-    artifacts = {'capture.bin': raw, 'canvas.png': canvas_png, 'front.png': front_png,
-                 'metadata.json': (json.dumps(metadata, ensure_ascii=False, indent=2) + '\n').encode('utf-8')}
+    artifacts = {
+        'capture.bin': raw,
+        'canvas.png': canvas_png,
+        'front.png': front_png,
+        'metadata.json': (json.dumps(metadata, ensure_ascii=False, indent=2) + '\n').encode(
+            'utf-8'
+        ),
+    }
     try:
         for name, content in artifacts.items():
             fd = os.open(directory / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -222,10 +277,13 @@ def save_capture(raw, download_seconds, output_root=LOCAL_DIR):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=(
-        'Pobierz jedną klatkę monitora i jego bufor RGB. Bez USB i odczytu konfiguracji. '
-        'Prywatne pliki w local/ mogą zawierać nazwę drukarki i widoczne dane wydruku. '
-        'Zrzut nie oznacza sprzętowego PASS.'))
+    parser = argparse.ArgumentParser(
+        description=(
+            'Pobierz jedną klatkę monitora i jego bufor RGB. Bez USB i odczytu konfiguracji. '
+            'Prywatne pliki w local/ mogą zawierać nazwę drukarki i widoczne dane wydruku. '
+            'Zrzut nie oznacza sprzętowego PASS.'
+        )
+    )
     parser.add_argument('--host', help='Adres IPv4 panelu (bez URL, portu i danych dostępowych)')
     parser.add_argument('--_download', help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -238,11 +296,15 @@ def main():
             return 0
         raw, duration = download(args.host)
         directory, metadata = save_capture(raw, duration)
-        print(f"Zapisano klatkę {metadata['frame']}; różniące się piksele: {metadata['mismatch_pixels']}.")
+        print(
+            f"Zapisano klatkę {metadata['frame']}; różniące się piksele: {metadata['mismatch_pixels']}."
+        )
         print(f'Canvas: {directory / "canvas.png"}')
         print(f'Bufor LCD: {directory / "front.png"}')
         print(f'Metadane: {directory / "metadata.json"}')
-        print('Pliki są prywatne i zawierają dane widoczne na panelu. Porównaj obrazy ze zdjęciem LCD wykonanym w tej samej chwili. Zrzut buforów nie oznacza sprzętowego PASS.')
+        print(
+            'Pliki są prywatne i zawierają dane widoczne na panelu. Porównaj obrazy ze zdjęciem LCD wykonanym w tej samej chwili. Zrzut buforów nie oznacza sprzętowego PASS.'
+        )
         return 0
     except (CaptureError, OSError) as error:
         if isinstance(error, CaptureError):

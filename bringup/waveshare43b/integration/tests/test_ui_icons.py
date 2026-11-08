@@ -1,4 +1,5 @@
 """Verify shared icon composition against independent per-pixel expectations."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -69,8 +70,23 @@ int main() {
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp)
             (p / 'test.cpp').write_text(code)
-            subprocess.run(['clang++', '-std=c++17', '-O1', '-Wall', '-Wextra', '-Werror',
-                            '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
-                            '-I', str(ROOT / 'include'), str(p / 'test.cpp'), '-o', str(p / 'test')],
-                           check=True, capture_output=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O1',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-fsanitize=address,undefined',
+                    '-fno-omit-frame-pointer',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
             subprocess.run([str(p / 'test')], check=True, capture_output=True)

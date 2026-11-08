@@ -5,6 +5,7 @@ No firmware edits, network calls or hardware access. The existing fixture
 provides only display/platform stubs; decisions and rendering come from the
 current firmware source and headers. Compiler outputs live in a temporary dir.
 """
+
 import ast
 from pathlib import Path
 import subprocess
@@ -17,12 +18,14 @@ ROOT = Path(__file__).resolve().parents[4]
 def existing_stub():
     fixture = ROOT / 'bringup/waveshare43b/integration/tests/test_combined_saver.py'
     tree = ast.parse(fixture.read_text(), filename=str(fixture))
-    values = [node.value.value for node in ast.walk(tree)
-              if isinstance(node, ast.Assign)
-              and any(isinstance(target, ast.Name) and target.id == 'stub'
-                      for target in node.targets)
-              and isinstance(node.value, ast.Constant)
-              and isinstance(node.value.value, str)]
+    values = [
+        node.value.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == 'stub' for target in node.targets)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    ]
     if len(values) != 1:
         raise AssertionError('Expected exactly one literal stub in test_combined_saver.py')
     stub = values[0]
@@ -30,15 +33,19 @@ def existing_stub():
     new = 'return ws43b_view::saver(m,online,now,cooling,alert,corePrinting);'
     if stub.count(old) != 1:
         raise AssertionError('Existing fixture saverView changed; inspect before adapting')
-    stub = stub.replace('bool alert=false,cooling=false;',
-                        'bool alert=false,cooling=false,corePrinting=true;')
+    stub = stub.replace(
+        'bool alert=false,cooling=false;', 'bool alert=false,cooling=false,corePrinting=true;'
+    )
     stub = stub.replace(old, new)
     # Make whole-clock repaints observable instead of leaving them as a no-op.
     old = 'void drawClockBackground(bool,int,uint32_t){}'
     if stub.count(old) != 1:
         raise AssertionError('Existing fixture clock-background stub changed')
-    stub = stub.replace(old, 'unsigned clockBackgrounds=0;\n'
-                       'void drawClockBackground(bool,int,uint32_t){++clockBackgrounds;}')
+    stub = stub.replace(
+        old,
+        'unsigned clockBackgrounds=0;\n'
+        'void drawClockBackground(bool,int,uint32_t){++clockBackgrounds;}',
+    )
     return stub
 
 
@@ -199,17 +206,31 @@ class WaitingRenderer(unittest.TestCase):
             source = directory / 'waiting_renderer.cpp'
             binary = directory / 'waiting_renderer'
             source.write_text(code)
-            command = ['clang++', '-std=c++17', '-fsanitize=address,undefined',
-                       '-I', str(ROOT / 'include'), str(source), '-o', str(binary)]
+            command = [
+                'clang++',
+                '-std=c++17',
+                '-fsanitize=address,undefined',
+                '-I',
+                str(ROOT / 'include'),
+                str(source),
+                '-o',
+                str(binary),
+            ]
             compiled = subprocess.run(command, text=True, capture_output=True)
-            self.assertEqual(compiled.returncode, 0,
-                             'Production renderer harness failed to compile. '
-                             'Expected policy API: saver(..., corePrinting), Saver::Waiting.\n'
-                             + compiled.stdout + compiled.stderr)
+            self.assertEqual(
+                compiled.returncode,
+                0,
+                'Production renderer harness failed to compile. '
+                'Expected policy API: saver(..., corePrinting), Saver::Waiting.\n'
+                + compiled.stdout
+                + compiled.stderr,
+            )
             result = subprocess.run([str(binary)], text=True, capture_output=True)
-            self.assertEqual(result.returncode, 0,
-                             'Production waiting-renderer contract failed:\n'
-                             + result.stdout + result.stderr)
+            self.assertEqual(
+                result.returncode,
+                0,
+                'Production waiting-renderer contract failed:\n' + result.stdout + result.stderr,
+            )
             print(result.stdout.strip())
 
 

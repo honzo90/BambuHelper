@@ -1,4 +1,5 @@
 """German language boundary regressions: real handlers, catalog and VLW glyphs."""
+
 from pathlib import Path
 import json
 import os
@@ -16,7 +17,9 @@ from test_language_choice import compile_and_run
 def braced(source, start):
     """Extract original C++ block, ignoring braces inside comments and literals."""
     first = source.index('{', start)
-    tokens = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\x27(?:\\.|[^\x27\\])*\x27|[{}]', re.S)
+    tokens = re.compile(
+        r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\x27(?:\\.|[^\x27\\])*\x27|[{}]', re.S
+    )
     depth = 0
     for token in tokens.finditer(source, first):
         if token[0] == '{':
@@ -24,22 +27,27 @@ def braced(source, start):
         elif token[0] == '}':
             depth -= 1
             if not depth:
-                return source[start:token.end()]
+                return source[start : token.end()]
     raise AssertionError('Unclosed C++ block')
 
 
 class GermanUi(unittest.TestCase):
     def test_real_language_http_and_backup_boundaries(self):
         source = (ROOT / 'src/web_server.cpp').read_text()
-        handlers = '\n'.join(braced(source, source.index('static void ' + name + '()'))
-                             for name in ('handleLanguageGet', 'handleLanguageSave'))
+        handlers = '\n'.join(
+            braced(source, source.index('static void ' + name + '()'))
+            for name in ('handleLanguageGet', 'handleLanguageSave')
+        )
         export_line = re.search(r'^\s*native\["language"\]\s*=.*?;', source, re.M)[0]
         import_start = source.index('static void handleSettingsImportFinish()')
         import_source = source[import_start:]
         initial = re.search(r'uint8_t\s+importedLanguage\s*=.*?;', import_source)[0]
         validation = braced(import_source, import_source.index('if (!native["language"].isNull())'))
-        save = braced(import_source, import_source.index('if (!saveWs43bLanguage(importedLanguage))'))
-        harness = r'''
+        save = braced(
+            import_source, import_source.index('if (!saveWs43bLanguage(importedLanguage))')
+        )
+        harness = (
+            r'''
 #include <string>
 #include <utility>
 #include <vector>
@@ -54,19 +62,29 @@ struct ServerStub {
  void sendHeader(const char* key,const char* value){assert(String(key)=="Cache-Control");cache=value;}
  void send(int status,const char* contentType,const String& content){code=status;type=contentType;body=content;}
 } server;
-''' + handlers + r'''
+'''
+            + handlers
+            + r'''
 String exportLanguage() {
  JsonDocument doc;JsonObject native=doc["waveshare43b"].to<JsonObject>();
-''' + export_line + r'''
+'''
+            + export_line
+            + r'''
  String out;serializeJson(doc,out);return out;
 }
 void importLanguage(const JsonDocument& doc) {
-''' + initial + r'''
+'''
+            + initial
+            + r'''
  JsonObjectConst native=doc["waveshare43b"].as<JsonObjectConst>();
  if(!native.isNull()) {
-''' + validation + r'''
+'''
+            + validation
+            + r'''
  }
-''' + save + r'''
+'''
+            + save
+            + r'''
  server.send(200,"application/json","{}");
 }
 void checkGet(const char* expected) {
@@ -118,17 +136,24 @@ int main() {
  assert(ws43bLanguage()==2 && ws43bLanguageRevision()==beforeFailure);checkGet("de");
 }
 '''
+        )
         compile_and_run(self, harness, [HERE / 'vendor/ArduinoJson-7.4.3/src'])
 
     def test_german_catalog_preserves_placeholders_entities_and_whitespace(self):
         catalog = json.loads((HERE / 'locale/de.json').read_text())
         self.assertGreater(len(catalog), 300)
         polish = json.loads((HERE / 'locale/pl.json').read_text())
-        self.assertEqual(set(catalog), set(polish), 'Only reviewed WebUI text keys may enter the runtime JS catalog')
+        self.assertEqual(
+            set(catalog),
+            set(polish),
+            'Only reviewed WebUI text keys may enter the runtime JS catalog',
+        )
         # UI percentages such as "10% steps" are not printf formats. A format
         # space flag would misread those fragments; real firmware formats here
         # use no such flag. Also check literal percent counts independently.
-        formats = re.compile(r'%[A-Z][A-Z0-9_]*%|%%|%[+\-#0]*\d*(?:\.\d+)?(?:hh|ll|[hljztL])?[diuoxXfFeEgGaAcspn]')
+        formats = re.compile(
+            r'%[A-Z][A-Z0-9_]*%|%%|%[+\-#0]*\d*(?:\.\d+)?(?:hh|ll|[hljztL])?[diuoxXfFeEgGaAcspn]'
+        )
         entities = re.compile(r'&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);')
         for source, german in catalog.items():
             with self.subTest(source=source):
@@ -137,7 +162,10 @@ int main() {
                 self.assertEqual(formats.findall(source), formats.findall(german))
                 self.assertEqual(source.count('%'), german.count('%'))
                 self.assertEqual(entities.findall(source), entities.findall(german))
-                self.assertEqual(re.findall(r'</?[A-Za-z][^>]*>', source), re.findall(r'</?[A-Za-z][^>]*>', german))
+                self.assertEqual(
+                    re.findall(r'</?[A-Za-z][^>]*>', source),
+                    re.findall(r'</?[A-Za-z][^>]*>', german),
+                )
                 self.assertEqual(re.match(r'\s*', source)[0], re.match(r'\s*', german)[0])
                 self.assertEqual(re.search(r'\s*$', source)[0], re.search(r'\s*$', german)[0])
         for key in ('BambuHelper Setup', 'Configuration', 'Invalid language'):
@@ -148,10 +176,20 @@ int main() {
         # Native-only words must not be inserted in the broad JS translation
         # catalog: some, e.g. layer/none, are protocol/CSS values in the portal.
         literal = r'"(?:[^"\\]|\\.)*"'
-        calls = re.compile(r'ws43bText\(\s*(' + literal + r')\s*,\s*(' + literal +
-                           r')\s*,\s*(' + literal + r')\s*\)')
-        formats = re.compile(r'%[A-Z][A-Z0-9_]*%|%%|%[+\-#0]*\d*(?:\.\d+)?(?:hh|ll|[hljztL])?[diuoxXfFeEgGaAcspn]')
+        calls = re.compile(
+            r'ws43bText\(\s*('
+            + literal
+            + r')\s*,\s*('
+            + literal
+            + r')\s*,\s*('
+            + literal
+            + r')\s*\)'
+        )
+        formats = re.compile(
+            r'%[A-Z][A-Z0-9_]*%|%%|%[+\-#0]*\d*(?:\.\d+)?(?:hh|ll|[hljztL])?[diuoxXfFeEgGaAcspn]'
+        )
         import ast
+
         for filename in ('src/display_ws43b.cpp', 'src/ws43b_weather.cpp'):
             source = (ROOT / filename).read_text()
             matches = calls.findall(source)
@@ -167,9 +205,20 @@ int main() {
 
     def test_german_glyphs_in_actual_ui_font_arrays(self):
         required = set('äöüÄÖÜß')
-        expected = {'ws43b_dash_14','ws43b_dash_18','ws43b_dash_24','ws43b_dash_30',
-                    'ws43b_inter_body','ws43b_v2_12','ws43b_v2_13','ws43b_v2_b14',
-                    'ws43b_v2_b15','ws43b_v2_b16','ws43b_v2_b17','ws43b_v2_b25'}
+        expected = {
+            'ws43b_dash_14',
+            'ws43b_dash_18',
+            'ws43b_dash_24',
+            'ws43b_dash_30',
+            'ws43b_inter_body',
+            'ws43b_v2_12',
+            'ws43b_v2_13',
+            'ws43b_v2_b14',
+            'ws43b_v2_b15',
+            'ws43b_v2_b16',
+            'ws43b_v2_b17',
+            'ws43b_v2_b25',
+        }
         found = set()
         for filename in ('ws43b_modern.h', 'ws43b_dashboard_v2.h'):
             text = (ROOT / 'include/fonts' / filename).read_text()
@@ -185,8 +234,12 @@ int main() {
                 self.assertEqual(24 + n * 28 + sum(r[1] * r[2] for r in records), len(data))
                 found.add(name)
                 if name == 'ws43b_dash_18':
-                    for phrase, width in [('< Einstellungen', 150), ('Deutsch', 312),
-                                           ('Sprache', 320), ('Sprache und Daten', 256)]:
+                    for phrase, width in [
+                        ('< Einstellungen', 150),
+                        ('Deutsch', 312),
+                        ('Sprache', 320),
+                        ('Sprache und Daten', 256),
+                    ]:
                         self.assertTrue(set(phrase) <= chars.keys())
                         self.assertLess(sum(chars[c][3] for c in phrase), width)
         self.assertEqual(found, expected)

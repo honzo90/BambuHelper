@@ -2,6 +2,7 @@
 """Provision smoke Wi-Fi in RAM and collect only its bounded diagnostic records.
 Run only after the explicitly approved smoke flash. Never sends printer commands.
 """
+
 import argparse
 import getpass
 from pathlib import Path
@@ -16,9 +17,15 @@ SMOKE_IDS = frozenset(f'SMOKE_ID waveshare43b-v{version} 800x480' for version in
 DIAGNOSTIC_FRESH_SECONDS = 12
 # Arduino-ESP32 3.3.11 libraries/WiFi/src/WiFiType.h: wl_status_t.
 WIFI_STATUSES = {
-    0: 'oczekiwanie', 1: 'sieć niedostępna', 2: 'skan zakończony',
-    3: 'połączono', 4: 'łączenie nie powiodło się', 5: 'połączenie utracone',
-    6: 'rozłączono', 254: 'Wi-Fi zatrzymane', 255: 'brak interfejsu',
+    0: 'oczekiwanie',
+    1: 'sieć niedostępna',
+    2: 'skan zakończony',
+    3: 'połączono',
+    4: 'łączenie nie powiodło się',
+    5: 'połączenie utracone',
+    6: 'rozłączono',
+    254: 'Wi-Fi zatrzymane',
+    255: 'brak interfejsu',
 }
 # ESP32 3.3.11 esp_wifi_types_generic.h: wifi_err_reason_t (not a password verdict).
 WIFI_REASONS = {
@@ -43,20 +50,24 @@ def safe_record(line):
         match = re.fullmatch(
             r'SCAN_RESULT boot=[0-9a-f]{8} total=([0-9]{1,5}) matches=([0-9]{1,5}) '
             r'best_rssi=(-?[0-9]{1,3}) best_channel=([0-9]{1,2}) '
-            r'best_auth=(-?[0-9]{1,3}) elapsed_ms=([0-9]{1,10})', line,
+            r'best_auth=(-?[0-9]{1,3}) elapsed_ms=([0-9]{1,10})',
+            line,
         )
         if match is None:
             return False
         total, matches, rssi, channel, auth, elapsed = map(int, match.groups())
         return (
-            0 <= matches <= total <= 65535 and elapsed <= 0xffffffff
-            and ((matches == 0 and rssi == 0 and channel == 0 and auth == -1)
-                 or (matches > 0 and -127 <= rssi <= 0 and 1 <= channel <= 14
-                     and 0 <= auth <= 255))
+            0 <= matches <= total <= 65535
+            and elapsed <= 0xFFFFFFFF
+            and (
+                (matches == 0 and rssi == 0 and channel == 0 and auth == -1)
+                or (matches > 0 and -127 <= rssi <= 0 and 1 <= channel <= 14 and 0 <= auth <= 255)
+            )
         )
     if line.startswith('SCAN_ERROR '):
         match = re.fullmatch(
-            r'SCAN_ERROR boot=[0-9a-f]{8} stage=(START|POLL|TIMEOUT) code=(-?[0-9]{1,10})', line,
+            r'SCAN_ERROR boot=[0-9a-f]{8} stage=(START|POLL|TIMEOUT) code=(-?[0-9]{1,10})',
+            line,
         )
         return match is not None and -(2**31) <= int(match[2]) <= 2**31 - 1
     if line.startswith('WIFI_EVENT '):
@@ -64,19 +75,23 @@ def safe_record(line):
             r'WIFI_EVENT boot=[0-9a-f]{8} seq=([1-9][0-9]{0,9}) '
             r'uptime_ms=([0-9]{1,10}) '
             r'event=(START|STOP|CONNECTED|DISCONNECTED|GOT_IP|LOST_IP) '
-            r'reason=(-1|[0-9]{1,3})', line,
+            r'reason=(-1|[0-9]{1,3})',
+            line,
         )
         if match is None:
             return False
         sequence, uptime, event, reason = match.groups()
         return (
-            int(sequence) <= 0xffffffff and int(uptime) <= 0xffffffff
-            and ((event == 'DISCONNECTED' and 0 <= int(reason) <= 255)
-                 or (event != 'DISCONNECTED' and reason == '-1'))
+            int(sequence) <= 0xFFFFFFFF
+            and int(uptime) <= 0xFFFFFFFF
+            and (
+                (event == 'DISCONNECTED' and 0 <= int(reason) <= 255)
+                or (event != 'DISCONNECTED' and reason == '-1')
+            )
         )
     if line.startswith('WIFI_TRACE '):
         match = re.fullmatch(r'WIFI_TRACE boot=[0-9a-f]{8} queued_dropped=([0-9]{1,10})', line)
-        return match is not None and int(match[1]) <= 0xffffffff
+        return match is not None and int(match[1]) <= 0xFFFFFFFF
     patterns = (
         r'SMOKE_ID waveshare43b-v[1234] 800x480',
         r'SCAN_BEGIN boot=[0-9a-f]{8}',
@@ -121,13 +136,30 @@ def wifi_description(values):
 
 
 def line_boot(line):
-    if line.startswith(('DIAG ', 'BOOT ', 'WIFI_BEGIN ', 'WIFI_DIAG ', 'WIFI_EVENT ', 'WIFI_TRACE ', 'RUN_BEGIN ', 'TOUCH ', 'FATAL ', 'SCAN_BEGIN ', 'SCAN_RESULT ', 'SCAN_REJECTED ', 'SCAN_ERROR ')):
+    if line.startswith(
+        (
+            'DIAG ',
+            'BOOT ',
+            'WIFI_BEGIN ',
+            'WIFI_DIAG ',
+            'WIFI_EVENT ',
+            'WIFI_TRACE ',
+            'RUN_BEGIN ',
+            'TOUCH ',
+            'FATAL ',
+            'SCAN_BEGIN ',
+            'SCAN_RESULT ',
+            'SCAN_REJECTED ',
+            'SCAN_ERROR ',
+        )
+    ):
         return line.split()[1].split('=', 1)[1]
     return None
 
 
 class WifiTrace:
     """Track only validated event metadata; diagnostic loss is not a Wi-Fi drop."""
+
     def __init__(self):
         self.first_disconnect = None
         self.last_sequence = None
@@ -176,22 +208,41 @@ class WifiTrace:
             if self.first_disconnect is None:
                 self.first_disconnect = values
                 print(self.first_description())
-            elif (values['reason'] == '36' and self.first_disconnect['reason'] != '36'
-                  and not self.later_leaving_reported):
+            elif (
+                values['reason'] == '36'
+                and self.first_disconnect['reason'] != '36'
+                and not self.later_leaving_reported
+            ):
                 self.later_leaving_reported = True
-                print('Późniejsze rozłączenie: 36 (STA_LEAVING); zachowano wcześniejsze zdarzenie w logu.')
+                print(
+                    'Późniejsze rozłączenie: 36 (STA_LEAVING); zachowano wcześniejsze zdarzenie w logu.'
+                )
         elif values['event'] in ('CONNECTED', 'GOT_IP', 'LOST_IP', 'STOP'):
-            labels = {'CONNECTED': 'skojarzenie z punktem dostępu', 'GOT_IP': 'otrzymano adres IP',
-                      'LOST_IP': 'utracono adres IP', 'STOP': 'zatrzymano Wi-Fi'}
+            labels = {
+                'CONNECTED': 'skojarzenie z punktem dostępu',
+                'GOT_IP': 'otrzymano adres IP',
+                'LOST_IP': 'utracono adres IP',
+                'STOP': 'zatrzymano Wi-Fi',
+            }
             print(f"Zdarzenie Wi-Fi: {labels[values['event']]} (uptime={values['uptime_ms']} ms).")
 
 
 def record_observation(log, line, boot, trace=None):
     """Record safe observation traffic, including v2/v3, and reject a changed boot."""
-    if safe_record(line) and line.startswith((
-        'RUN_BEGIN ', 'DIAG ', 'WIFI_BEGIN ', 'WIFI_DIAG ', 'WIFI_EVENT ', 'WIFI_TRACE ', 'TOUCH ',
-        'FATAL ', 'WINDOW_READY', 'BOOT ',
-    )):
+    if safe_record(line) and line.startswith(
+        (
+            'RUN_BEGIN ',
+            'DIAG ',
+            'WIFI_BEGIN ',
+            'WIFI_DIAG ',
+            'WIFI_EVENT ',
+            'WIFI_TRACE ',
+            'TOUCH ',
+            'FATAL ',
+            'WINDOW_READY',
+            'BOOT ',
+        )
+    ):
         record(log, line)
         current_boot = line_boot(line)
         if current_boot is not None:
@@ -231,34 +282,50 @@ def wait_wifi(port, log, timeout=60, trace=None):
             values = dict(item.split('=', 1) for item in line.split()[1:])
             current_boot = values['boot']
             if boot is not None and boot != current_boot:
-                raise SystemExit('Restart podczas oczekiwania na Wi-Fi; dane w RAM mogły zostać utracone.')
+                raise SystemExit(
+                    'Restart podczas oczekiwania na Wi-Fi; dane w RAM mogły zostać utracone.'
+                )
             boot = current_boot
         trace.receive(line)
         if line == 'WIFI_ACCEPTED':
             accepted = True
             print('Płytka przyjęła dane Wi-Fi; oczekiwanie na połączenie i adres IP.')
         if line.startswith('WIFI_BEGIN '):
-            print(f"WiFi.begin zwróciło {status_description(values['status'])}; to wynik rozpoczęcia próby, nie końcowy wynik połączenia.")
+            print(
+                f"WiFi.begin zwróciło {status_description(values['status'])}; to wynik rozpoczęcia próby, nie końcowy wynik połączenia."
+            )
         if line.startswith('WIFI_DIAG '):
             last_wifi_diag, last_wifi_diag_time = values, time.monotonic()
             print(wifi_description(values))
         if line.startswith('DIAG '):
             last_diag, last_diag_time = values, time.monotonic()
-            print(f"Wi-Fi={values['wifi']}, rozłączenia={values['drops']}, uptime={int(values['uptime_ms']) // 1000} s")
+            print(
+                f"Wi-Fi={values['wifi']}, rozłączenia={values['drops']}, uptime={int(values['uptime_ms']) // 1000} s"
+            )
             if accepted and values['wifi'] == '1':
                 return boot
-    trace_detail = ' '.join(part for part in (trace.first_description(), trace.loss_description()) if part)
+    trace_detail = ' '.join(
+        part for part in (trace.first_description(), trace.loss_description()) if part
+    )
     trace_suffix = ' ' + trace_detail if trace_detail else ''
     if not accepted:
-        raise SystemExit('Brak WIFI_ACCEPTED: nie potwierdzono przyjęcia komendy przez płytkę. Szczegóły w logu.' + trace_suffix)
+        raise SystemExit(
+            'Brak WIFI_ACCEPTED: nie potwierdzono przyjęcia komendy przez płytkę. Szczegóły w logu.'
+            + trace_suffix
+        )
     if last_diag is None or time.monotonic() - last_diag_time > DIAGNOSTIC_FRESH_SECONDS:
-        raise SystemExit('Dane Wi-Fi przyjęte, ale brak aktualnej diagnostyki DIAG. Szczegóły w logu.' + trace_suffix)
+        raise SystemExit(
+            'Dane Wi-Fi przyjęte, ale brak aktualnej diagnostyki DIAG. Szczegóły w logu.'
+            + trace_suffix
+        )
     detail = 'Obecny firmware nie podaje przyczyny (sieć/uwierzytelnienie/DHCP).'
     if last_wifi_diag is not None:
         if time.monotonic() - last_wifi_diag_time <= DIAGNOSTIC_FRESH_SECONDS:
             detail = wifi_description(last_wifi_diag)
         else:
-            detail = 'Brak aktualnego WIFI_DIAG; historyczny zapis nie rozstrzyga bieżącej przyczyny.'
+            detail = (
+                'Brak aktualnego WIFI_DIAG; historyczny zapis nie rozstrzyga bieżącej przyczyny.'
+            )
     raise SystemExit(
         f"Dane Wi-Fi przyjęte; po {timeout} s nadal wifi={last_diag['wifi']}, rozłączenia={last_diag['drops']}. "
         'Test 10 minut nie rozpoczął się. ' + detail + trace_suffix
@@ -337,7 +404,9 @@ def main():
             raise SystemExit('Obserwacja przerwana; zapisano OBSERVATION_ERROR.')
         log.write(f'{time.monotonic():.3f} OBSERVATION_END\n')
     print('Zapisano:', logfile)
-    print('Uruchom check_log.py. Ocena obrazu/dotyku należy do człowieka; log sam nie daje hardware PASS.')
+    print(
+        'Uruchom check_log.py. Ocena obrazu/dotyku należy do człowieka; log sam nie daje hardware PASS.'
+    )
 
 
 if __name__ == '__main__':

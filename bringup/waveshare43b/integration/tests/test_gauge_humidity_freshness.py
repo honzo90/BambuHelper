@@ -1,4 +1,5 @@
 """Exercise actual gauge freshness and caller gating with mixed AMS sensors."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,10 +12,10 @@ class GaugeHumidityFreshness(unittest.TestCase):
     def test_raw_rh_freshness_unit_identity_presence_and_offline_rendering(self):
         display = (ROOT / 'src/display_ws43b.cpp').read_text()
         start = display.index('bool gaugeDataFresh(')
-        functions = display[start:display.index('\n#endif', start)]
+        functions = display[start : display.index('\n#endif', start)]
         settings = (ROOT / 'src/settings.h').read_text()
         start = settings.index('enum GaugeType :')
-        gauge_types = settings[start:settings.index('\n};', start) + 3]
+        gauge_types = settings[start : settings.index('\n};', start) + 3]
         harness = r'''
 #include "bambu_monitor.h"
 #include "ws43b_dashboard_policy.h"
@@ -90,9 +91,21 @@ int main(){
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory)
             (p / 'test.cpp').write_text(harness + gauge_types + functions + cases)
-            subprocess.run(['clang++', '-std=c++17', '-fsanitize=address,undefined',
-                            '-I', str(ROOT / 'include'), str(p / 'test.cpp'),
-                            '-o', str(p / 'test')], check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(p / 'test')], check=True, capture_output=True, text=True)
 
 

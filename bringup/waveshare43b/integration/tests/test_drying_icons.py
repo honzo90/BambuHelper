@@ -1,4 +1,5 @@
 """Real drying raster: shared spool, fixed clip bounds and symbolic airflow."""
+
 from pathlib import Path
 import json
 import subprocess
@@ -122,14 +123,27 @@ class DryingIcons(unittest.TestCase):
     def test_shared_spool_bounds_and_airflow_at_all_production_sizes(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)
-            (path/'drying.cpp').write_text(HARNESS)
-            result = subprocess.run([
-                'clang++', '-std=c++17', '-O1', '-Wall', '-Wextra', '-Werror',
-                '-fsanitize=address,undefined', '-I', str(ROOT/'include'),
-                str(path/'drying.cpp'), '-o', str(path/'drying'),
-            ], capture_output=True, text=True)
+            (path / 'drying.cpp').write_text(HARNESS)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O1',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(path / 'drying.cpp'),
+                    '-o',
+                    str(path / 'drying'),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
-            result = subprocess.run([str(path/'drying')], capture_output=True, text=True)
+            result = subprocess.run([str(path / 'drying')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             report = json.loads(result.stdout)
             self.assertEqual(report['result'], 'PASS')

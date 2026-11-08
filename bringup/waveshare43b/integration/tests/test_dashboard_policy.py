@@ -1,9 +1,12 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class DashboardPolicy(unittest.TestCase):
- def test_thermal_and_navigation(self):
-  code=r'''#include "ws43b_dashboard_policy.h"
+    def test_thermal_and_navigation(self):
+        code = r'''#include "ws43b_dashboard_policy.h"
 #include <cassert>
 using namespace ws43b_view;
 int main(){
@@ -33,7 +36,23 @@ int main(){
  assert(navigationItem(15,458)==-1);assert(navigationItem(782,458)==-1);
  assert(navigationItem(799,479)==-1);
 }'''
-  with tempfile.TemporaryDirectory() as tmp:
-   src=Path(tmp)/'test.cpp';exe=Path(tmp)/'test';src.write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'include'),str(src),'-o',str(exe)],check=True)
-   subprocess.run([str(exe)],check=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / 'test.cpp'
+            exe = Path(tmp) / 'test'
+            src.write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(src),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+            )
+            subprocess.run([str(exe)], check=True)

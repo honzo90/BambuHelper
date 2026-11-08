@@ -1,10 +1,12 @@
 """Generate synthetic UI proposals from the layout source, never from a screenshot.
 No firmware changes. Background is static; cards are opaque.
 """
+
 from pathlib import Path
-source_path=Path(__file__).with_name('preview_dashboard_refined.py')
-source=source_path.read_text()
-background=r'''
+
+source_path = Path(__file__).with_name('preview_dashboard_refined.py')
+source = source_path.read_text()
+background = r'''
 # Static atmosphere behind opaque cards and all foreground text.
 night=MODE=='night'
 top=(11,20,34) if night else (15,34,42)
@@ -34,13 +36,33 @@ elif MODE=='night':
   circle(x,y,1,'#536975')
  cloud(375,64,.65,'#182e39')
 '''
-for mode,description,temp in [('cloud','pochmurno','11°C'),('clear','bezchmurnie','18°C'),('rain','deszcz','9°C'),('snow','śnieg','0°C'),('night','bezchmurnie','8°C'),('neutral','pogoda: —','—')]:
- s=source.replace('# Compact weather stays separate',"MODE="+repr(mode)+'\n'+background+'\n# Compact weather stays separate')
- s=s.replace("'Schanbach · pochmurno'",repr('Schanbach · '+description)).replace("'11°C'",repr(temp))
- if mode not in ('night','neutral'):s=s.replace("'20:03'","'13:03'").replace("'Koniec ok. 21:28'","'Koniec ok. 14:28'")
- icon="circle(518,32,6,DIM);circle(527,26,9,DIM);circle(536,32,6,DIM)"
- if mode=='clear':s=s.replace(icon,"circle(527,29,9,DIM)")
- if mode=='night':s=s.replace(icon,"circle(525,28,10,DIM);circle(530,25,9,'#101e2c')")
- if mode=='neutral':s=s.replace(icon,'')
- s=s.replace('dashboard-refined-hidden.png','dashboard-weather-'+mode+'.png').replace('dashboard-refined-navigation.png','dashboard-weather-'+mode+'-navigation.png')
- exec(compile(s,str(source_path),'exec'),{'__file__':str(source_path),'__name__':'__main__'})
+for mode, description, temp in [
+    ('cloud', 'pochmurno', '11°C'),
+    ('clear', 'bezchmurnie', '18°C'),
+    ('rain', 'deszcz', '9°C'),
+    ('snow', 'śnieg', '0°C'),
+    ('night', 'bezchmurnie', '8°C'),
+    ('neutral', 'pogoda: —', '—'),
+]:
+    s = source.replace(
+        '# Compact weather stays separate',
+        "MODE=" + repr(mode) + '\n' + background + '\n# Compact weather stays separate',
+    )
+    s = s.replace("'Schanbach · pochmurno'", repr('Schanbach · ' + description)).replace(
+        "'11°C'", repr(temp)
+    )
+    if mode not in ('night', 'neutral'):
+        s = s.replace("'20:03'", "'13:03'").replace("'Koniec ok. 21:28'", "'Koniec ok. 14:28'")
+    icon = "circle(518,32,6,DIM);circle(527,26,9,DIM);circle(536,32,6,DIM)"
+    if mode == 'clear':
+        s = s.replace(icon, "circle(527,29,9,DIM)")
+    if mode == 'night':
+        s = s.replace(icon, "circle(525,28,10,DIM);circle(530,25,9,'#101e2c')")
+    if mode == 'neutral':
+        s = s.replace(icon, '')
+    s = s.replace('dashboard-refined-hidden.png', 'dashboard-weather-' + mode + '.png').replace(
+        'dashboard-refined-navigation.png', 'dashboard-weather-' + mode + '-navigation.png'
+    )
+    exec(
+        compile(s, str(source_path), 'exec'), {'__file__': str(source_path), '__name__': '__main__'}
+    )

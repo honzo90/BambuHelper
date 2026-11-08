@@ -191,12 +191,28 @@ class PrintJobBoundary(unittest.TestCase):
             source = work / 'boundary.cpp'
             binary = work / 'boundary'
             source.write_text(CPP)
-            subprocess.run([
-                'clang++', '-std=c++17', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
-                '-Wno-deprecated-declarations', '-fsanitize=address,undefined',
-                '-I', str(ROOT / 'include'), '-I', str(VENDOR), str(source),
-                '-o', str(binary),
-            ], check=True, capture_output=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O1',
+                    '-g',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-Wno-deprecated-declarations',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    '-I',
+                    str(VENDOR),
+                    str(source),
+                    '-o',
+                    str(binary),
+                ],
+                check=True,
+                capture_output=True,
+            )
             subprocess.run([str(binary)], check=True)
 
 

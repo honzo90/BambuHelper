@@ -1,9 +1,12 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class FilamentStages(unittest.TestCase):
- def test_partial_reports_freshness_and_state_changes(self):
-  code=r'''#include "bambu_monitor_parser.h"
+    def test_partial_reports_freshness_and_state_changes(self):
+        code = r'''#include "bambu_monitor_parser.h"
 #include <cassert>
 int main(){
  BambuMonitorTelemetry m;
@@ -34,7 +37,23 @@ int main(){
  assert(monitorFilamentStage(m,true,10)==24);
  assert(monitorFilamentStage(m,true,60000)==0);
 }'''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-Wno-deprecated-declarations','-I',str(ROOT/'include'),'-I',str(ROOT/'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wno-deprecated-declarations',
+                    '-I',
+                    str(ROOT / 'include'),
+                    '-I',
+                    str(ROOT / 'bringup/waveshare43b/integration/vendor/ArduinoJson-7.4.3/src'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

@@ -1,4 +1,5 @@
 """Print-head cadence is independent of ambient effects and yields to live data."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -57,14 +58,29 @@ int main() {
 }
 '''
         with tempfile.TemporaryDirectory() as temporary:
-            path=Path(temporary)
-            (path/'test.cpp').write_text(code)
-            result=subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror',
-                '-fsanitize=address,undefined','-I',str(ROOT/'include'),str(path/'test.cpp'),
-                '-o',str(path/'test')],capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stderr)
-            result=subprocess.run([str(path/'test')],capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stderr)
+            path = Path(temporary)
+            (path / 'test.cpp').write_text(code)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(path / 'test.cpp'),
+                    '-o',
+                    str(path / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run([str(path / 'test')], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
 
-if __name__=='__main__':unittest.main()
+if __name__ == '__main__':
+    unittest.main()

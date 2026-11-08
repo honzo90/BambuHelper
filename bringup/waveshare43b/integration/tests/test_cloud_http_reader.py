@@ -1,4 +1,5 @@
 """Exercise actual cloud HTTP framing with slow segmented synthetic TLS bytes."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -95,14 +96,28 @@ int main(){
         with tempfile.TemporaryDirectory() as folder:
             p = Path(folder)
             (p / 'test.cpp').write_text(source)
-            subprocess.run(['clang++', '-std=c++17', '-fsanitize=address,undefined',
-                            '-I', str(ROOT / 'include'), str(p / 'test.cpp'), '-o', str(p / 'test')],
-                           check=True, capture_output=True, text=True)
-            subprocess.run([str(p / 'test')], check=True, capture_output=True, text=True, timeout=15)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [str(p / 'test')], check=True, capture_output=True, text=True, timeout=15
+            )
 
     def test_cloud_transport_uses_complete_framing_before_cookie_commit(self):
         source = (ROOT / 'src/cloud_login.cpp').read_text()
-        request = source[source.index('static bool cloudRequest('):source.index('//  Flow steps')]
+        request = source[source.index('static bool cloudRequest(') : source.index('//  Flow steps')]
         self.assertNotIn('tls->readStringUntil(', request)
         self.assertNotIn('tls->readBytes(', request)
         self.assertIn('cloud_http::readResponse(', request)

@@ -1,4 +1,5 @@
 """Validate approved sprite provenance, lossless row coding and native safety."""
+
 from pathlib import Path
 import hashlib
 import importlib.util
@@ -19,61 +20,102 @@ class VisualAssets(unittest.TestCase):
     def test_source_dimensions_provenance_and_pixel_roundtrip(self):
         manifest = json.loads((PIPELINE / 'manifest.json').read_text())
         self.assertLess(manifest['total_encoded_and_offsets_bytes'], 165 * 1024)
-        self.assertEqual(hashlib.sha256((ROOT / manifest['generated_header']).read_bytes()).hexdigest(),
-                         manifest['generated_header_sha256'])
-        expected = {'Nozzle':(42,46), 'Bed':(42,46), 'Chamber':(42,46),
-                    'Print':(33,33), 'AMS':(33,33), 'Details':(33,33),
-                    'Settings':(33,33), 'Spool':(64,69), 'Model':(160,132),
-                    'Plate':(220,108), 'Head':(36,47), 'Clock':(33,33),
-                    'Weather':(33,33), 'Network':(33,33), 'Check':(33,33),
-                    'Pause':(33,33), 'Alert':(33,33), 'EmptySlot':(33,33),
-                    'UnknownData':(33,33), 'Printer':(33,33), 'Fan':(33,33)}
-        self.assertEqual({asset['name'] for asset in manifest['assets']},set(expected))
+        self.assertEqual(
+            hashlib.sha256((ROOT / manifest['generated_header']).read_bytes()).hexdigest(),
+            manifest['generated_header_sha256'],
+        )
+        expected = {
+            'Nozzle': (42, 46),
+            'Bed': (42, 46),
+            'Chamber': (42, 46),
+            'Print': (33, 33),
+            'AMS': (33, 33),
+            'Details': (33, 33),
+            'Settings': (33, 33),
+            'Spool': (64, 69),
+            'Model': (160, 132),
+            'Plate': (220, 108),
+            'Head': (36, 47),
+            'Clock': (33, 33),
+            'Weather': (33, 33),
+            'Network': (33, 33),
+            'Check': (33, 33),
+            'Pause': (33, 33),
+            'Alert': (33, 33),
+            'EmptySlot': (33, 33),
+            'UnknownData': (33, 33),
+            'Printer': (33, 33),
+            'Fan': (33, 33),
+        }
+        self.assertEqual({asset['name'] for asset in manifest['assets']}, set(expected))
         for asset in manifest['assets']:
             with self.subTest(asset=asset['name']):
-                width,height=asset['width'],asset['height']
-                self.assertEqual((width,height),expected[asset['name']])
+                width, height = asset['width'], asset['height']
+                self.assertEqual((width, height), expected[asset['name']])
                 self.assertEqual(generator.sha(PIPELINE / asset['source']), asset['source_sha256'])
-                self.assertEqual(generator.source_dimensions(PIPELINE / asset['source']), asset['source_pixel_dimensions'])
-                if asset['name']=='Spool':
-                    self.assertEqual(asset['source_pixel_dimensions'],[1254,1254])
-                    self.assertEqual((asset['image_width'],asset['image_height']),(1280,1280))
-                if asset['name'] in ('Model','Plate','Head'):
-                    self.assertEqual(asset['source_pixel_dimensions'],[1448,1086])
-                raw=(PIPELINE / 'rasterized' / (asset['name']+'.rgba')).read_bytes()
-                self.assertEqual(hashlib.sha256(raw).hexdigest(),asset['rgba_sha256'])
-                self.assertEqual(len(raw),width*height*4)
-                offsets,data,tinted=generator.encode(asset,raw)
-                self.assertEqual(len(data),asset['encoded_bytes'])
-                self.assertEqual(tinted,asset['material_pixels'])
-                if asset['name'] in ('Check','Pause','Alert'):
-                    self.assertGreater(tinted,40)
-                    self.assertLess(tinted,width*height//2)
-                elif asset['name'] in ('Clock','Weather','Network','EmptySlot','UnknownData','Printer','Fan'):
-                    self.assertEqual(tinted,0)
-                decoded=[None]*(width*height)
+                self.assertEqual(
+                    generator.source_dimensions(PIPELINE / asset['source']),
+                    asset['source_pixel_dimensions'],
+                )
+                if asset['name'] == 'Spool':
+                    self.assertEqual(asset['source_pixel_dimensions'], [1254, 1254])
+                    self.assertEqual((asset['image_width'], asset['image_height']), (1280, 1280))
+                if asset['name'] in ('Model', 'Plate', 'Head'):
+                    self.assertEqual(asset['source_pixel_dimensions'], [1448, 1086])
+                raw = (PIPELINE / 'rasterized' / (asset['name'] + '.rgba')).read_bytes()
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), asset['rgba_sha256'])
+                self.assertEqual(len(raw), width * height * 4)
+                offsets, data, tinted = generator.encode(asset, raw)
+                self.assertEqual(len(data), asset['encoded_bytes'])
+                self.assertEqual(tinted, asset['material_pixels'])
+                if asset['name'] in ('Check', 'Pause', 'Alert'):
+                    self.assertGreater(tinted, 40)
+                    self.assertLess(tinted, width * height // 2)
+                elif asset['name'] in (
+                    'Clock',
+                    'Weather',
+                    'Network',
+                    'EmptySlot',
+                    'UnknownData',
+                    'Printer',
+                    'Fan',
+                ):
+                    self.assertEqual(tinted, 0)
+                decoded = [None] * (width * height)
                 for y in range(height):
-                    at,end,x=offsets[y],offsets[y+1],0
-                    while at<end:
-                        skip,flags=struct.unpack_from('<HH',data,at);at+=4;x+=skip
-                        count,mask=flags&0x7fff,flags>>15
-                        self.assertLessEqual(x+count,width)
+                    at, end, x = offsets[y], offsets[y + 1], 0
+                    while at < end:
+                        skip, flags = struct.unpack_from('<HH', data, at)
+                        at += 4
+                        x += skip
+                        count, mask = flags & 0x7FFF, flags >> 15
+                        self.assertLessEqual(x + count, width)
                         for _ in range(count):
-                            color,alpha=struct.unpack_from('<HB',data,at);at+=3
-                            self.assertGreater(alpha,0)
-                            decoded[y*width+x]=(color,alpha,mask);x+=1
-                    self.assertEqual(at,end)
-                for i,pixel in enumerate(decoded):
-                    r,g,b,a=raw[i*4:i*4+4]
-                    if not a:self.assertIsNone(pixel)
-                    else:self.assertEqual(pixel,(generator.rgb565(r,g,b),a,
-                         generator.material(r,g,b) if asset.get('green_material') else 0))
-                self.assertTrue(any(raw[i]==0 for i in range(3,len(raw),4)))
-        for name,digest in manifest['pipeline_sha256'].items():
-            self.assertEqual(generator.sha(PIPELINE/name),digest,name)
+                            color, alpha = struct.unpack_from('<HB', data, at)
+                            at += 3
+                            self.assertGreater(alpha, 0)
+                            decoded[y * width + x] = (color, alpha, mask)
+                            x += 1
+                    self.assertEqual(at, end)
+                for i, pixel in enumerate(decoded):
+                    r, g, b, a = raw[i * 4 : i * 4 + 4]
+                    if not a:
+                        self.assertIsNone(pixel)
+                    else:
+                        self.assertEqual(
+                            pixel,
+                            (
+                                generator.rgb565(r, g, b),
+                                a,
+                                generator.material(r, g, b) if asset.get('green_material') else 0,
+                            ),
+                        )
+                self.assertTrue(any(raw[i] == 0 for i in range(3, len(raw), 4)))
+        for name, digest in manifest['pipeline_sha256'].items():
+            self.assertEqual(generator.sha(PIPELINE / name), digest, name)
 
     def test_native_alpha_recolor_chunking_and_malformed_rows(self):
-        code=r'''
+        code = r'''
 #include "ws43b_visual_assets.h"
 #include <cassert>
 #include <array>
@@ -166,11 +208,31 @@ int main() {
 }
 '''
         with tempfile.TemporaryDirectory() as temp:
-            p=Path(temp);(p/'test.cpp').write_text(code)
-            result=subprocess.run(['clang++','-std=c++17','-O1','-g','-Wall','-Wextra','-Werror',
-                '-fsanitize=address,undefined','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stderr)
-            result=subprocess.run([str(p/'test')],capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stderr)
+            p = Path(temp)
+            (p / 'test.cpp').write_text(code)
+            result = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-O1',
+                    '-g',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-fsanitize=address,undefined',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run([str(p / 'test')], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
-if __name__=='__main__':unittest.main()
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,11 +1,21 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class SaverFilament(unittest.TestCase):
- def test_slot_switch_staleness_and_black_filament(self):
-  s=(ROOT/'src/display_ws43b.cpp').read_text()
-  f=s[s.index('uint16_t saverFilamentColor(const BambuMonitorTelemetry &m'):s.index('void saverAnimation(')]
-  code='#include "bambu_monitor.h"\n#include <cassert>\n'+f+r'''
+    def test_slot_switch_staleness_and_black_filament(self):
+        s = (ROOT / 'src/display_ws43b.cpp').read_text()
+        f = s[
+            s.index('uint16_t saverFilamentColor(const BambuMonitorTelemetry &m') : s.index(
+                'void saverAnimation('
+            )
+        ]
+        code = (
+            '#include "bambu_monitor.h"\n#include <cassert>\n'
+            + f
+            + r'''
 int main(){
  BambuMonitorTelemetry m;
  auto &u=m.amsUnits[0];u.used=true;u.id=2;
@@ -24,7 +34,21 @@ int main(){
  m.newSession();assert(saverFilamentColor(m,true,70004)==0xbdf7);
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)

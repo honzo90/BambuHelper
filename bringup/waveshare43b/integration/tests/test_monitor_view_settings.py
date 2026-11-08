@@ -1,4 +1,5 @@
 """Compile the actual view handlers against fake storage; no device or network."""
+
 from pathlib import Path
 import shutil
 import subprocess
@@ -19,7 +20,8 @@ class MonitorViewSettingsTests(unittest.TestCase):
         end = source.index('\n#endif', begin)
         # No MQTT, restart or general saveSettings declarations are provided:
         # these real handler bodies can only use the view-storage contract.
-        harness = r'''
+        harness = (
+            r'''
 #include <cassert>
 #include <cstdint>
 #include <string>
@@ -45,7 +47,9 @@ struct ServerStub {
  void sendHeader(const char* key,const char* value){assert(String(key)=="Cache-Control");cache=value;}
  void send(int status,const char* contentType,const String& content){code=status;type=contentType;body=content;}
 } server;
-''' + source[begin:end] + r'''
+'''
+            + source[begin:end]
+            + r'''
 JsonDocument reply(int expectedCode) {
  assert(server.code==expectedCode && server.type=="application/json" && server.cache=="no-store");
  JsonDocument doc;assert(!deserializeJson(doc,server.body));return doc;
@@ -97,12 +101,16 @@ int main() {
  assert(activeTheme==oldTheme && dispSettings.fanMatchPrinter==oldFan);get();
 }
 '''
+        )
         with tempfile.TemporaryDirectory(prefix='bambu-view-settings-') as folder:
             tmp = Path(folder)
             cpp, binary = tmp / 'view.cpp', tmp / 'view'
             cpp.write_text(harness)
-            result = subprocess.run([compiler, '-std=c++17', '-I', str(JSON_INCLUDE),
-                                     str(cpp), '-o', str(binary)], capture_output=True, text=True)
+            result = subprocess.run(
+                [compiler, '-std=c++17', '-I', str(JSON_INCLUDE), str(cpp), '-o', str(binary)],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(binary)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

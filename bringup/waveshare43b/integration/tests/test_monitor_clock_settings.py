@@ -1,4 +1,5 @@
 """Real clock handlers and NVS logic against synthetic storage, without a device."""
+
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,11 +16,12 @@ class MonitorClockSettingsTests(unittest.TestCase):
         if not compiler:
             self.skipTest('Native C++ compiler required')
         storage = (REPO / 'src/ws43b_clock_settings.cpp').read_text()
-        storage = storage[storage.index('static Ws43bClockSettings'):storage.rindex('#endif')]
+        storage = storage[storage.index('static Ws43bClockSettings') : storage.rindex('#endif')]
         source = (REPO / 'src/web_server.cpp').read_text()
         begin = source.index('static void handleMonitorClockGet() {')
-        handlers = source[begin:source.index('\n#endif', begin)]
-        harness = r'''
+        handlers = source[begin : source.index('\n#endif', begin)]
+        harness = (
+            r'''
 #include <cassert>
 #include <cstring>
 #include <string>
@@ -50,7 +52,10 @@ struct ServerStub {
  void sendHeader(const char* key,const char* value){assert(String(key)=="Cache-Control");cache=value;}
  void send(int status,const char* type,const String& content){assert(String(type)=="application/json");code=status;body=content;}
 } server;
-''' + storage + handlers + r'''
+'''
+            + storage
+            + handlers
+            + r'''
 void get() {
  const auto before=writes;server={};handleMonitorClockGet();
  assert(server.code==200 && server.cache=="no-store" && writes==before);
@@ -103,12 +108,26 @@ int main() {
  assert(netSettings.use24h==saved.use24h && ws43bClockSettings().revision==0);
 }
 '''
+        )
         with tempfile.TemporaryDirectory(prefix='bambu-clock-settings-') as folder:
             cpp, binary = Path(folder) / 'test.cpp', Path(folder) / 'test'
             cpp.write_text(harness)
-            result = subprocess.run([compiler, '-std=c++17', '-DBOARD_IS_WS43B',
-                                     '-I', str(REPO / 'src'), '-I', str(JSON_INCLUDE),
-                                     str(cpp), '-o', str(binary)], capture_output=True, text=True)
+            result = subprocess.run(
+                [
+                    compiler,
+                    '-std=c++17',
+                    '-DBOARD_IS_WS43B',
+                    '-I',
+                    str(REPO / 'src'),
+                    '-I',
+                    str(JSON_INCLUDE),
+                    str(cpp),
+                    '-o',
+                    str(binary),
+                ],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(binary)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

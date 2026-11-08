@@ -1,14 +1,28 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class TemperatureLastReading(unittest.TestCase):
- def test_cached_values_are_visible_but_never_presented_as_live(self):
-  source=(ROOT/'src/display_ws43b.cpp').read_text()
-  functions=source[source.index('template <class Field>\nconst char *missing'):source.index('void temperature(')]
-  functions+=source[source.index('template<class Field>\nvoid amsReadingAge'):source.index('void amsView(')]
-  functions+=source[source.index('void v2Clear('):source.index('int v2Text(')]
-  functions+=source[source.index('void dashboardTemperature('):source.index('// Solar data')]
-  code=r'''
+    def test_cached_values_are_visible_but_never_presented_as_live(self):
+        source = (ROOT / 'src/display_ws43b.cpp').read_text()
+        functions = source[
+            source.index('template <class Field>\nconst char *missing') : source.index(
+                'void temperature('
+            )
+        ]
+        functions += source[
+            source.index('template<class Field>\nvoid amsReadingAge') : source.index(
+                'void amsView('
+            )
+        ]
+        functions += source[source.index('void v2Clear(') : source.index('int v2Text(')]
+        functions += source[
+            source.index('void dashboardTemperature(') : source.index('// Solar data')
+        ]
+        code = (
+            r'''
 #include "bambu_monitor.h"
 #include "ws43b_dashboard_policy.h"
 #include "ws43b_style.h"
@@ -39,7 +53,9 @@ struct Canvas {
   for(int row=0;row<h;++row)for(int i=0;i<w;++i)point(x+i,y+row);
  }
 }tft;
-'''+functions+r'''
+'''
+            + functions
+            + r'''
 bool has(const char*s,int color=-1){for(auto &v:text)if(v.value.find(s)!=std::string::npos&&(color==-1||v.color==color))return true;return false;}
 int main(){
  BambuMonitorTelemetry m;m.nozzleTemp.set(250,100);m.nozzleTarget.set(250,100);
@@ -78,7 +94,21 @@ int main(){
  assert(tft.pixels>0);
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   subprocess.run(['clang++','-std=c++17','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],check=True,capture_output=True)
-   subprocess.run([str(p/'test')],check=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(p / 'test')], check=True)

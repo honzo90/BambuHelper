@@ -1,11 +1,19 @@
 from pathlib import Path
-import subprocess,tempfile,unittest
-ROOT=Path(__file__).resolve().parents[4]
+import subprocess, tempfile, unittest
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
 class AmsLastReading(unittest.TestCase):
- def test_actual_view_preserves_values_without_claiming_freshness(self):
-  source=(ROOT/'src/display_ws43b.cpp').read_text()
-  view=source[source.index('const MonitorAmsUnit *amsUnit('):source.index('void dashboardTemperature(')]
-  code=r'''
+    def test_actual_view_preserves_values_without_claiming_freshness(self):
+        source = (ROOT / 'src/display_ws43b.cpp').read_text()
+        view = source[
+            source.index('const MonitorAmsUnit *amsUnit(') : source.index(
+                'void dashboardTemperature('
+            )
+        ]
+        code = (
+            r'''
 #include "bambu_monitor.h"
 namespace lgfx {using rgb565_t=uint16_t;}
 #include "ws43b_style.h"
@@ -32,7 +40,9 @@ void button(const char*,int,int,int,int,bool){}
 void levelCard(int,int,int,int,int,bool,bool){}
 unsigned animationFrames=0;
 struct {void setClipRect(int x,int y,int w,int h){assert(x==668&&y==138&&w==96&&h==94);++animationFrames;} void clearClipRect(){} void fillRect(int,int,int,int,int){} void drawRect(int,int,int,int,int){} void drawPixel(int,int,int){} void fillTriangle(int,int,int,int,int,int,int){} void drawTriangle(int,int,int,int,int,int,int){} void drawFastVLine(int,int,int,int){} void drawFastHLine(int,int,int,int){} void fillEllipse(int,int,int,int,int c){colors.push_back(c);} void drawEllipse(int,int,int,int,int){} void drawLine(int,int,int,int,int){} void drawCircle(int,int,int,int){} void drawRoundRect(int,int,int,int,int,int){} void fillRoundRect(int,int,int,int,int,int){} void fillCircle(int,int,int,int c){colors.push_back(c);} void pushImage(int,int,int,int,const lgfx::rgb565_t*){}}tft;
-'''+view+r'''
+'''
+            + view
+            + r'''
 bool has(const char*s){for(auto &v:text)if(v.find(s)!=std::string::npos)return true;return false;}
 int main(){
  BambuMonitorTelemetry m;m.hasUsefulData=true;m.lastUsefulMs=100;
@@ -52,8 +62,22 @@ int main(){
  char age[64];MonitorField<int> f;f.set(0,0xffffff00u);amsReadingAge(age,sizeof(age),f,true,0x100u);assert(!age[0]);
 }
 '''
-  with tempfile.TemporaryDirectory() as tmp:
-   p=Path(tmp);(p/'test.cpp').write_text(code)
-   compiled=subprocess.run(['clang++','-std=c++17','-I',str(ROOT/'include'),str(p/'test.cpp'),'-o',str(p/'test')],text=True,capture_output=True)
-   self.assertEqual(compiled.returncode,0,compiled.stderr)
-   subprocess.run([str(p/'test')],check=True,capture_output=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / 'test.cpp').write_text(code)
+            compiled = subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(p / 'test.cpp'),
+                    '-o',
+                    str(p / 'test'),
+                ],
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            subprocess.run([str(p / 'test')], check=True, capture_output=True)

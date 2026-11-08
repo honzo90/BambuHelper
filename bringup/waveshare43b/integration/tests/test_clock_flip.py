@@ -1,4 +1,5 @@
 """Calendar-page flip of the screensaver digits: timing, motion, opacity."""
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -46,10 +47,26 @@ int main(){
 class ClockFlip(unittest.TestCase):
     def test_flip(self):
         with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / 'flip.cpp'; src.write_text(HARNESS)
+            src = Path(tmp) / 'flip.cpp'
+            src.write_text(HARNESS)
             exe = Path(tmp) / 'flip'
-            subprocess.run(['clang++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'include'),
-                            str(src), '-o', str(exe)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    'clang++',
+                    '-std=c++17',
+                    '-Wall',
+                    '-Wextra',
+                    '-Werror',
+                    '-I',
+                    str(ROOT / 'include'),
+                    str(src),
+                    '-o',
+                    str(exe),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run([str(exe)], check=True)
 
 

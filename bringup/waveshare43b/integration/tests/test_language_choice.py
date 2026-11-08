@@ -1,4 +1,5 @@
 """Real language persistence, generated assets and picker behavior, offline."""
+
 from pathlib import Path
 import json
 import os
@@ -42,12 +43,15 @@ def compile_and_run(test, code, extra_includes=()):
         d = Path(tmp)
         (d / 'config.h').write_text('#define BOARD_IS_WS43B 1\n#define NVS_NAMESPACE "bambu"\n')
         (d / 'Preferences.h').write_text(PREFERENCES_STUB)
-        (d / 'test.cpp').write_text('#include "' + str(ROOT / 'src/ws43b_language.cpp') + '"\n' + code)
+        (d / 'test.cpp').write_text(
+            '#include "' + str(ROOT / 'src/ws43b_language.cpp') + '"\n' + code
+        )
         command = [compiler, '-std=c++17', '-Wall', '-Wextra', '-I', str(d)]
         for path in extra_includes:
             command += ['-I', str(path)]
-        result = subprocess.run(command + [str(d / 'test.cpp'), '-o', str(d / 'test')],
-                                capture_output=True, text=True)
+        result = subprocess.run(
+            command + [str(d / 'test.cpp'), '-o', str(d / 'test')], capture_output=True, text=True
+        )
         test.assertEqual(result.returncode, 0, result.stderr)
         result = subprocess.run([str(d / 'test')], capture_output=True, text=True)
         test.assertEqual(result.returncode, 0, result.stderr)
@@ -55,7 +59,9 @@ def compile_and_run(test, code, extra_includes=()):
 
 class LanguageChoice(unittest.TestCase):
     def test_persistence_validation_and_failed_write(self):
-        compile_and_run(self, r'''
+        compile_and_run(
+            self,
+            r'''
 void current(uint8_t id,const char* code) {
  assert(ws43bLanguage()==id);
  assert(ws43bPolish()==(id==0));
@@ -105,7 +111,8 @@ int main(){
  }
  stored=2;openOk=false;loadWs43bLanguage();current(0,"pl");
 }
-'''.replace('void current', '#include <initializer_list>\nvoid current', 1))
+'''.replace('void current', '#include <initializer_list>\nvoid current', 1),
+        )
 
     def test_browser_save_and_failure_without_commands(self):
         html = (HERE / 'locale/language_picker.html').read_text()
@@ -167,8 +174,13 @@ function page(lang, outcome='ok') {
             for lang in ('en', 'pl', 'de'):
                 pages = src / ('web_pages.h' if lang == 'en' else 'web_pages_' + lang + '.h')
                 self.assertIn('lang="' + lang + '"', pages.read_text())
-                self.assertIn('serveMainPage_' + lang + '()', (src / 'web_template.cpp').read_text())
-                self.assertIn('webAssetJsVersion_' + lang + '()', (src / ('web_template_' + lang + '.cpp')).read_text())
+                self.assertIn(
+                    'serveMainPage_' + lang + '()', (src / 'web_template.cpp').read_text()
+                )
+                self.assertIn(
+                    'webAssetJsVersion_' + lang + '()',
+                    (src / ('web_template_' + lang + '.cpp')).read_text(),
+                )
             server = (src / 'web_server.cpp').read_text()
             self.assertIn('WEB_EN_APP_JS_VER', server)
             self.assertIn('WEB_DE_APP_JS_VER', server)

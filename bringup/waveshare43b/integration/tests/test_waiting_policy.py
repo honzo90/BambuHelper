@@ -1,4 +1,5 @@
 """Independent WS43B Waiting policy contract; host only, no network or hardware."""
+
 from pathlib import Path
 import shutil
 import subprocess
@@ -248,17 +249,35 @@ class WaitingPolicy(unittest.TestCase):
         cls.binary = Path(cls.folder.name) / 'test'
         cpp.write_text(HARNESS, encoding='utf-8')
         result = subprocess.run(
-            [compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror',
-             '-Wno-deprecated-declarations', '-ferror-limit=3',
-             '-I', str(ROOT / 'include'), '-I', str(JSON_INCLUDE),
-             str(cpp), '-o', str(cls.binary)],
-            capture_output=True, text=True, timeout=60,
+            [
+                compiler,
+                '-std=c++17',
+                '-Wall',
+                '-Wextra',
+                '-Werror',
+                '-Wno-deprecated-declarations',
+                '-ferror-limit=3',
+                '-I',
+                str(ROOT / 'include'),
+                '-I',
+                str(JSON_INCLUDE),
+                str(cpp),
+                '-o',
+                str(cls.binary),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode:
-            raise AssertionError('Contract harness failed to compile:\n' + result.stdout + result.stderr)
+            raise AssertionError(
+                'Contract harness failed to compile:\n' + result.stdout + result.stderr
+            )
 
     def run_case(self, name):
-        result = subprocess.run([str(self.binary), name], capture_output=True, text=True, timeout=20)
+        result = subprocess.run(
+            [str(self.binary), name], capture_output=True, text=True, timeout=20
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('PASS: ' + name, result.stdout)
 
