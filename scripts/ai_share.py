@@ -84,6 +84,9 @@ def commits(since):
     """Yield (sha, date, message, added, deleted) for non-merge commits after FORK_BASE."""
     args = ["log", "--no-merges", "--format=%x00%h%x01%cs%x01%B%x02", "--numstat"]
     if since:
+        # A bare date makes git count from the current time of day; start at midnight.
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", since):
+            since += " 00:00"
         args.append(f"--since={since}")
     out = git(*args, f"{FORK_BASE}..HEAD")
     for record in out.split("\x00")[1:]:
