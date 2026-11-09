@@ -2,27 +2,23 @@
 
 This branch contains the 800×480 display/touch port, native dashboard and scenes,
 clock/weather views, Polish/English/German interface, and its host regression tests.
-German UI support is available from `v4.0.0-beta.3`.
 The board profile is `boards/ws_lcd_43b.ini`. Other board definitions are inherited
 from upstream and have not been hardware-tested as part of this publication.
 
-## Snapshot and status
+## Status
 
-Application sources match the recorded 16 October 2026 panel build (23:20:30 +0200):
-SHA256 `96d92f834b9a9145f859578ffdbb1caff2c39bc09bb23ff9a90ede786c5dd07f`,
-2,864,112 bytes, Arduino ESP32 3.3.11, RGB PCLK 16 MHz. This hash identifies the
-locally tested candidate; no binary with this hash is distributed here and a
-fresh build is not claimed to be bit-for-bit identical.
+- **Stable: v4.1.0** (2026-11-05). A complete first installation through the
+  browser USB installer was confirmed on a 4.3B board.
+- **Beta: v4.1.1-beta.1** (2026-11-06) – built on an SDK with an IRAM-safe RGB
+  interrupt handler, aimed at the picture glitches below.
+- Known issues: occasional picture glitches during long prints (the framebuffer
+  stays clean, so the cause is in display scan-out; fix in testing in the beta),
+  and a rarely seen [black screen that does not wake on touch (#1)](https://github.com/honzo90/BambuHelper/issues/1).
+- Host tests do not prove physical LCD/touch behaviour or full print cycles;
+  every beta is checked on a real panel before it becomes stable.
 
-The recorded flash verification matched the installed app to that candidate.
-Physical acceptance remains incomplete: a dark screen with no touch wake was
-reported, its cause is unverified, and full print-cycle checks remain pending.
-Host tests and a later diagnostic observation do not resolve this known issue.
-
-Packaging changes only make build/test tooling portable: Arduino tool paths,
-public pinned cache64 build inputs, Node lookup and a standalone upstream LED
-fixture. Application sources are unchanged. Private hardware-operator scripts,
-device configuration, captures and test logs are excluded.
+Private hardware-operator scripts, device configuration, captures and test logs
+are not part of the repository.
 
 ## Build dependencies
 
@@ -67,9 +63,12 @@ Releases use **Arduino ESP32 3.3.11**, **ESP-IDF 5.5.5**, the rebuilt
 **cache64_xip** SDK and a **12 MHz** requested RGB PCLK. Each release's
 `BUILD-INFO.json` records the exact source commit, SDK provenance, configuration
 and validation results. Reproduction requires the separately prepared XIP SDK,
-its matching manifest and SHA-256, `WS43B_SDK_PROFILE=cache64_xip` and
+its matching manifest and SHA-256 (`WS43B_XIP_SDK_MANIFEST`,
+`WS43B_XIP_SDK_MANIFEST_SHA256`), `WS43B_SDK_PROFILE=cache64_xip` and
 `WS43B_RGB_PCLK_HZ=12000000`; the default cache64 build does not reproduce a
-release. The build fails if a local filesystem path would end up in the image.
+release. From v4.1.1 the SDK additionally enables `CONFIG_LCD_RGB_ISR_IRAM_SAFE`
+(declared as `rgb_isr_iram_safe` in its manifest). The build fails if a local
+filesystem path would end up in the image.
 
 ## Host tests
 
@@ -78,31 +77,15 @@ already installs ArduinoJson; for a tests-only setup use
 `python3 -B prepare_test_dependencies.py` once instead.
 
 ```sh
-python3 -B -m unittest discover -s bringup/waveshare43b/integration/tests -p 'test_*.py'
+python3 -B scripts/agent_check.py        # all host tests; -k <name> for a subset
 ```
 
-Export validation on 17 October 2026: **174 host tests passed, 1 optional test
-skipped**. The sandbox initially blocked 10 MQTT loopback cases; all 10 passed
-when rerun with local socket access.
+The long MQTT loopback timing test is opt-in. Read-only WebUI tests against a
+live panel live in `bringup/waveshare43b/integration/webui-e2e/` (Playwright).
 
-**Fresh-clone build verification, 18 October 2026:** the published source commit
-`5b9d48e04b5b2ffee45e6f5b44ed6d4b61d9e07a` was rebuilt successfully on macOS
-without tracked source changes. The build used Arduino CLI 1.5.1, Arduino ESP32
-3.3.11, esp-x32/2601, requested RGB PCLK 16 MHz and the cache64 SDK; memory and connection
-diagnostics were disabled. The application was 2,865,120 bytes within the
-3,145,728-byte app partition, with SHA256
-`f5e0d7dfc7a1e9473c71f1b9814458e0a8c599e919ab7110f62484238ff40277`.
-SDK and legacy-I2C link checks passed.
-
-Dependencies were prepared from pinned public sources. The core and S3 SDK used
-an isolated data directory; existing compiler/helper tools were reused, so this
-was not a clean-machine toolchain installation test. This build was neither
-flashed nor published as a binary. It is separate from the earlier hardware
-candidate identified above and provides no new physical LCD/touch acceptance.
-
-The long MQTT loopback timing test is opt-in. The private historical flash-uploader
-test is excluded along with its device-specific uploader. These tests do not
-prove physical LCD/touch behavior or printer-cycle acceptance.
+History: the first public source export (`5b9d48e`, 2026-10-17/18) passed 174
+host tests and was rebuilt from a fresh clone on macOS (requested RGB PCLK
+16 MHz, stock cache64 SDK). Releases since v4.0.0 use the XIP profile above.
 
 Checked-in font and image headers are sufficient to build. Asset regeneration
 requires additional Pillow/Playwright/Chromium tooling described alongside the
