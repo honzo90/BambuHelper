@@ -1,3 +1,27 @@
+/* ============ Request limiter ============
+   The panel's web server answers one request at a time, and every connection
+   the browser opens to it waits in the panel's scarce internal RAM (measured:
+   six parallel requests cost up to ~60 KB). Keep at most two requests to the
+   panel in flight; the rest queue here. A request that hangs frees its slot
+   after 8 s so the UI never stalls. Other hosts (GitHub update check) pass. */
+(function(){
+  var nativeFetch = window.fetch.bind(window), active = 0, queue = [], MAX = 2;
+  function next(){
+    while (active < MAX && queue.length){
+      var job = queue.shift(), done = false;
+      active++;
+      var release = function(){ if (!done){ done = true; active--; next(); } };
+      var timer = setTimeout(release, 8000);
+      nativeFetch.apply(null, job.args).then(job.ok, job.fail).then(function(){ clearTimeout(timer); release(); });
+    }
+  }
+  window.fetch = function(input, init){
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (/^[a-z]+:\/\//i.test(url) && url.indexOf(location.origin + '/') !== 0) return nativeFetch(input, init);
+    return new Promise(function(ok, fail){ queue.push({args: [input, init], ok: ok, fail: fail}); next(); });
+  };
+})();
+
 /* ============ Loader / section dispatcher ============ */
 var SECTION_LABELS = {
   printer: 'Printer Settings',
