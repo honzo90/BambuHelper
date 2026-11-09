@@ -30,6 +30,10 @@ python3 -B scripts/agent_check.py -k fixture # only test modules whose name cont
 python3 -B bringup/waveshare43b/integration/build.py   # firmware build, see WAVESHARE.md for setup
 ```
 
+WebUI end-to-end (read-only, against a live panel; Playwright, `npm install` once):
+`cd bringup/waveshare43b/integration/webui-e2e && BH_PANEL_URL=http://<panel-ip> npm test`.
+Never commit the panel address.
+
 Release-profile build environment:
 `WS43B_ARDUINO_DATA=<dir with core 3.3.11> WS43B_SDK_PROFILE=cache64_xip WS43B_RGB_PCLK_HZ=12000000`.
 Arduino ESP32 core must be exactly **3.3.11**. `build.py` fails if local paths leak
