@@ -646,6 +646,8 @@ input[type="radio"] { accent-color: var(--accent); width: 18px; height: 18px; }
 }
 .ws-display-settings .ws-display-card { display: flex; flex-direction: column; min-width: 0; margin: 0; }
 .ws-display-settings .ws-display-wide { grid-column: 1 / -1; }
+.ws-photo-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.ws-photo-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border, rgba(255,255,255,.08)); overflow-wrap: anywhere; }
 .ws-display-settings .ws-display-form { display: flex; flex-direction: column; flex: 1; gap: var(--sp-4); }
 .ws-display-settings .ws-display-form > .field,
 .ws-display-settings .ws-display-form > .hint,

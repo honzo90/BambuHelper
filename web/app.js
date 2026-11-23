@@ -2412,7 +2412,77 @@ function ws43bDisplaySettingsMarkup(){
     '<form id="wsIdleForm" class="ws-display-form"><div class="row"><div class="field"><label for="wsIdle">Time without touch</label><select id="wsIdle" data-nodirty><option value="0">Disabled</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>' +
     '<div class="field"><label for="wsIdleAction">On timeout</label><select id="wsIdleAction" data-nodirty><option value="0">Show clock</option><option value="1">Turn off backlight</option></select></div></div>' +
     '<p class="hint">Daytime printing stays on Print after timeout. Other views return to Print first. Night behavior follows the night schedule. Touch resets the timer.</p><div class="action-bar"><button type="submit" class="btn btn-primary" disabled>Save idle settings</button></div></form></div>' +
+    '<div class="card ws-display-card ws-display-wide" id="wsPhotoCard"><div class="card-head"><div><h3>Photo screensaver</h3><p>Show JPG and PNG pictures from the memory card instead of the clock.</p></div></div>' +
+    '<form id="wsPhotoForm" class="ws-display-form"><div class="row"><div class="field"><label for="wsPhotoOn">Photo screensaver</label><select id="wsPhotoOn" data-nodirty><option value="0">Off</option><option value="1">On</option></select></div>' +
+    '<div class="field"><label for="wsPhotoInterval">Change picture every</label><select id="wsPhotoInterval" data-nodirty><option value="10">10 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="300">5 minutes</option></select></div></div>' +
+    '<div class="row"><div class="field"><label for="wsPhotoFit">Picture size</label><select id="wsPhotoFit" data-nodirty><option value="fit">Whole picture</option><option value="fill">Fill the screen</option></select></div>' +
+    '<div class="field"><label for="wsPhotoCorner">Clock card</label><select id="wsPhotoCorner" data-nodirty><option value="0">Bottom right</option><option value="1">Bottom left</option><option value="2">Top right</option><option value="3">Top left</option></select></div></div>' +
+    '<p class="hint">Pictures are read from the images folder on the memory card. Pause, alerts and cooling keep their own screens.</p><div class="action-bar"><button type="submit" class="btn btn-primary" disabled>Save photo settings</button></div></form>' +
+    '<div class="ws-photo-files"><p id="wsPhotoCardState" class="hint"></p><div class="field"><label for="wsPhotoFile">Add pictures (JPG up to 4 MB, PNG up to 2 MB)</label><input type="file" id="wsPhotoFile" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple data-nodirty></div>' +
+    '<ul id="wsPhotoList" class="ws-photo-list"></ul></div></div>' +
     '<div class="ws-display-tools ws-display-wide"><button type="button" class="btn btn-ghost btn-sm" id="wsNativeReload">Reload panel settings</button><p id="wsNativeStatus" class="hint" role="status" aria-live="polite"></p></div>';
+}
+function setupWs43bPhotos(){
+  var form=document.getElementById('wsPhotoForm');if(!form)return;
+  var button=form.querySelector('button'),list=document.getElementById('wsPhotoList'),state=document.getElementById('wsPhotoCardState'),picker=document.getElementById('wsPhotoFile');
+  var namePattern=/^[A-Za-z0-9_() -][A-Za-z0-9_(). -]{0,46}$/;
+  function okName(name){return namePattern.test(name) && name.indexOf('..')<0 && name[0]!=='.' && name[0]!==' ' && /\.(jpe?g|png)$/i.test(name);}
+  async function load(){
+    button.disabled=true;state.textContent='Reading the memory card…';
+    try {
+      var response=await fetch('/monitor/photos',{cache:'no-store'}),data=await response.json();
+      if(!response.ok || typeof data.enabled!=='boolean' || !Array.isArray(data.files))throw Error('Invalid photo settings response');
+      document.getElementById('wsPhotoOn').value=data.enabled?'1':'0';
+      document.getElementById('wsPhotoInterval').value=String(data.interval);
+      document.getElementById('wsPhotoFit').value=data.fill?'fill':'fit';
+      document.getElementById('wsPhotoCorner').value=String(data.corner);
+      state.textContent=data.card?('Memory card: '+data.used_mb+' / '+data.total_mb+' MB used, pictures: '+data.files.length):'No memory card. Insert a FAT32 card and reload.';
+      picker.disabled=!data.card;
+      list.textContent='';
+      data.files.forEach(function(file){
+        var item=document.createElement('li'),label=document.createElement('span'),remove=document.createElement('button');
+        label.textContent=file.name+' · '+Math.max(1,Math.round(file.size/1024))+' KB'+(file.ok?'':' · too large, skipped');
+        remove.type='button';remove.className='btn btn-ghost btn-sm';remove.textContent='Delete';
+        remove.onclick=async function(){
+          if(!confirm('Delete '+file.name+' from the memory card?'))return;
+          remove.disabled=true;
+          try {
+            var r=await fetch('/monitor/photos/delete',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({name:file.name}).toString()}),d=await r.json();
+            if(!r.ok || d.status!=='ok')throw Error(d.message || 'Delete failed');
+            load();
+          } catch(e){showToast(e.message);remove.disabled=false;}
+        };
+        item.append(label,remove);list.append(item);
+      });
+      button.disabled=false;
+    } catch(e){state.textContent=e.message || 'Could not read photo settings. Retry.';}
+  }
+  form.onsubmit=async function(event){
+    event.preventDefault();if(button.disabled)return;button.disabled=true;
+    var body=new URLSearchParams({enabled:document.getElementById('wsPhotoOn').value,interval:document.getElementById('wsPhotoInterval').value,corner:document.getElementById('wsPhotoCorner').value,fit:document.getElementById('wsPhotoFit').value});
+    try {
+      var r=await fetch('/monitor/photos',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()}),d=await r.json();
+      if(!r.ok || d.status!=='ok')throw Error(d.message || 'Photo settings were not saved');
+      showToast('Photo settings saved.');
+    } catch(e){showToast(e.message);}
+    finally{button.disabled=false;}
+  };
+  picker.onchange=async function(){
+    var files=Array.prototype.slice.call(picker.files||[]);picker.disabled=true;
+    // One upload at a time: the panel answers one request at a time.
+    for(var i=0;i<files.length;i++){
+      var file=files[i];
+      if(!okName(file.name)){showToast('Skipped '+file.name+': use letters, digits, spaces, - _ ( ) and .jpg, .jpeg or .png');continue;}
+      state.textContent='Uploading '+file.name+' ('+(i+1)+' / '+files.length+')…';
+      try {
+        var data=new FormData();data.append('file',file,file.name);
+        var r=await fetch('/monitor/photos/upload',{method:'POST',body:data}),d=await r.json();
+        if(!r.ok || d.status!=='ok')throw Error(d.message || 'Upload failed');
+      } catch(e){showToast(file.name+': '+e.message);}
+    }
+    picker.value='';picker.disabled=false;load();
+  };
+  load();
 }
 function setupWs43bDisplaySettings(){
   var intro=document.querySelector('#sec-display .section-intro');
@@ -2505,6 +2575,7 @@ function setupWs43bPortal(){
   if (notes) notes.href = 'https://github.com/honzo90/BambuHelper/releases';
   var displaySection=document.getElementById('sec-display');if(displaySection)displaySection.classList.add('ws-display-settings');
   setupWs43bDisplaySettings();
+  setupWs43bPhotos();
   setupWs43bWeather();
   // Keep fields in the DOM because upstream form serializers address them
   // explicitly. Disable unsupported choices and explain them at the field.

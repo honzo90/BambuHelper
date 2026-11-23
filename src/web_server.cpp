@@ -40,6 +40,7 @@ void ws43bNoteWebRequest();
 #include "ws43b_hardware.h"
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
+#include "ws43b_photo.h"
 #include "ws43b_language.h"
 #include "ws43b_web_security.h"
 #include <lwip/sockets.h>
@@ -3610,6 +3611,7 @@ void initWebServer() {
   server.on("/monitor/display-mode", HTTP_GET, handleMonitorDisplayModeGet);
   server.on("/monitor/display-mode", HTTP_POST, handleMonitorDisplayModeSave);
   server.on("/diagnostics/frame", HTTP_GET, handleFrameCapture);
+  ws43bPhotoRegisterRoutes(server);
 #endif
   server.onNotFound(handleMonitorBlocked);
 #else
@@ -3630,6 +3632,7 @@ void initWebServer() {
   server.on("/monitor/display-mode", HTTP_GET, handleMonitorDisplayModeGet);
   server.on("/monitor/display-mode", HTTP_POST, handleMonitorDisplayModeSave);
   server.on("/diagnostics/frame", HTTP_GET, handleFrameCapture);
+  ws43bPhotoRegisterRoutes(server);
 #endif
   server.on("/save/gaugelayout", HTTP_POST, handleSaveGaugeLayout);
   server.on("/save/rotation", HTTP_POST, handleSaveRotation);

@@ -39,6 +39,7 @@
 #include "ws43b_water_clock.h"
 #include "ws43b_dashboard_policy.h"
 #include "ws43b_ota_status.h"
+#include "ws43b_photo.h"
 #include <WiFi.h>
 #include <stdio.h>
 #include <time.h>
@@ -1640,6 +1641,38 @@ void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &uni
   ws43b_drying_scene::draw(tft,720,292,40,now,ACCENT,TRACK,INK,bg);
   tft.clearClipRect();
 }
+#if WS43B_PHOTO_SAVER
+// Photo screensaver: the slide fills the screen (only when it changes); a
+// dimmed card in the chosen corner carries the time and, while printing, the
+// progress. Each minute only the card is copied from the slide again.
+void photoScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool print,bool fullFrame) {
+  const auto r=ws43b_photo::card(ws43bPhotoSettings().corner,print);
+  if(fullFrame)ws43bPhotoPush(0,0,800,480);
+  ws43bPhotoDimmedCard(r.x,r.y,r.w,r.h);
+  char text[ws43b_clock_flip::kTextMax+4];bool pm=false;
+  if(!clockTimeText(text,ws43b_clock_flip::kTextMax,pm))snprintf(text,sizeof(text),"--:--");
+  else if(!netSettings.use24h)strncat(text,pm?" PM":" AM",sizeof(text)-strlen(text)-1);
+  dashText(text,r.x+18,r.y+14,r.w-36,30,INK);
+  if(!print) {
+    struct tm date{};
+    char line[32]="";
+    if(getLocalTime(&date,5))strftime(line,sizeof(line),"%d.%m.%Y",&date);
+    dashText(line,r.x+18,r.y+58,r.w-36,18,DIM);
+    return;
+  }
+  const unsigned percent=m.progress.value>100?100u:unsigned(m.progress.value);
+  const int barW=r.w-36;
+  tft.fillRoundRect(r.x+18,r.y+60,barW,8,4,ws43b_native::mix(BG,TRACK,180));
+  if(percent)tft.fillRoundRect(r.x+18,r.y+60,barW*int(percent)/100<8?8:barW*int(percent)/100,8,4,v2Accent());
+  char line[48];
+  if(missing(m.remainingMinutes,online,now)==nullptr) {
+    const unsigned minutes=unsigned(m.remainingMinutes.value);
+    snprintf(line,sizeof(line),ws43bText("%u%% · zostało %uh %02um","%u%% · %uh %02um left","%u%% · noch %uh %02um"),percent,minutes/60,minutes%60);
+  } else snprintf(line,sizeof(line),"%u%%",percent);
+  dashText(line,r.x+18,r.y+80,r.w-36,18,INK);
+}
+#endif
+
 void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool partial = false) {
   const auto view=saverView(m,online,now);
   if(view==ws43b_view::Saver::Cooling){coolingScreen(m,online,now,partial);return;}
@@ -2245,6 +2278,40 @@ void renderWs43bMonitor(bool force) {
     const auto &state = displayedPrinter().state;
     const auto &m = state.monitor;
     const bool online = isWiFiConnected() && state.connected;
+#if WS43B_PHOTO_SAVER
+    {
+      // Photos replace the clock and print saver; pause, alerts and cooling
+      // keep their own screens.
+      static bool photoShown=false;static uint32_t photoRevision=0;static int photoLayout=-1;
+      static char previousPhotoKey[96]={};
+      const auto view=saverView(m,online,now);
+      const bool photoView=view==ws43b_view::Saver::Clock||view==ws43b_view::Saver::Print||view==ws43b_view::Saver::Waiting;
+      if(photoView && ws43bPhotoPrepare(now)) {
+        const bool print=view==ws43b_view::Saver::Print && clockHasProgress(m,online,now);
+        char timeText[ws43b_clock_flip::kTextMax];bool pm=false;
+        const bool timeValid=clockTimeText(timeText,sizeof(timeText),pm);
+        const bool remaining=missing(m.remainingMinutes,online,now)==nullptr;
+        char photoKey[96];
+        snprintf(photoKey,sizeof(photoKey),"%s/%d/%d/%u/%d/%u/%lu",timeValid?timeText:"-",pm,netSettings.use24h,
+                 print?unsigned(m.progress.value):0u,remaining,remaining?unsigned(m.remainingMinutes.value):0u,
+                 (unsigned long)ws43bLanguageRevision());
+        const int layout=int(print)|(int(ws43bPhotoSettings().corner)<<1);
+        const bool fullFrame=!reuseWater||!photoShown||photoRevision!=ws43bPhotoSlideRevision()||layout!=photoLayout;
+        waterCached=false;clockShown[0]=0;
+        if(!fullFrame && !strcmp(photoKey,previousPhotoKey))return;
+        tft.startWrite();
+        ws43b::beginRenderDiagnostics(fullFrame);
+        tft.unloadFont();tft.setTextSize(1);
+        photoScreen(m,online,now,print,fullFrame);
+        tft.endWrite();
+        ws43b::endRenderDiagnostics(true);
+        photoShown=true;photoRevision=ws43bPhotoSlideRevision();photoLayout=layout;
+        snprintf(previousPhotoKey,sizeof(previousPhotoKey),"%s",photoKey);
+        return;
+      }
+      photoShown=false;
+    }
+#endif
     const bool valid = saverView(m,online,now)==ws43b_view::Saver::Print && clockHasProgress(m,online,now);
     const auto activity=ws43b_view::activity(m,online,now,false);
     const bool cleaning=saverView(m,online,now)==ws43b_view::Saver::Print && activity==ws43b_view::Activity::Cleaning;
