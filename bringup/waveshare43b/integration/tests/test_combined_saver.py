@@ -79,7 +79,7 @@ auto saverView(const BambuMonitorTelemetry&m,bool online,uint32_t now){return ws
         case = r'''
 bool has(const char*s){for(auto&t:texts)if(t.find(s)!=std::string::npos)return true;return false;}
 bool exact(const char*s){for(auto&t:texts)if(t==s)return true;return false;}
-bool dual(){for(auto&r:clears)if(r.x==680&&r.y==262)return true;return false;}
+bool dual(){for(auto&r:clears)if(r.x==672&&r.y==250)return true;return false;}
 void render(BambuMonitorTelemetry&m,bool online,uint32_t now,bool partial=false){texts.clear();clears.clear();printingAnimations=0;clockScreen(m,online,now,partial);}
 void cleaningPhase(uint32_t started,uint32_t now,bool combined){
  BambuMonitorTelemetry m;m.status.set("RUNNING",now);m.printStage.set(14,now);m.layerNum.set(0,now);
@@ -106,7 +106,7 @@ void runMode(){
  BambuMonitorTelemetry m;m.status.set("RUNNING",100);m.progress.set(68,100);m.remainingMinutes.set(92,100);
  auto&u=m.amsUnits[0];u.used=true;u.id=128;u.dryRemainMin.set(150,100);u.temp.set(55,100);u.humidityRaw.set(14,100);
  render(m,true,100);assert(dual()&&has("68%")&&has("1 h 32 min")&&has("2 h 30 min")&&has("55°C · 14% RH")&&has("AMS 128"));
- render(m,true,101,true);assert(dual()&&texts.empty());for(auto&r:clears)assert(r.y>=258&&r.y+r.h<=362);
+ render(m,true,101,true);assert(dual()&&texts.empty());for(auto&r:clears)assert(r.y>=250&&r.y+r.h<=362);
  m.progress.invalidate(100);render(m,true,100);assert(dual()&&has("--%")&&has("2 h 30 min"));m.progress.set(68,100);
  m.status.set("PREPARE",100);render(m,true,100);assert(dual()&&has("PRZYGOTOWANIE")&&!has("DRUKOWANIE"));m.status.set("RUNNING",100);
  // The saver displays the unchanged MQTT percentage before and after layer 1.

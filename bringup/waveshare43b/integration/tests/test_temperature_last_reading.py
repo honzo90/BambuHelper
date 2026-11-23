@@ -36,7 +36,7 @@ namespace lgfx { using rgb565_t=uint16_t; }
 struct{int displayIndex=0;}rotState;
 constexpr int BG=0x0084,CARD=1,INK=2,DIM=3,WARN=4,ACCENT=5,TRACK=6;
 constexpr uint8_t ws43b_v2_12[]={0},ws43b_v2_b29[]={0};
-uint16_t v2Ink(){return INK;}uint16_t v2Dim(){return DIM;}
+uint16_t v2Ink(){return INK;}uint16_t v2Dim(){return DIM;}uint16_t v2Accent(){return ACCENT;}
 const char* ws43bText(const char*p,const char*,const char* = nullptr){return p;}
 struct Text{std::string value;int color;};std::vector<Text> text;
 int top=66;
@@ -49,6 +49,8 @@ struct Canvas {
  void point(int x,int y){assert(x>=528&&x<784&&y>=top&&y<top+74);++pixels;}
  void drawFastHLine(int x,int y,int w,uint16_t){for(int i=0;i<w;++i)point(x+i,y);}
  void drawRoundRect(int x,int y,int w,int h,int,uint16_t){point(x,y);point(x+w-1,y+h-1);}
+ void fillRoundRect(int x,int y,int w,int h,int,uint16_t){point(x,y);point(x+w-1,y+h-1);}
+ void fillCircle(int x,int y,int r,uint16_t){point(x-r,y-r);point(x+r,y+r);}
  void pushImage(int x,int y,int w,int h,const lgfx::rgb565_t*){
   for(int row=0;row<h;++row)for(int i=0;i<w;++i)point(x+i,y+row);
  }
@@ -60,7 +62,7 @@ bool has(const char*s,int color=-1){for(auto &v:text)if(v.value.find(s)!=std::st
 int main(){
  BambuMonitorTelemetry m;m.nozzleTemp.set(250,100);m.nozzleTarget.set(250,100);
  dashboardTemperature(0,66,"DYSZA",m.nozzleTemp,m.nozzleTarget,true,100);
- assert(has("250°C",INK)&&has("Cel 250°")&&!has("temu"));
+ assert(has("250°C",INK)&&has("· cel 250°")&&!has("temu"));
  text.clear();dashboardTemperature(0,66,"DYSZA",m.nozzleTemp,m.nozzleTarget,true,240100);
  assert(has("250°C",DIM)&&has("4 min temu",WARN)&&has("cel 250° stary",WARN));assert(!has("Stabilna")&&!has("Nagrzewanie"));
  assert(m.nozzleTemp.updatedMs==100&&m.nozzleTarget.updatedMs==100&&!m.nozzleTemp.fresh(240100));
@@ -72,12 +74,12 @@ int main(){
  // A validated related delta can retain the unchanged target, preserving its age.
  m.retainCore(240100);
  text.clear();dashboardTemperature(0,66,"DYSZA",m.nozzleTemp,m.nozzleTarget,true,240100);
- assert(has("245°C",INK)&&has("Cel 250°")&&!has("temu")&&!has("nieaktualny"));
+ assert(has("245°C",INK)&&has("· cel 250°")&&!has("temu")&&!has("nieaktualny"));
  assert(m.nozzleTarget.updatedMs==100&&!m.nozzleTarget.fresh(240100));
  m.nozzleTemp.set(250,100);
  text.clear();dashboardTemperature(0,66,"DYSZA",m.nozzleTemp,m.nozzleTarget,false,240100);assert(has("offline")&&has("250°C",DIM));
  text.clear();m.nozzleTemp.set(0,240101);m.nozzleTarget.set(0,240101);
- dashboardTemperature(0,66,"DYSZA",m.nozzleTemp,m.nozzleTarget,true,240101);assert(has("0°C",INK)&&has("Cel 0°"));
+ dashboardTemperature(0,66,"DYSZA",m.nozzleTemp,m.nozzleTarget,true,240101);assert(has("0°C",INK)&&has("· cel 0°"));
  text.clear();m.nozzleTemp.invalidate(240102);m.nozzleTarget.invalidate(240102);
  dashboardTemperature(0,66,"DYSZA",m.nozzleTemp,m.nozzleTarget,true,240102);assert(has("--")&&!has("0°C")&&has("Brak danych"));
  char layers[160];m.layerNum.set(221,240100);m.totalLayers.set(291,100);
@@ -92,6 +94,10 @@ int main(){
   assert(has(channel?"1000°C":"-273°C",INK));
  }
  assert(tft.pixels>0);
+ // The chamber has no target: it says so instead of a generic caption.
+ top=234;text.clear();m.chamberTemp.set(41,240103);MonitorField<float> none;
+ dashboardTemperature(2,top,"KOMORA",m.chamberTemp,none,true,240103);
+ assert(has("41°C",INK)&&has("Bez celu · odczyt"));
 }
 '''
         )

@@ -77,6 +77,7 @@ struct Canvas {
       fillRect(x+column,y+row,1,1,data[row*w+column]);
   }
   void fillRoundRect(int x,int y,int w,int h,int,int color){fillRect(x,y,w,h,color);}
+  void fillCircle(int x,int y,int r,int color){fillRect(x-r,y-r,2*r+1,2*r+1,color);}
   void drawFastHLine(int x,int y,int w,int color){fillRect(x,y,w,1,color);}
   void drawFastVLine(int x,int y,int h,int color){fillRect(x,y,1,h,color);}
   void drawRoundRect(int x,int y,int w,int h,int,int color) {
@@ -315,13 +316,14 @@ int main(){
   {
     // Simple Wydruk uses actual MQTT progress, including 0% before layer 1,
     // while retaining the thermal/AMS cards and native animation region.
+    // It shows the layer counter once known, but never the material line.
     advancedDisplay=false;
     Scenario s(View::Dashboard);s.draw(All);
     assert(has("DYSZA")&&has("STÓŁ")&&has("KOMORA")&&has("PETG"));
-    assert(!has("Warstwa")&&!has("Materiał")&&!has("AMS 1 / 2"));
+    assert(!has("Materiał")&&!has("AMS 1 / 2"));
     s.m.layerNum.set(0,s.now);s.m.progress.set(0,s.now);s.update();
     assert(exact("0")&&exact("%")&&!has("Przed pierwszą"));
-    assert(!has("Warstwa")&&!has("Materiał")&&!has("AMS 1 / 2"));s.equivalent();
+    assert(has("Warstwa 0 /")&&!has("Materiał")&&!has("AMS 1 / 2"));s.equivalent();
     const auto progressTime=s.m.progress.updatedMs;
     for(int stage:{14,1,51,0}) {
       s.m.printStage.set(stage,s.now);s.update();
@@ -329,7 +331,7 @@ int main(){
       // can leave the generic status wording unchanged in simple mode.
       s.draw(regionBit(Region::Primary));
       assert(exact("0")&&exact("%")&&s.m.progress.updatedMs==progressTime);
-      assert(!has("Warstwa")&&!has("Materiał")&&!has("AMS 1 / 2"));s.equivalent();
+      assert(has("Warstwa 0 /")&&!has("Materiał")&&!has("AMS 1 / 2"));s.equivalent();
     }
     s.m.progress.set(1,s.now);s.update();assert(exact("1")&&exact("%"));s.equivalent();
     s.m.status.set("PREPARE",s.now);s.update();assert(exact("1")&&exact("%"));s.equivalent();

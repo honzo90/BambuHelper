@@ -26,6 +26,8 @@ class DetailsLastReading(unittest.TestCase):
         code = (
             r'''
 #include "bambu_monitor_parser.h"
+#include "ws43b_dashboard_policy.h"
+#include <ctime>
 #include <cassert>
 #include <cstdio>
 #include <string>
@@ -39,6 +41,8 @@ struct Text{std::string value;int x,y,color;};std::vector<Text> texts;
 struct Bar{int x,y,w,h,color;};std::vector<Bar> bars;
 void dashText(const char*s,int x,int y,int,int,int color){texts.push_back({s,x,y,color});}
 void button(const char*,int,int,int,int,bool){}
+// No synced clock in the fixture: the job line omits the expected end.
+bool getLocalTime(struct tm*,int){return false;}
 struct Canvas {
  template<class... A>void fillRoundRect(A...){}
  void fillRect(int x,int y,int w,int h,int color){bars.push_back({x,y,w,h,color});}

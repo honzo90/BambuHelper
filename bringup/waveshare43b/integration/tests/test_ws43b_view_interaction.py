@@ -140,49 +140,51 @@ int main() {
   page=Page::Dashboard;tap(p.x,p.y);assert(page==Page::Dashboard && hmsOpens==0);
  }
 #if WS43B_FULL_WEBUI
- for(const auto p:{TapPoint{216,0},{220,31},{239,55}}) {
+ // The renderer records the status pill; it is the HMS tap target on every page.
+ headerPillX=200;headerPillW=60;
+ for(const auto p:{TapPoint{200,0},{220,31},{259,55}}) {
   page=Page::Dashboard;const auto before=hmsOpens;
   tap(p.x,p.y);assert(hmsOpen&&hmsOpens==before+1);
   tap(606,35);assert(!hmsOpen&&page==Page::Dashboard); // Dismiss only.
   tap(606,35);assert(page==Page::Clock&&hmsOpens==before+1);
  }
- for(const auto p:{TapPoint{240,35},{220,56},{220,66}}) {
+ for(const auto p:{TapPoint{260,35},{220,56},{220,66}}) {
   page=Page::Dashboard;const auto before=hmsOpens;
   tap(p.x,p.y);assert(!hmsOpen&&hmsOpens==before&&page==Page::Dashboard);
  }
  // Enable a second configured printer only for selector boundary checks.
  configuredSecond=true;
- for(const auto p:{TapPoint{0,0},{100,35},{215,55}}) {
+ for(const auto p:{TapPoint{0,0},{100,35},{199,55}}) {
   page=Page::Dashboard;rotState.displayIndex=0;
   tap(p.x,p.y);assert(rotState.displayIndex==1&&page==Page::Dashboard);
  }
- for(const auto p:{TapPoint{215,56},{20,66},{100,80},{200,120},{430,35}}) {
+ for(const auto p:{TapPoint{199,56},{20,66},{100,80},{200,120},{430,35}}) {
   page=Page::Dashboard;rotState.displayIndex=0;
   tap(p.x,p.y);assert(rotState.displayIndex==0&&page==Page::Dashboard);
  }
- // Other pages retain their original header regions, including y=66..79.
+ // Menus share the header row; their selector band still reaches y=79.
  for(Page destination:{Page::Ams,Page::Details,Page::Settings}) {
-  for(const auto p:{TapPoint{0,0},{100,66},{439,79}}) {
+  for(const auto p:{TapPoint{0,0},{100,66},{199,79}}) {
    page=destination;rotState.displayIndex=0;
    tap(p.x,p.y);assert(rotState.displayIndex==1&&page==destination);
   }
-  for(const auto p:{TapPoint{440,35},{100,80},{606,35}}) {
+  for(const auto p:{TapPoint{440,35},{100,80},{260,35}}) {
    page=destination;rotState.displayIndex=0;
    tap(p.x,p.y);assert(rotState.displayIndex==0&&page==destination);
   }
-  for(const auto p:{TapPoint{658,0},{672,37},{689,65}}) {
+  for(const auto p:{TapPoint{200,0},{230,37},{259,65}}) {
    page=destination;const auto before=hmsOpens;
    tap(p.x,p.y);assert(hmsOpen&&hmsOpens==before+1&&page==destination);
    tap(700,35);assert(!hmsOpen&&page==destination);
   }
  }
- configuredSecond=false;rotState.displayIndex=0;
+ configuredSecond=false;rotState.displayIndex=0;headerPillX=headerPillW=0;
 #endif
  for(Page destination:{Page::Ams,Page::Details,Page::Settings}) {
-  for(const auto p:{TapPoint{690,0},{740,35},{799,65}}) {
+  for(const auto p:{TapPoint{606,35},{700,0},{740,35},{799,65}}) {
    page=destination;tap(p.x,p.y);assert(page==Page::Clock);
   }
-  for(const auto p:{TapPoint{690,66},{740,70},{606,35}}) {
+  for(const auto p:{TapPoint{690,66},{740,70},{694,35}}) {
    page=destination;tap(p.x,p.y);assert(page==destination);
   }
  }
