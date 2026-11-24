@@ -90,7 +90,18 @@ int main(){
   // Dimming keeps black black, darkens white, and rounds card corners.
   assert(dim(0xFFFF,0)==0xFFFF&&dim(0xFFFF,160)<0xFFFF&&dim(0x0000,256)==dim(0x1234,256));
   assert(!insideRounded(0,0,100,50,14)&&insideRounded(14,0,100,50,14)&&insideRounded(50,25,100,50,14));
-  puts("PASS: photo names, limits, JPEG/PNG headers, zoom, settings, slideshow and card");
+  // Full repaint only when the canvas no longer holds the picture.
+  Canvas canvas;assert(fullFrame(canvas,false,1,0,10));
+  canvas.shown=true;canvas.revision=1;canvas.layout=0;canvas.frames=10;
+  assert(!fullFrame(canvas,false,1,0,10));                 // nothing changed: card/minute only
+  assert(fullFrame(canvas,true,1,0,10));                   // explicit redraw
+  assert(fullFrame(canvas,false,2,0,10));                  // new slide
+  assert(fullFrame(canvas,false,1,1,10));                  // card moved / print started
+  assert(fullFrame(canvas,false,1,0,11));                  // something else rendered
+  // A single unchanged picture is decoded once.
+  assert(decodeDue(false,1,0,0)&&!decodeDue(true,1,3,3)&&decodeDue(true,1,4,3)&&decodeDue(true,2,3,3));
+  assert(kScreenH%kPushBandRows==0);
+  puts("PASS: photo names, limits, JPEG/PNG headers, zoom, settings, slideshow, card and repaint");
 }
 '''
 

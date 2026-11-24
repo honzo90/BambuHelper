@@ -165,6 +165,29 @@ struct Slideshow {
   }
 };
 
+// What the photo screensaver last left on the canvas. A full repaint copies
+// 768 KB PSRAM -> PSRAM and then presents all 480 rows; repeated bursts like
+// that disturb the RGB scan-out (visible flicker mid-screen), so the whole
+// picture is repainted only when the canvas no longer holds it.
+struct Canvas {
+  bool shown = false;
+  uint32_t revision = 0;  // slide revision on the canvas
+  int layout = -1;        // card corner and size
+  uint32_t frames = 0;    // render counter right after our last frame
+};
+// framesNow differs from c.frames when anything else rendered in between
+// (another page, an overlay); force is an explicit redraw request.
+inline bool fullFrame(const Canvas &c, bool force, uint32_t revision, int layout, uint32_t framesNow) {
+  return force || !c.shown || c.revision != revision || c.layout != layout || c.frames != framesNow;
+}
+// The only picture, unchanged on the card, is decoded once, not every interval.
+inline bool decodeDue(bool slideReady, uint16_t count, uint32_t listRevision, uint32_t decodedRevision) {
+  return !slideReady || count != 1 || listRevision != decodedRevision;
+}
+// Rows per band when copying the slide to the canvas; a short pause between
+// bands leaves PSRAM bandwidth to the scan-out.
+constexpr int kPushBandRows = 48;
+
 struct Rect {
   int x, y, w, h;
 };

@@ -40,6 +40,9 @@ uint16_t count = 0;
 lgfx::LGFX_Sprite *slide = nullptr;
 bool slideReady = false;
 uint32_t revision = 0;
+// Bumped when the set of pictures may have changed (upload, delete, a
+// different list after a rescan); one unchanged picture is decoded once.
+uint32_t listRevision = 0, decodedListRevision = 0, listHash = 0;
 Slideshow show;
 
 void unmount() {
@@ -106,6 +109,13 @@ void scan(uint32_t now) {
   dir.close();
   qsort(names, count, kNameMax,
         [](const void *a, const void *b) { return strcmp(static_cast<const char *>(a), static_cast<const char *>(b)); });
+  uint32_t hash = 2166136261u;  // FNV-1a over the sorted names
+  for (uint16_t i = 0; i < count; ++i)
+    for (const char *c = names[i]; *c; ++c) hash = (hash ^ uint8_t(*c)) * 16777619u;
+  if (hash != listHash) {
+    listHash = hash;
+    ++listRevision;
+  }
   Serial.printf("PHOTO list: %u file(s) in %s\n", unsigned(count), DIR);
 }
 
@@ -239,6 +249,7 @@ void handleDelete(WebServer &server) {
     return;
   }
   listDirty = true;
+  ++listRevision;
   sendStatus(server, 200, nullptr);
 }
 
@@ -319,6 +330,7 @@ void handleUpload(WebServer &server) {
     }
     uploadOk = true;
     listDirty = true;
+    ++listRevision;  // same name replaced: the content changed
     Serial.printf("PHOTO upload %s %lu bytes\n", uploadName, (unsigned long)uploadBytes);
   } else if (upload.status == UPLOAD_FILE_ABORTED) {
     if (uploadFile) dropUpload(ws43bText("Przesyłanie przerwane.", "Upload interrupted.", "Hochladen abgebrochen."));
@@ -354,7 +366,10 @@ bool saveWs43bPhotoSettings(const Settings &next) {
   const bool redecode = next.fill != settings.fill;
   settings = next;
   if (!settings.enabled) ws43bPhotoRelease();
-  else if (redecode) show = Slideshow{};  // show the current picture again, rescaled
+  else if (redecode) {  // show the current picture again, rescaled
+    show = Slideshow{};
+    slideReady = false;
+  }
   return true;
 }
 
@@ -371,6 +386,10 @@ bool ws43bPhotoPrepare(uint32_t now) {
   }
   if (!allocate()) return false;
   if (show.due(now, kIntervals[settings.interval & 3])) {
+    if (!decodeDue(slideReady, count, listRevision, decodedListRevision)) {
+      show.shown(now);
+      return true;
+    }
     bool decoded = false;
     for (unsigned attempt = 0; attempt < 3 && attempt < count && !decoded; ++attempt) {
       const uint16_t index = show.next(count);
@@ -380,6 +399,7 @@ bool ws43bPhotoPrepare(uint32_t now) {
     }
     if (decoded) {
       slideReady = true;
+      decodedListRevision = listRevision;
       ++revision;
     } else if (SD.cardType() == CARD_NONE) {
       unmount();
@@ -394,9 +414,15 @@ uint32_t ws43bPhotoSlideRevision() { return revision; }
 
 void ws43bPhotoPush(int x, int y, int w, int h) {
   if (!slide || !slideReady) return;
-  tft.setClipRect(x, y, w, h);
-  slide->pushSprite(tft_ptr, 0, 0);
-  tft.clearClipRect();
+  // In bands with a 1 ms pause: the canvas is presented only at endWrite(),
+  // so the pauses are invisible, and the scan-out gets PSRAM bandwidth.
+  for (int top = y; top < y + h; top += kPushBandRows) {
+    const int rows = y + h - top < kPushBandRows ? y + h - top : kPushBandRows;
+    tft.setClipRect(x, top, w, rows);
+    slide->pushSprite(tft_ptr, 0, 0);
+    tft.clearClipRect();
+    if (top + rows < y + h) delay(1);
+  }
 }
 
 void ws43bPhotoDimmedCard(int x, int y, int w, int h) {

@@ -2282,7 +2282,7 @@ void renderWs43bMonitor(bool force) {
     {
       // Photos replace the clock and print saver; pause, alerts and cooling
       // keep their own screens.
-      static bool photoShown=false;static uint32_t photoRevision=0;static int photoLayout=-1;
+      static ws43b_photo::Canvas photoCanvas;
       static char previousPhotoKey[96]={};
       const auto view=saverView(m,online,now);
       const bool photoView=view==ws43b_view::Saver::Clock||view==ws43b_view::Saver::Print||view==ws43b_view::Saver::Waiting;
@@ -2296,7 +2296,10 @@ void renderWs43bMonitor(bool force) {
                  print?unsigned(m.progress.value):0u,remaining,remaining?unsigned(m.remainingMinutes.value):0u,
                  (unsigned long)ws43bLanguageRevision());
         const int layout=int(print)|(int(ws43bPhotoSettings().corner)<<1);
-        const bool fullFrame=!reuseWater||!photoShown||photoRevision!=ws43bPhotoSlideRevision()||layout!=photoLayout;
+        // Not !reuseWater: print-stage changes clear "painted" without
+        // touching this page, and each full repaint is a long PSRAM burst.
+        const bool fullFrame=ws43b_photo::fullFrame(photoCanvas,force,ws43bPhotoSlideRevision(),layout,
+                                                    ws43b::renderDiagnostics().frames);
         waterCached=false;clockShown[0]=0;
         if(!fullFrame && !strcmp(photoKey,previousPhotoKey))return;
         tft.startWrite();
@@ -2305,11 +2308,11 @@ void renderWs43bMonitor(bool force) {
         photoScreen(m,online,now,print,fullFrame);
         tft.endWrite();
         ws43b::endRenderDiagnostics(true);
-        photoShown=true;photoRevision=ws43bPhotoSlideRevision();photoLayout=layout;
+        photoCanvas={true,ws43bPhotoSlideRevision(),layout,ws43b::renderDiagnostics().frames};
         snprintf(previousPhotoKey,sizeof(previousPhotoKey),"%s",photoKey);
         return;
       }
-      photoShown=false;
+      photoCanvas.shown=false;
     }
 #endif
     const bool valid = saverView(m,online,now)==ws43b_view::Saver::Print && clockHasProgress(m,online,now);
