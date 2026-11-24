@@ -17,9 +17,10 @@ class PclkChoices(unittest.TestCase):
         assertion = assertion[: assertion.index(';')]
         panel_values = {int(v) for v in re.findall(r'== (\d+)', assertion)}
         self.assertEqual(build_values, panel_values)
-        self.assertEqual(build_values, {12000000, 14000000, 16000000, 18000000, 20000000})
+        self.assertEqual(build_values, {12000000, 14000000, 16000000, 18000000})
         default = re.search(r"WS43B_RGB_PCLK_HZ', '(\d+)'", build).group(1)
-        self.assertEqual(default, '16000000')
+        self.assertEqual(default, '18000000')
+        self.assertIn('#define WS43B_RGB_PCLK_HZ 18000000', panel)
 
 
 if __name__ == '__main__':

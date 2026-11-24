@@ -29,12 +29,13 @@
 #endif
 
 #ifndef WS43B_RGB_PCLK_HZ
-#define WS43B_RGB_PCLK_HZ 16000000
+#define WS43B_RGB_PCLK_HZ 18000000
 #endif
-// 16 MHz is the manufacturer value; 18/20 MHz are physical flicker trials.
+// 18 MHz (~44 Hz) chosen on the panel: 12 MHz flickered with bright photos,
+// 16 MHz is the manufacturer value, 20 MHz showed noise (PSRAM scan-out).
 static_assert(WS43B_RGB_PCLK_HZ == 12000000 || WS43B_RGB_PCLK_HZ == 14000000 ||
-              WS43B_RGB_PCLK_HZ == 16000000 || WS43B_RGB_PCLK_HZ == 18000000 ||
-              WS43B_RGB_PCLK_HZ == 20000000, "Unsupported WS43B PCLK experiment");
+              WS43B_RGB_PCLK_HZ == 16000000 || WS43B_RGB_PCLK_HZ == 18000000,
+              "Unsupported WS43B PCLK");
 
 namespace {
 esp_panel::board::Board board;

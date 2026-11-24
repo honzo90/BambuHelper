@@ -173,10 +173,11 @@ def main():
     memory_diag = os.environ.get('WS43B_MEMORY_DIAG', '0')
     if memory_diag not in ('0', '1'):
         raise SystemExit('WS43B_MEMORY_DIAG must be 0 or 1.')
-    pclk_hz = os.environ.get('WS43B_RGB_PCLK_HZ', '16000000')
-    # 18/20 MHz: physical trials for less flicker (~44/49 Hz refresh).
-    if pclk_hz not in ('12000000', '14000000', '16000000', '18000000', '20000000'):
-        raise SystemExit('WS43B_RGB_PCLK_HZ must be 12000000, 14000000, 16000000, 18000000 or 20000000.')
+    pclk_hz = os.environ.get('WS43B_RGB_PCLK_HZ', '18000000')
+    # 18 MHz (~44 Hz) is the default: 12 MHz (~29 Hz) made bright pictures
+    # flicker, 20 MHz showed noise on the panel (PSRAM scan-out limit).
+    if pclk_hz not in ('12000000', '14000000', '16000000', '18000000'):
+        raise SystemExit('WS43B_RGB_PCLK_HZ must be 12000000, 14000000, 16000000 or 18000000.')
     if git('rev-parse', 'HEAD') != REF_COMMIT or git('status', '--porcelain'):
         raise SystemExit('Manufacturer reference must be clean at the recorded commit.')
     profile = configparser.ConfigParser(interpolation=None)

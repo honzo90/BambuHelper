@@ -60,12 +60,12 @@ and saved settings; a complete first installation of v4.1.0 was confirmed on a
 ## Release builds
 
 Releases use **Arduino ESP32 3.3.11**, **ESP-IDF 5.5.5**, the rebuilt
-**cache64_xip** SDK and a **16 MHz** requested RGB PCLK (~39 Hz refresh; up to v4.1.1-beta.6 12 MHz, ~29 Hz, which made bright pictures flicker). Each release's
+**cache64_xip** SDK and a **18 MHz** requested RGB PCLK (~44 Hz refresh; up to v4.1.1-beta.6 12 MHz, ~29 Hz, which made bright pictures flicker; 20 MHz showed noise). Each release's
 `BUILD-INFO.json` records the exact source commit, SDK provenance, configuration
 and validation results. Reproduction requires the separately prepared XIP SDK,
 its matching manifest and SHA-256 (`WS43B_XIP_SDK_MANIFEST`,
 `WS43B_XIP_SDK_MANIFEST_SHA256`), `WS43B_SDK_PROFILE=cache64_xip` and
-`WS43B_RGB_PCLK_HZ=16000000`; the default cache64 build does not reproduce a
+`WS43B_RGB_PCLK_HZ=18000000`; the default cache64 build does not reproduce a
 release. From v4.1.1 the SDK additionally enables `CONFIG_LCD_RGB_ISR_IRAM_SAFE`
 (declared as `rgb_isr_iram_safe` in its manifest). The build fails if a local
 filesystem path would end up in the image.
