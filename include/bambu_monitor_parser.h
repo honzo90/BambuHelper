@@ -307,8 +307,11 @@ inline bool parse(const uint8_t* payload, size_t length, BambuMonitorTelemetry& 
   useful |= mergeLegacyFan(print, "heatbreak_fan_speed", m.heatbreakFanPct, heatbreakRounded, now);
   // Apply leases only from validated live data, before AMS/metadata can make
   // the report useful. No value or actual observation timestamp is fabricated.
-  if (jobData) m.retainJob(now);
-  if (useful) m.retainCore(now);
+  if (jobData) m.observeJob(now);
+  if (useful) {
+    m.retainCore(now);
+    m.retainJobWithinGrace(now);
+  }
   useful |= metadata;
   useful |= mergeAms(print["ams"].as<JsonObjectConst>(), m, now);
   // Resolve after AMS so a snow delta wins even if the same report includes

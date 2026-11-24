@@ -1,4 +1,4 @@
-"""Exercise production header patches and icon animation for both header layouts."""
+"""Exercise production header patches and icon animation on the shared header row."""
 
 from pathlib import Path
 import subprocess, tempfile, unittest
@@ -41,12 +41,12 @@ bool dashboardWeatherNight(const ws43b_weather::Data&){return false;}
 constexpr int BG=0x0084,INK=0xf7be,WARN=0xf5cb,DIM=0x9d34,FONT_NONE=0;
 uint16_t v2Ink(){return INK;}uint16_t v2Dim(){return DIM;}
 std::string label;int labelColor=0;
-void dashText(const char*s,int x,int y,int w,int size,int color){
- assert(page!=Page::Dashboard&&x==563&&y==24&&w==94&&size==24);label=s;labelColor=color;
-}
+// Every page shares the dashboard header row; menus only shift it down.
+int headerOffset(){return page==Page::Dashboard?0:7;}
 int v2Text(const char*s,int x,int y,int w,const uint8_t *font,int size,int color,bool right,bool fit){
- assert(page==Page::Dashboard&&x==646&&w==48&&right&&!fit);
- assert((font==ws43b_v2_b17&&size==17&&y==22)||(font==ws43b_v2_b14&&size==14&&y==24));
+ assert(x==646&&w==48&&right&&!fit);
+ const int dy=headerOffset();
+ assert((font==ws43b_v2_b17&&size==17&&y==22+dy)||(font==ws43b_v2_b14&&size==14&&y==24+dy));
  label=s;labelColor=color;return 0;
 }
 template<class C>void setFont(C&,int){}
@@ -55,7 +55,7 @@ struct Canvas {
  std::set<std::pair<int,int>> pixels;
  std::array<uint16_t,800*480> image{};
  void setClipRect(int x,int y,int w,int h){
-  assert(!clipped&&x==(page==Page::Dashboard?606:525)&&y==(page==Page::Dashboard?11:16)&&w==36&&h==36);
+  assert(!clipped&&x==606&&y==11+headerOffset()&&w==36&&h==36);
   left=x;top=y;clipped=true;
  }
  void fillRect(int x,int y,int w,int h,int color){

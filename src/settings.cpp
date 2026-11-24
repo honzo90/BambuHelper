@@ -12,6 +12,7 @@
 #include "ws43b_weather.h"
 #include "ws43b_clock_settings.h"
 #include "ws43b_display_mode.h"
+#include "ws43b_photo.h"
 #include "ws43b_language.h"
 #endif
 #include <Preferences.h>
@@ -1008,6 +1009,7 @@ void loadSettings() {
   loadWs43bDisplayMode();
   loadWs43bWeather();
   loadWs43bLanguage();
+  loadWs43bPhotoSettings();
 #endif
 }
 

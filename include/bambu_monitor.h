@@ -11,6 +11,13 @@
 // Retention is session-local inference, not a new measurement; both expire on
 // silence and callers must still gate current() with the connection state.
 constexpr uint32_t BAMBU_MONITOR_FRESH_MS = 60000;
+// Reports are deltas: progress, layer and remaining time arrive only when they
+// change - remaining time about once a minute, a layer can take longer. While
+// live core data (temperatures, fans) keeps arriving, the job fields stay
+// current for this long after the last actual job observation, so a delta a
+// second late does not flash "outdated". A dropped delta (cloud) still
+// expires: at most this plus BAMBU_MONITOR_FRESH_MS after the last job report.
+constexpr uint32_t BAMBU_MONITOR_JOB_GRACE_MS = 120000;
 template <typename T> struct MonitorField {
   T value{};
   bool valid = false;
@@ -104,9 +111,16 @@ struct BambuMonitorTelemetry {
     status.retain(now); printStage.retain(now); progress.retain(now);
     layerNum.retain(now); remainingMinutes.retain(now);
   }
+  bool jobObserved = false;
+  uint32_t lastJobMs = 0;  // last report that carried a job field
+  void observeJob(uint32_t now) { jobObserved = true; lastJobMs = now; retainJob(now); }
+  // Live core traffic renews the job stream only within the grace period.
+  void retainJobWithinGrace(uint32_t now) {
+    if (jobObserved && uint32_t(now - lastJobMs) <= BAMBU_MONITOR_JOB_GRACE_MS) retainJob(now);
+  }
   void retainCore(uint32_t now) {
     // Temperatures/fans may stay constant and disappear from partial reports.
-    // They cannot renew job status/progress: that requires actual job traffic.
+    // On their own they renew job status/progress only within the job grace.
     subtaskName.retain(now); totalLayers.retain(now);
     nozzleTemp.retain(now); nozzleTarget.retain(now);
     bedTemp.retain(now); bedTarget.retain(now); chamberTemp.retain(now);

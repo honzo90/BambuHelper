@@ -17,6 +17,9 @@ uint32_t requestedPclkHz();
 uint32_t dcacheLineBytes();
 // CH422G is a switch, not a PWM dimmer: 0 = off, all other values = on.
 bool setBacklight(uint8_t brightness);
+// TF card chip select is CH422G EXIO4 (active low), reached through the BSP
+// expander; the card is the only device on its SPI bus, so it stays selected.
+bool selectSdCard();
 // Main-loop OTA lifecycle: hide scanout while Flash writes disable caches.
 bool beginOtaDisplay();
 void endOtaDisplay();

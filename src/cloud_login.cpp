@@ -8,7 +8,7 @@
 
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include <esp_task_wdt.h>
+#include "task_watchdog.h"
 #if BOARD_MQTT_ASYNC_CONNECT
 #include <atomic>
 #include <freertos/FreeRTOS.h>
@@ -182,13 +182,13 @@ static bool cloudRequest(const char* host, const char* path, const char* method,
   tls->setCACertBundle(rootca_crt_bundle_start);
 #endif
 
-  if (feedWatchdog) esp_task_wdt_reset();
+  if (feedWatchdog) feedTaskWatchdog();
 #if defined(BOARD_IS_WS43B)
   bool connected = tls->connect(host, 443, 5000); // separate TCP/socket timeout
 #else
   bool connected = tls->connect(host, 443);
 #endif
-  if (feedWatchdog) esp_task_wdt_reset();          // the handshake itself can eat several seconds
+  if (feedWatchdog) feedTaskWatchdog();          // the handshake itself can eat several seconds
   if (!connected) {
     delete tls;
     out.status = -1;
@@ -210,13 +210,13 @@ static bool cloudRequest(const char* host, const char* path, const char* method,
   const auto result = sent ? cloud_http::readResponse(*tls, out.status,
     out.setCookies, out.body, maxBody,
     [] { return uint32_t(millis()); },
-    [feedWatchdog] { if (feedWatchdog) esp_task_wdt_reset(); delay(1); })
+    [feedWatchdog] { if (feedWatchdog) feedTaskWatchdog(); delay(1); })
     : cloud_http::Result::Disconnected;
   out.truncated = result != cloud_http::Result::Complete;
 
   tls->stop();
   delete tls;
-  if (feedWatchdog) esp_task_wdt_reset();
+  if (feedWatchdog) feedTaskWatchdog();
 
   // Never commit cookies or parse an incomplete/malformed token response.
   const bool complete = result == cloud_http::Result::Complete;

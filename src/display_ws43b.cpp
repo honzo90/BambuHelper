@@ -39,6 +39,7 @@
 #include "ws43b_water_clock.h"
 #include "ws43b_dashboard_policy.h"
 #include "ws43b_ota_status.h"
+#include "ws43b_photo.h"
 #include <WiFi.h>
 #include <stdio.h>
 #include <time.h>
@@ -93,6 +94,8 @@ bool navigationShown(uint32_t now) {
 bool touchHeld = false, touchMoved = false, touchNeedsRelease = false;
 uint16_t pressX = 0, pressY = 0;
 uint32_t pressMs = 0;
+// Header status pill bounds; the pill is the tap target for printer messages (HMS).
+int headerPillX = 0, headerPillW = 0;
 bool systemTouchArea(uint16_t x,uint16_t y) { return x>=660 && x<776 && y>=82 && y<124; }
 const char *settingsNotice = nullptr;
 ws43b_view::IdlePolicy idlePolicy;
@@ -235,7 +238,24 @@ void dashText(const char *text, int x, int y, int w, int size=18, uint16_t color
   tft.setTextDatum(TL_DATUM); tft.setClipRect(x,y,w,size+10);
   if(text) {
     if(size==72 && tft.textWidth(text)>w) {
-      tft.unloadFont();tft.loadFont(ws43b_dash_30);tft.setTextSize(2);
+      // Too wide at 72 px (e.g. "100%"): step down to the dashboard's 64 px
+      // digits and 43 px percent sign, not the old blocky 2x 30 px font.
+      const size_t len=strlen(text);
+      const bool percent=len&&text[len-1]=='%';
+      char digits[16];snprintf(digits,sizeof(digits),"%.*s",int(percent?len-1:len),text);
+      bool numeric=digits[0]!=0;
+      for(const char *c=digits;*c;++c)numeric=numeric&&((*c>='0'&&*c<='9')||*c=='-'||*c==' ');
+      tft.unloadFont();tft.loadFont(ws43b_v2_b64);
+      const int numberW=numeric?tft.textWidth(digits):w+1;
+      tft.unloadFont();tft.loadFont(ws43b_v2_b43);
+      const int percentW=percent?tft.textWidth("%"):0;
+      if(numeric&&numberW+percentW<=w) {
+        tft.setClipRect(x,y,w,size+10);
+        if(percent)tft.drawString("%",x+numberW,y+25);
+        tft.unloadFont();tft.loadFont(ws43b_v2_b64);tft.drawString(digits,x,y+4);
+        tft.clearClipRect();tft.unloadFont();return;
+      }
+      tft.unloadFont();tft.loadFont(ws43b_dash_30);
     }
     char fitted[256];snprintf(fitted,sizeof(fitted),"%s",text);
     if(tft.textWidth(text)>w) {
@@ -325,6 +345,23 @@ void footer(const BambuMonitorTelemetry &, uint32_t now) {
     ws43b_native::sprite(tft,icons[i],left,441,[=](int,int){return active?activeBg:bg;});
     v2Text(names[i],left+43,450,textWidth+2,ws43b_v2_b15,15,active?v2Ink():v2Dim());
   }
+}
+// Menus keep a taller header band than the dashboard; the row only moves down.
+int headerOffset() { return page==Page::Dashboard?0:7; }
+// Status as a quiet pill tinted with the data colour (live, stale, offline).
+void headerStatusPill(const char *text,int x,int dy,uint16_t dot,uint16_t color) {
+  headerPillX=x;headerPillW=0;
+  if(!text || !*text)return;
+  ::setFont(tft,FONT_NONE);tft.loadFont(ws43b_v2_b14);
+  const int textWidth=tft.textWidth(text);tft.unloadFont();
+  const int limit=598-x;
+  if(limit<60)return;
+  const int width=textWidth+38>limit?limit:textWidth+38;
+  headerPillW=width;
+  const uint16_t base=page==Page::Dashboard&&BG==ws43b_style::background?ws43b_native::rgb(17,30,43):BG;
+  tft.fillRoundRect(x,18+dy,width,26,13,ws43b_native::mix(base,dot,40));
+  tft.fillCircle(x+14,31+dy,4,dot);
+  v2Text(text,x+25,24+dy,width-34,ws43b_v2_b14,14,color);
 }
 void applyWs43bPalette() {
 #if WS43B_FULL_WEBUI
@@ -417,6 +454,18 @@ const MonitorAmsUnit *amsUnit(const BambuMonitorTelemetry &m,bool details) {
     if(u.used && !(u.present.valid&&!u.present.value)) { if(details)selectedAms=index; return &u; }
   }
   return nullptr;
+}
+// Empty or unread AMS slots: a dotted spool outline instead of a heavy icon,
+// so the slots with filament stay the first thing the eye finds.
+uint16_t slotMute(uint16_t dim) { return ws43b_assets::blend(BG,dim,110); }
+void dottedSpool(int cx,int cy,int r,uint16_t color) {
+  for(int ring=0;ring<2;++ring) {
+    const int radius=ring?r/3:r,dots=ring?8:28;
+    for(int i=0;i<dots;++i) {
+      const float a=i*6.2831853f/dots;
+      tft.fillCircle(cx+int(lroundf(cosf(a)*radius)),cy+int(lroundf(sinf(a)*radius)),1,color);
+    }
+  }
 }
 bool amsDryingAnimated(const BambuMonitorTelemetry &m,bool online,uint32_t now) {
   const auto *unit=amsUnit(m,true);
@@ -528,18 +577,18 @@ void amsView(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool detail
     const bool identified=!empty&&tray.type.valid;
     const uint16_t filament=identified&&tray.colorRgb565.valid?tray.colorRgb565.value:DIM;
     const int height=details?174:92;
-    tft.fillRoundRect(x,row,182,height,12,CARD);
-    tft.drawRoundRect(x,row,182,height,12,active?ACCENT:TRACK);
+    const bool vacant=empty || (!identified && !known);
+    tft.fillRoundRect(x,row,182,height,12,vacant?BG:CARD);
+    tft.drawRoundRect(x,row,182,height,12,active?ACCENT:vacant?ws43b_assets::blend(BG,TRACK,90):TRACK);
     const char *type=empty?ws43bText("Pusty","Empty","Leer"):identified?tray.type.value:ws43bText("Brak danych","No data","Keine Daten");
     char age[64];amsReadingAge(age,sizeof(age),tray.remain,linkCurrent,now);
-    if(empty || (!identified && !known)) {
+    if(vacant) {
       snprintf(buf,sizeof(buf),"SLOT %d",i+1);
-      dashText(buf,x+12,row+7,158,14,DIM);
-      // Unknown telemetry is not evidence of an empty spool.
-      const int iconX=x+91,iconY=row+(details?85:40);
-      panelIcon(empty?UiAsset::EmptySlot:UiAsset::UnknownData,iconX,iconY,CARD,details?48:33);
+      dashText(buf,x+12,row+7,158,14,slotMute(DIM));
+      // Unknown telemetry is not evidence of an empty spool: the caption says which.
+      dottedSpool(x+91,row+(details?85:40),details?28:18,slotMute(DIM));
       dashText(empty?ws43bText("Pusty slot","Empty slot","Leerer Platz"):ws43bText("Brak odczytu","No reading","Kein Messwert"),
-               x+12,row+(details?126:60),158,details?18:14,DIM);
+               x+12,row+(details?132:60),158,14,slotMute(DIM));
       continue;
     }
 
@@ -591,13 +640,25 @@ void dashboardTemperature(int channel,int y,const char *name,const MonitorField<
     !targetFresh?ws43bText("Odczyt","Reading","Messwert"):ws43bText("Stabilna","Stable","Stabil");
   amsReadingAge(age,sizeof(age),actual,online,now);
   amsReadingAge(targetAge,sizeof(targetAge),target,online,now);
+  const bool warning=age[0]||targetAge[0];
   if(channel!=2 && target.valid && age[0])snprintf(buf,sizeof(buf),ws43bText("%s · cel %.0f°%s","%s · target %.0f°%s","%s · Soll %.0f°%s"),age,double(target.value),targetAge[0]?ws43bText(" stary"," stale"," veraltet"):"");
   else if(age[0])snprintf(buf,sizeof(buf),"%s",age);
   else if(channel!=2 && target.valid && targetAge[0])snprintf(buf,sizeof(buf),ws43bText("Cel %.0f° · nieaktualny","Target %.0f° · outdated","Soll %.0f° · veraltet"),double(target.value));
-  else if(channel==2)snprintf(buf,sizeof(buf),"%s",fresh?ws43bText("Temperatura komory","Chamber temperature","Bauraumtemperatur"):status);
-  else if(target.valid)snprintf(buf,sizeof(buf),ws43bText("Cel %.0f° · %s","Target %.0f° · %s","Soll %.0f° · %s"),double(target.value),status);
-  else snprintf(buf,sizeof(buf),ws43bText("Cel -- · %s","Target -- · %s","Soll -- · %s"),status);
-  v2Text(buf,585,y+47,185,ws43b_v2_12,12,age[0]||targetAge[0]?WARN:changing?color:v2Dim());
+  else if(channel==2)snprintf(buf,sizeof(buf),"%s",fresh?ws43bText("Bez celu · odczyt","No target · reading","Kein Soll · Messwert"):status);
+  else if(target.valid)snprintf(buf,sizeof(buf),ws43bText("%s · cel %.0f°","%s · target %.0f°","%s · Soll %.0f°"),status,double(target.value));
+  else snprintf(buf,sizeof(buf),ws43bText("%s · cel --","%s · target --","%s · Soll --"),status);
+  // State first, after a dot in the state colour; warnings keep text only.
+  const bool stable=state==ws43b_view::Thermal::Stable&&fresh&&targetFresh&&channel!=2;
+  const int textX=warning?585:597;
+  if(!warning)tft.fillCircle(589,y+53,3,changing?color:stable?v2Accent():v2Dim());
+  v2Text(buf,textX,y+47,770-textX,ws43b_v2_12,12,warning?WARN:changing?color:v2Dim());
+  // Heating towards a known target: a thin bar of how far the reading has got.
+  if(!warning&&state==ws43b_view::Thermal::Heating&&targetFresh&&target.value>0) {
+    const float ratio=actual.value<=0?0.f:actual.value>=target.value?1.f:actual.value/target.value;
+    tft.fillRoundRect(585,y+65,185,3,1,ws43b_native::rgb(53,75,93));
+    const int fill=int(185*ratio);
+    if(fill>0)tft.fillRoundRect(585,y+65,fill,3,1,color);
+  }
 }
 // Solar data selects the visual day/night palette. If unavailable, use the
 // existing configured night schedule; this is a UI fallback, not an astronomy claim.
@@ -622,7 +683,7 @@ bool weatherHeaderVisible=false;
 void dashboardWeatherIcon(uint32_t now) {
   // The animation only restores its own patch, never the card below the header.
   const bool native=page==Page::Dashboard;
-  const int x=native?606:525,y=native?11:16;
+  const int x=606,y=11+headerOffset();
   tft.setClipRect(x,y,36,36);
   if(native)v2Clear(x,y,36,36);else tft.fillRect(x,y,36,36,BG);
   const auto weather=ws43bWeatherData();
@@ -640,12 +701,11 @@ void menuWeatherHeader(uint32_t now) {
   char value[40];
   if(fresh)snprintf(value,sizeof(value),"%.0f°C",double(weather.temperature));
   else snprintf(value,sizeof(value),"--°C");
-  if(page==Page::Dashboard) {
+  {
     ::setFont(tft,FONT_NONE);tft.loadFont(ws43b_v2_b17);
     const bool compact=tft.textWidth(value)>48;tft.unloadFont();
-    v2Text(value,646,compact?24:22,48,compact?ws43b_v2_b14:ws43b_v2_b17,compact?14:17,fresh?v2Ink():v2Dim(),true,false);
+    v2Text(value,646,(compact?24:22)+headerOffset(),48,compact?ws43b_v2_b14:ws43b_v2_b17,compact?14:17,fresh?v2Ink():v2Dim(),true,false);
   }
-  else dashText(value,563,24,94,24,fresh?INK:DIM);
 }
 bool dashboardCooling=false, dashboardCoolingPainted=false;
 ws43b_view::ActivityClock dashboardActivity;
@@ -760,16 +820,18 @@ void dashboardAms(const BambuMonitorTelemetry &m,bool online,uint32_t now,ws43b_
     const bool known=tray&&!empty&&tray->remain.valid&&tray->remain.value>=0;
     const bool recent=known&&linkCurrent&&tray->remain.current(now);
     const bool active=tray&&!empty&&linkCurrent&&m.activeTrayRaw.current(now)&&unit->id<63&&m.activeTrayRaw.value==unit->id*4+i;
-    dashboardSlotCard(x,active);
     char buf[80];
     if(empty || (!identified&&!known)) {
-      ws43b_ui_icons::draw(tft,empty?UiAsset::EmptySlot:UiAsset::UnknownData,x+36,385,40,
-        [=](int px,int py){return dashboardSlotBg(px,py,active);});
+      // No card fill: the slot recedes into the background with a faint frame.
+      v2Clear(x,345,184,80);
+      tft.drawRoundRect(x,345,184,80,10,ws43b_native::mix(ws43b_native::line,BG,90));
+      dottedSpool(x+36,385,22,slotMute(v2Dim()));
       snprintf(buf,sizeof(buf),"SLOT %d",i+1);
-      v2Text(buf,x+73,356,103,ws43b_v2_b14,14,v2Dim());
-      v2Text(empty?ws43bText("Pusty","Empty","Leer"):ws43bText("Brak odczytu","No reading","Kein Messwert"),x+73,383,103,ws43b_v2_b14,14,v2Dim());
+      v2Text(buf,x+73,356,103,ws43b_v2_b14,14,slotMute(v2Dim()));
+      v2Text(empty?ws43bText("Pusty","Empty","Leer"):ws43bText("Brak odczytu","No reading","Kein Messwert"),x+73,383,103,ws43b_v2_12,12,slotMute(v2Dim()));
       continue;
     }
+    dashboardSlotCard(x,active);
     const uint16_t filament=identified&&tray->colorRgb565.valid?tray->colorRgb565.value:v2Dim();
     ws43b_native::sprite(tft,ws43b_assets::Asset::Spool,x+3,350,[=](int px,int py){return dashboardSlotBg(px,py,active);},true,filament);
     snprintf(buf,sizeof(buf),"%d %s",i+1,identified?tray->type.value:ws43bText("Materiał","Material","Material"));
@@ -846,20 +908,25 @@ void dashboardScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,
     tft.fillRoundRect(32,247,468,6,3,ws43b_native::rgb(53,75,93));
     if(progress&&m.progress.value>0)tft.fillRoundRect(32,247,468*(m.progress.value>100?100:m.progress.value)/100,6,3,v2Accent());
     const bool nameOld=m.subtaskName.valid&&(!online||!m.subtaskName.current(now));
-    v2Text(m.subtaskName.valid?m.subtaskName.value:ws43bText("Brak nazwy wydruku","Job name unavailable","Druckname unbekannt"),33,265,advanced?306:466,ws43b_v2_b17,17,nameOld?v2Dim():v2Ink());
-    if(advanced) {
+    // The layer counter sits beside the job name in both modes; the simple
+    // mode's second line appears only when there is something to warn about.
+    const bool layers=advanced||m.layerNum.valid||m.totalLayers.valid;
+    v2Text(m.subtaskName.valid?m.subtaskName.value:ws43bText("Brak nazwy wydruku","Job name unavailable","Druckname unbekannt"),33,265,layers?306:466,ws43b_v2_b17,17,nameOld?v2Dim():v2Ink());
+    if(layers) {
       char layer[24],total[24];
       if(m.layerNum.valid)snprintf(layer,sizeof(layer),"%u",unsigned(m.layerNum.value));else snprintf(layer,sizeof(layer),"--");
       if(m.totalLayers.valid)snprintf(total,sizeof(total),"%u",unsigned(m.totalLayers.value));else snprintf(total,sizeof(total),"--");
       snprintf(buf,sizeof(buf),ws43bText("Warstwa %s / %s","Layer %s / %s","Schicht %s / %s"),layer,total);
       v2Text(buf,346,267,153,ws43b_v2_13,13,v2Dim(),true);
+    }
+    if(advanced) {
       dashboardMaterialLine(buf,sizeof(buf),m,online,now);
       v2Text(buf,33,288,466,ws43b_v2_12,12,v2Dim());
     } else {
       const char *notice=!online?ws43bText("Offline · ostatnie dane","Offline · last readings","Offline · letzte Werte"):
         !ws43b_view::statusCurrent(m,online,now)?ws43bText("Oczekiwanie na aktualne dane","Waiting for current data","Warte auf aktuelle Daten"):
-        nameOld?ws43bText("Nazwa: ostatni odczyt","Name: last reading","Name: letzter Wert"):ws43bText("Dane z drukarki","Printer data","Druckerdaten");
-      v2Text(notice,33,288,466,ws43b_v2_12,12,v2Dim());
+        nameOld?ws43bText("Nazwa: ostatni odczyt","Name: last reading","Name: letzter Wert"):nullptr;
+      if(notice)v2Text(notice,33,288,466,ws43b_v2_12,12,WARN);
     }
     dashboardCoolingPainted=false;
   }
@@ -880,43 +947,48 @@ void detailReadingCard(const char *title,const char *value,int x,int y,
   if(age[0])dashText(age,x+16,y+73,208,14,WARN);
 }
 void detailsScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now) {
-  tft.fillRoundRect(24, 86, 752, 120, 10, CARD);
-  char nameAge[64],jobTitle[100];
+#if WS43B_FULL_WEBUI
+  constexpr int jobW=552;
+#else
+  constexpr int jobW=752;
+#endif
+  tft.fillRoundRect(24, 86, jobW, 120, 10, CARD);
+  char nameAge[64],jobTitle[100],line[160];
   amsReadingAge(nameAge,sizeof(nameAge),m.subtaskName,online,now);
   snprintf(jobTitle,sizeof(jobTitle),"%s%s%s",ws43bText("ZADANIE","JOB","AUFTRAG"),nameAge[0]?" · ":"",nameAge);
-  dashText(jobTitle,40,99,530,14,nameAge[0]?WARN:DIM);
-#if WS43B_FULL_WEBUI
-  button(ws43bText("Wskaźniki >","Gauges >","Anzeigen >"),600,90,160,30,false);
-#endif
+  dashText(jobTitle,40,99,jobW-32,14,nameAge[0]?WARN:DIM);
   const char *why = missing(m.subtaskName, online, now);
-  // Fit two lines with the actual selected font. UTF-8 is left intact; avoid
-  // splitting a multibyte sequence when a long name wraps or is abbreviated.
-  const char *source = m.subtaskName.valid ? m.subtaskName.value : ws43bText("Brak nazwy wydruku","Job name unavailable","Druckname unbekannt");
-  tft.loadFont(ws43b_dash_18);
-  for (int line = 0; line < 2 && *source; ++line) {
-    char text[132]{};
-    size_t used = 0;
-    while (source[used] && used < sizeof(text) - 5) {
-      size_t next = used + 1;
-      while (source[next] && (uint8_t(source[next]) & 0xC0) == 0x80) ++next;
-      if (next >= sizeof(text) - 4) break;
-      memcpy(text + used, source + used, next - used); text[next] = 0;
-      if (tft.textWidth(text) > 700) { text[used] = 0; break; }
-      used = next;
+  dashText(m.subtaskName.valid ? m.subtaskName.value : ws43bText("Brak nazwy wydruku","Job name unavailable","Druckname unbekannt"),
+           40,124,jobW-32,18,why?DIM:INK);
+  // One summary line instead of an empty second name line: layer, time left
+  // and the expected end, each only while its reading is current.
+  char layer[24],total[24];
+  if(m.layerNum.valid)snprintf(layer,sizeof(layer),"%u",unsigned(m.layerNum.value));else snprintf(layer,sizeof(layer),"--");
+  if(m.totalLayers.valid)snprintf(total,sizeof(total),"%u",unsigned(m.totalLayers.value));else snprintf(total,sizeof(total),"--");
+  snprintf(line,sizeof(line),ws43bText("Warstwa %s / %s","Layer %s / %s","Schicht %s / %s"),layer,total);
+  if(!missing(m.remainingMinutes,online,now)) {
+    size_t used=strlen(line);
+    snprintf(line+used,sizeof(line)-used,ws43bText(" · pozostało %uh %02u"," · %uh %02u left"," · noch %uh %02u"),
+             unsigned(m.remainingMinutes.value/60),unsigned(m.remainingMinutes.value%60));
+    struct tm local{};
+    if(getLocalTime(&local,5)) {
+      const time_t end=time(nullptr)+60u*m.remainingMinutes.value;localtime_r(&end,&local);
+      used=strlen(line);
+      snprintf(line+used,sizeof(line)-used,ws43bText(" · koniec %02d:%02d"," · ends %02d:%02d"," · Ende %02d:%02d"),local.tm_hour,local.tm_min);
     }
-    if (!used) break;
-    if (line == 1 && source[used]) {
-      while (used && tft.textWidth((String(text) + "...").c_str()) > 700) {
-        do { --used; } while (used && (uint8_t(text[used]) & 0xC0) == 0x80);
-        text[used] = 0;
-      }
-      strncat(text, "...", sizeof(text) - strlen(text) - 1);
-    }
-    dashText(text,40,131+line*32,716,18,why?DIM:INK);
-    tft.loadFont(ws43b_dash_18);
-    source += used;
   }
-  tft.unloadFont();
+  dashText(line,40,154,jobW-32,14,DIM);
+  tft.fillRoundRect(40,184,jobW-32,5,2,TRACK);
+  if(ws43b_view::progressCurrent(m,online,now)&&m.progress.value>0)
+    tft.fillRoundRect(40,184,(jobW-32)*(m.progress.value>100?100:m.progress.value)/100,5,2,ACCENT);
+#if WS43B_FULL_WEBUI
+  // The gauges entry is a full card aligned with the grid, not a corner chip.
+  tft.fillRoundRect(592,86,184,120,10,CARD);
+  tft.drawRoundRect(592,86,184,120,10,TRACK);
+  panelIcon(UiAsset::Details,684,121,CARD,33,true,ACCENT);
+  dashText(ws43bText("Wskaźniki","Gauges","Anzeigen"),608,146,152,18,INK);
+  dashText(ws43bText("tarcze temperatur","temperature dials","Temperaturskalen"),608,174,152,14,DIM);
+#endif
   char buf[160];
   jobLayerText(buf,sizeof(buf),m,online,now);
   char *ageSuffix=strstr(buf," · ");
@@ -1563,11 +1635,44 @@ void combinedSaverCards(const BambuMonitorTelemetry &m,const MonitorAmsUnit &uni
   else if(progressValid)ws43b_print_scene::draw(tft,250,258,m.progress.value,now,saverFilamentColor(m,online,now),bg,false);
   else panelIcon(UiAsset::Printer,306,310,bg,48);
   tft.clearClipRect();
-  // Airflow around a spool, contained in the existing small dirty region.
-  tft.setClipRect(680,262,68,62);tft.fillRect(680,262,68,62,bg);
-  ws43b_drying_scene::draw(tft,714,292,29,now,ACCENT,TRACK,INK,bg);
+  // Airflow around a spool, contained in its own small dirty region; sized
+  // to read at a glance from across the room, right of the timer text.
+  tft.setClipRect(672,250,96,84);tft.fillRect(672,250,96,84,bg);
+  ws43b_drying_scene::draw(tft,720,292,40,now,ACCENT,TRACK,INK,bg);
   tft.clearClipRect();
 }
+#if WS43B_PHOTO_SAVER
+// Photo screensaver: the slide fills the screen (only when it changes); a
+// dimmed card in the chosen corner carries the time and, while printing, the
+// progress. Each minute only the card is copied from the slide again.
+void photoScreen(const BambuMonitorTelemetry &m,bool online,uint32_t now,bool print,bool fullFrame) {
+  const auto r=ws43b_photo::card(ws43bPhotoSettings().corner,print);
+  if(fullFrame)ws43bPhotoPush(0,0,800,480);
+  ws43bPhotoDimmedCard(r.x,r.y,r.w,r.h);
+  char text[ws43b_clock_flip::kTextMax+4];bool pm=false;
+  if(!clockTimeText(text,ws43b_clock_flip::kTextMax,pm))snprintf(text,sizeof(text),"--:--");
+  else if(!netSettings.use24h)strncat(text,pm?" PM":" AM",sizeof(text)-strlen(text)-1);
+  dashText(text,r.x+18,r.y+14,r.w-36,30,INK);
+  if(!print) {
+    struct tm date{};
+    char line[32]="";
+    if(getLocalTime(&date,5))strftime(line,sizeof(line),"%d.%m.%Y",&date);
+    dashText(line,r.x+18,r.y+58,r.w-36,18,DIM);
+    return;
+  }
+  const unsigned percent=m.progress.value>100?100u:unsigned(m.progress.value);
+  const int barW=r.w-36;
+  tft.fillRoundRect(r.x+18,r.y+60,barW,8,4,ws43b_native::mix(BG,TRACK,180));
+  if(percent)tft.fillRoundRect(r.x+18,r.y+60,barW*int(percent)/100<8?8:barW*int(percent)/100,8,4,v2Accent());
+  char line[48];
+  if(missing(m.remainingMinutes,online,now)==nullptr) {
+    const unsigned minutes=unsigned(m.remainingMinutes.value);
+    snprintf(line,sizeof(line),ws43bText("%u%% · zostało %uh %02um","%u%% · %uh %02um left","%u%% · noch %uh %02um"),percent,minutes/60,minutes%60);
+  } else snprintf(line,sizeof(line),"%u%%",percent);
+  dashText(line,r.x+18,r.y+80,r.w-36,18,INK);
+}
+#endif
+
 void clockScreen(const BambuMonitorTelemetry &m, bool online, uint32_t now, bool partial = false) {
   const auto view=saverView(m,online,now);
   if(view==ws43b_view::Saver::Cooling){coolingScreen(m,online,now,partial);return;}
@@ -1875,8 +1980,9 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
   // Dismiss an existing HMS overlay before routing the same tap underneath it.
   if(handleWs43bErrorTap(false)) { painted=false; return; }
 #endif
-  if(page==Page::Dashboard && ws43bWeatherConfig().enabled &&
-     pressY<56 && pressX>=600 && pressX<694) {
+  // Shared header row: the weather patch opens the saver on every page.
+  if(page!=Page::Clock && ws43bWeatherConfig().enabled &&
+     (page==Page::Dashboard?pressY<56:pressY<66) && pressX>=600 && pressX<694) {
     page=Page::Clock; painted=false; return;
   }
   if (page == Page::Clock && (!dispSettings.pongClock || ws43bWeatherConfig().enabled || ws43b_view::dryingUnit(displayedPrinter().state.monitor,isWiFiConnected()&&displayedPrinter().state.connected,now) || coolingView(displayedPrinter().state.monitor))) {
@@ -1891,13 +1997,16 @@ void handleWs43bMonitorTouch(uint16_t x, uint16_t y, bool down) {
     else if(pressX>=44&&pressX<752&&pressY>=164&&pressY<220)page=Page::FactoryReset;
     painted=false;return;
   }
-  if((page==Page::Dashboard?pressY<56&&pressX>=700:pressY<66&&pressX>=690)) { page=Page::Clock; painted=false; return; }
+  const bool headerRow=page==Page::Dashboard?pressY<56:pressY<66;
+  if(headerRow&&pressX>=700) { page=Page::Clock; painted=false; return; }
 #if WS43B_FULL_WEBUI
-  if(page==Page::Details && pressX>=600 && pressX<760 && pressY>=90 && pressY<120) {
+  if(page==Page::Details && pressX>=592 && pressX<776 && pressY>=86 && pressY<206) {
     page=Page::Gauges; painted=false; return;
   }
-  if (handleWs43bErrorTap(page==Page::Dashboard?pressY<56&&pressX>=216&&pressX<240:pressY<66&&pressX>=658&&pressX<690)) { painted = false; return; }
-  if (page==Page::Dashboard?pressY<56&&pressX<216:pressY<80&&pressX<440) {
+  if (handleWs43bErrorTap(headerRow&&headerPillW>0&&pressX>=headerPillX&&pressX<headerPillX+headerPillW)) { painted = false; return; }
+  // The printer name (everything left of the status pill) selects the next printer.
+  const int selectorEnd=headerPillW>0?headerPillX:page==Page::Dashboard?216:440;
+  if (page==Page::Dashboard?pressY<56&&pressX<selectorEnd:pressY<80&&pressX<selectorEnd) {
     for (uint8_t step = 1; step < MAX_ACTIVE_PRINTERS; ++step) {
       const uint8_t candidate = (rotState.displayIndex + step) % MAX_ACTIVE_PRINTERS;
       if (!isPrinterConfigured(candidate)) continue;
@@ -2169,6 +2278,43 @@ void renderWs43bMonitor(bool force) {
     const auto &state = displayedPrinter().state;
     const auto &m = state.monitor;
     const bool online = isWiFiConnected() && state.connected;
+#if WS43B_PHOTO_SAVER
+    {
+      // Photos replace the clock and print saver; pause, alerts and cooling
+      // keep their own screens.
+      static ws43b_photo::Canvas photoCanvas;
+      static char previousPhotoKey[96]={};
+      const auto view=saverView(m,online,now);
+      const bool photoView=view==ws43b_view::Saver::Clock||view==ws43b_view::Saver::Print||view==ws43b_view::Saver::Waiting;
+      if(photoView && ws43bPhotoPrepare(now)) {
+        const bool print=view==ws43b_view::Saver::Print && clockHasProgress(m,online,now);
+        char timeText[ws43b_clock_flip::kTextMax];bool pm=false;
+        const bool timeValid=clockTimeText(timeText,sizeof(timeText),pm);
+        const bool remaining=missing(m.remainingMinutes,online,now)==nullptr;
+        char photoKey[96];
+        snprintf(photoKey,sizeof(photoKey),"%s/%d/%d/%u/%d/%u/%lu",timeValid?timeText:"-",pm,netSettings.use24h,
+                 print?unsigned(m.progress.value):0u,remaining,remaining?unsigned(m.remainingMinutes.value):0u,
+                 (unsigned long)ws43bLanguageRevision());
+        const int layout=int(print)|(int(ws43bPhotoSettings().corner)<<1);
+        // Not !reuseWater: print-stage changes clear "painted" without
+        // touching this page, and each full repaint is a long PSRAM burst.
+        const bool fullFrame=ws43b_photo::fullFrame(photoCanvas,force,ws43bPhotoSlideRevision(),layout,
+                                                    ws43b::renderDiagnostics().frames);
+        waterCached=false;clockShown[0]=0;
+        if(!fullFrame && !strcmp(photoKey,previousPhotoKey))return;
+        tft.startWrite();
+        ws43b::beginRenderDiagnostics(fullFrame);
+        tft.unloadFont();tft.setTextSize(1);
+        photoScreen(m,online,now,print,fullFrame);
+        tft.endWrite();
+        ws43b::endRenderDiagnostics(true);
+        photoCanvas={true,ws43bPhotoSlideRevision(),layout,ws43b::renderDiagnostics().frames};
+        snprintf(previousPhotoKey,sizeof(previousPhotoKey),"%s",photoKey);
+        return;
+      }
+      photoCanvas.shown=false;
+    }
+#endif
     const bool valid = saverView(m,online,now)==ws43b_view::Saver::Print && clockHasProgress(m,online,now);
     const auto activity=ws43b_view::activity(m,online,now,false);
     const bool cleaning=saverView(m,online,now)==ws43b_view::Saver::Print && activity==ws43b_view::Activity::Cleaning;
@@ -2372,26 +2518,18 @@ void renderWs43bMonitor(bool force) {
   char header[80];struct tm local{};
   if(getLocalTime(&local,5))snprintf(header,sizeof(header),"%02d:%02d",netSettings.use24h?local.tm_hour:(local.tm_hour%12?local.tm_hour%12:12),local.tm_min);
   else snprintf(header,sizeof(header),"--:--");
-  if(page==Page::Dashboard) {
-    v2Text(slot.config.name[0]?slot.config.name:"BambuHelper",20,16,180,ws43b_v2_b25,25,v2Ink());
-    tft.fillCircle(220,31,4,dataColor);
-    v2Text(headerStatus,232,24,362,ws43b_v2_b14,14,!online?v2Dim():statusCurrent?v2Ink():WARN);
-    tft.drawFastVLine(701,19,25,ws43b_native::line);
-    if(netSettings.use24h || !getLocalTime(&local,5))v2Text(header,705,17,76,ws43b_v2_b25,25,v2Ink(),true,false);
-    else {
-      snprintf(header,sizeof(header),"%02d:%02d %s",local.tm_hour%12?local.tm_hour%12:12,local.tm_min,local.tm_hour<12?"AM":"PM");
-      v2Text(header,705,24,76,ws43b_v2_b14,14,v2Ink(),true,false);
-    }
-    menuWeatherHeader(now);
-    tft.drawFastHLine(16,55,768,ws43b_native::line);
-  } else {
-    dashText(slot.config.name[0]?slot.config.name:"BambuHelper",24,24,190,30,INK);
-    dashText(headerStatus,224,31,290,18,!online?DIM:statusCurrent?ACCENT:WARN);
-    tft.fillCircle(672,37,5,!online?RED:printCurrent?GREEN:WARN);
-    dashText(header,697,24,79,24,INK);
-    menuWeatherHeader(now);
-    tft.drawFastHLine(24,66,752,TRACK);
+  // One header for the dashboard and every menu: menus keep their taller
+  // band (content starts at y=84), so the same row only moves down.
+  const int dy=headerOffset();
+  const int nameWidth=v2Text(slot.config.name[0]?slot.config.name:"BambuHelper",20,16+dy,260,ws43b_v2_b25,25,v2Ink());
+  headerStatusPill(headerStatus,20+nameWidth+14,dy,dataColor,!online?v2Dim():statusCurrent?v2Ink():WARN);
+  if(netSettings.use24h || !getLocalTime(&local,5))v2Text(header,705,17+dy,76,ws43b_v2_b25,25,v2Ink(),true,false);
+  else {
+    snprintf(header,sizeof(header),"%02d:%02d %s",local.tm_hour%12?local.tm_hour%12:12,local.tm_min,local.tm_hour<12?"AM":"PM");
+    v2Text(header,705,24+dy,76,ws43b_v2_b14,14,v2Ink(),true,false);
   }
+  menuWeatherHeader(now);
+  tft.drawFastHLine(16,dy?66:55,768,ws43b_native::line);
   }
 
   if (page != Page::Dashboard) {

@@ -35,14 +35,16 @@ WebUI end-to-end (read-only, against a live panel; Playwright, `npm install` onc
 Never commit the panel address.
 
 Release-profile build environment:
-`WS43B_ARDUINO_DATA=<dir with core 3.3.11> WS43B_SDK_PROFILE=cache64_xip WS43B_RGB_PCLK_HZ=12000000`.
+`WS43B_ARDUINO_DATA=<dir with core 3.3.11> WS43B_SDK_PROFILE=cache64_xip WS43B_RGB_PCLK_HZ=16000000`.
+PCLK 16 MHz (~39 Hz refresh, manufacturer value) since v4.1.1-beta.7: at 12 MHz (~29 Hz)
+bright full-screen content (photo screensaver) visibly flickers on the panel.
 Arduino ESP32 core must be exactly **3.3.11**. `build.py` fails if local paths leak
 into the binary (`-ffile-prefix-map`); keep it that way.
 
 ## Hard constraints
 
-- **Flash is tight:** the app uses ~92 % of its 3 MiB OTA slot (2026-11-08,
-  2.91 MB; ~240 KB free). No new libraries, no large tables/fonts/images. Prefer
+- **Flash is tight:** the app uses ~95 % of its 3 MiB OTA slot (2026-11-23,
+  2.99 MB with SD + JPG/PNG photo screensaver, +85 KB; ~150 KB free). No new libraries, no large tables/fonts/images. Prefer
   smaller code; report the app size change of every firmware change.
 - **Internal RAM is tight** (min free internal heap ~57 KB under WebUI load).
   Large buffers go to PSRAM; TLS during MQTT connect already uses PSRAM.

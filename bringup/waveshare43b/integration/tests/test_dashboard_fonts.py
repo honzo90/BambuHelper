@@ -173,6 +173,9 @@ using String=std::string;
 constexpr int FONT_NONE=0,TL_DATUM=0;
 uint16_t v2Ink(){return 0;}
 uint16_t v2Dim(){return 0;}
+int headerOffset(){return 0;}
+constexpr int dy=0; // dashboard header row offset used by the clock call
+uint16_t slotMute(uint16_t color){return color;}
 bool polish=true;
 const char *ws43bText(const char *pl,const char *en,const char* = nullptr){return polish?pl:en;}
 uint32_t be32(const uint8_t *data) {

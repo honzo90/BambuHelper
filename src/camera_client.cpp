@@ -9,7 +9,7 @@
 
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
-#include <esp_task_wdt.h>
+#include "task_watchdog.h"
 #include "bambu_state.h"
 #include "bambu_mqtt.h"
 #include "settings.h"
@@ -216,7 +216,7 @@ void cameraService() {
       g_tls->setInsecure();
       g_tls->setTimeout(CAM_TLS_TIMEOUT_S);
     }
-    esp_task_wdt_reset();
+    feedTaskWatchdog();
     if (!g_tls->connect(g_ip, CAM_PORT)) {
       teardownSocket();
       g_connectBackoffMs *= 2;

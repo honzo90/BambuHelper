@@ -30,7 +30,7 @@ bool ws43bWebActivity(uint32_t &lastMs);  // web_server.cpp
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <algorithm>
-#include <esp_task_wdt.h>
+#include "task_watchdog.h"
 #if BOARD_MQTT_ASYNC_CONNECT
 #include <atomic>
 #include <freertos/FreeRTOS.h>
@@ -1661,7 +1661,7 @@ static void parseMqttPayload(byte* payload, unsigned int length, BambuState& s,
 // ---------------------------------------------------------------------------
 static void mqttCallback(char* topic, byte* payload, unsigned int length) {
   ws43b_memory::Scope memory(ws43b_memory::Stage::MqttParse);
-  esp_task_wdt_reset();
+  feedTaskWatchdog();
 
   // Extract serial from topic: "device/{serial}/report"
 #if BAMBU_MONITOR_ONLY || defined(BOARD_IS_WS43B)
@@ -2083,7 +2083,7 @@ static void reconnectConn(MqttConn& c) {
   }
 
   unsigned long t0 = millis();
-  esp_task_wdt_reset();
+  feedTaskWatchdog();
 
   bool connected = false;
   {
@@ -2234,7 +2234,7 @@ static void handleConn(MqttConn& c) {
     // the broker naturally sends a full status (can take minutes).
     if (!c.initialPushallSent && c.connectTime > 0 &&
         millis() - c.connectTime > BAMBU_PUSHALL_INITIAL_DELAY) {
-      esp_task_wdt_reset();
+      feedTaskWatchdog();
       if (requestPushall(c, PUSHALL_INITIAL)) {
         c.initialPushallSent = true;
 #if HAS_HMS_UI
@@ -2250,13 +2250,13 @@ static void handleConn(MqttConn& c) {
       if (c.initialPushallSent && !c.gotDataSinceConnect &&
           millis() - c.lastPushallRequest > 10000) {
         MQTT_LOG("[%d] No data after pushall, retrying...", c.slotIndex);
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         requestPushall(c, PUSHALL_RETRY_NO_DATA);
       }
 
       if (c.initialPushallSent && c.gotDataSinceConnect &&
           millis() - c.lastPushallRequest > BAMBU_PUSHALL_INTERVAL) {
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         requestPushall(c, PUSHALL_PERIODIC);
       }
     } else {
@@ -2269,7 +2269,7 @@ static void handleConn(MqttConn& c) {
       // lastPushallRequest, so it naturally coalesces with recovery pushalls.
       if (c.initialPushallSent && c.gotDataSinceConnect && !s.printing &&
           millis() - c.lastPushallRequest > BAMBU_CLOUD_IDLE_PUSHALL_INTERVAL) {
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         requestPushall(c, PUSHALL_PERIODIC_IDLE);
       }
     }
@@ -2317,7 +2317,7 @@ static void handleConn(MqttConn& c) {
       // Keep showing printing screen with stale values.
       if (isConnected && c.stalePushallSentMs == 0 && !cloudPushallThrottled && !recoveryCooldown) {
         MQTT_LOG("[%d] core print data stale - sending recovery pushall", c.slotIndex);
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         if (requestPushall(c, PUSHALL_RECOVERY_PRINT))
           c.stalePushallSentMs = millis();
       }
@@ -2326,7 +2326,7 @@ static void handleConn(MqttConn& c) {
       // Connection truly dead - no messages at all for connStaleMs.
       if (isConnected && c.stalePushallSentMs == 0) {
         MQTT_LOG("[%d] connection dead during print - sending recovery pushall", c.slotIndex);
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         if (requestPushall(c, PUSHALL_RECOVERY_CONN_DEAD))
           c.stalePushallSentMs = millis();
       } else if (c.stalePushallSentMs == 0 ||
@@ -2354,7 +2354,7 @@ static void handleConn(MqttConn& c) {
     if (s.lastPrintDataMs > 0 && millis() - s.lastPrintDataMs > finishHoldMs) {
       if (connAlive && isConnected && c.stalePushallSentMs == 0 && !cloudPushallThrottled && !recoveryCooldown) {
         MQTT_LOG("[%d] stale finish - sending recovery pushall", c.slotIndex);
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         if (requestPushall(c, PUSHALL_RECOVERY_FINISH))
           c.stalePushallSentMs = millis();
       } else if (!connAlive &&
@@ -2387,7 +2387,7 @@ static void handleConn(MqttConn& c) {
           !cloudPushallThrottled && !recoveryCooldown) {
         MQTT_LOG("[%d] hot FINISH (nT=%.0f bT=%.0f) - recovery pushall",
                  c.slotIndex, s.nozzleTarget, s.bedTarget);
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         if (requestPushall(c, PUSHALL_RECOVERY_FINISH_HOT))
           c.hotFinishHintConsumed = true;
       }
@@ -2405,14 +2405,14 @@ static void handleConn(MqttConn& c) {
       MQTT_LOG("[%d] stale idle on cloud - clearing cached state", c.slotIndex);
       clearLiveMetrics(s);
       setPrinterGcodeStateCanonical(s, GCODE_UNKNOWN);
-      esp_task_wdt_reset();
+      feedTaskWatchdog();
       if (requestPushall(c, PUSHALL_RECOVERY_IDLE))
         c.stalePushallSentMs = millis();
     } else if (hotIdle) {
       if (c.stalePushallSentMs == 0 && !cloudPushallThrottled && !recoveryCooldown) {
         MQTT_LOG("[%d] hot IDLE (nT=%.0f bT=%.0f) - sending recovery pushall",
                  c.slotIndex, s.nozzleTarget, s.bedTarget);
-        esp_task_wdt_reset();
+        feedTaskWatchdog();
         if (requestPushall(c, PUSHALL_RECOVERY_IDLE_HOT))
           c.stalePushallSentMs = millis();
       }
@@ -2432,7 +2432,7 @@ static void handleConn(MqttConn& c) {
     if (firstAttempt || !cloudPushallThrottled) {
       MQTT_LOG("[%d] UNKNOWN + data flowing - sending %s pushall",
                c.slotIndex, firstAttempt ? "bootstrap" : "retry");
-      esp_task_wdt_reset();
+      feedTaskWatchdog();
       if (requestPushall(c, PUSHALL_RECOVERY_IDLE)) {
         c.stalePushallSentMs = millis();
 #if HAS_HMS_UI
@@ -2460,7 +2460,7 @@ static void handleConn(MqttConn& c) {
                     (millis() - c.stalePushallSentMs > 300000);
     if (retryDue && !cloudPushallThrottled) {
       MQTT_LOG("[%d] FAILED on cloud - sending recovery pushall", c.slotIndex);
-      esp_task_wdt_reset();
+      feedTaskWatchdog();
       if (requestPushall(c, PUSHALL_RECOVERY_FAILED))
         c.stalePushallSentMs = millis();
     }
@@ -2729,7 +2729,7 @@ void requestCloudRefresh(uint8_t slot) {
   if (lastRefreshMs > 0 && millis() - lastRefreshMs < 5000) return;
   lastRefreshMs = millis();
   MQTT_LOG("[%d] manual cloud refresh (pushall)", c.slotIndex);
-  esp_task_wdt_reset();
+  feedTaskWatchdog();
   requestPushall(c, PUSHALL_MANUAL);
 }
 

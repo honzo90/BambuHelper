@@ -136,6 +136,8 @@ void dashboardWeatherIcon(uint32_t){++animationCount;++weatherIconCount;}
 void coolingScreen(const BambuMonitorTelemetry &,bool,uint32_t,bool){++bodyCount;}
 void resetPongClock(){}void tickPongClock(){}
 void dashText(const char *s,int,int,int,int=18,int=0){tft.text.emplace_back(s);}
+int headerOffset(){return page==Page::Dashboard?0:7;}
+void headerStatusPill(const char *s,int,int,uint16_t,uint16_t){if(s&&*s)tft.text.emplace_back(s);}
 void modernText(const char *s,int,int,bool,int){tft.text.emplace_back(s);}
 void connectedWifiName(int,int,int){}
 void setupScreen(bool,bool){++setupCount;tft.fillScreen(BG);}

@@ -233,6 +233,14 @@ bool readTouch(uint16_t &x, uint16_t &y, bool &down) {
   down = touchDown;
   return true;
 }
+
+bool selectSdCard() {
+  // Manufacturer example 03_SD_Test: EXIO4 low, then SD.begin() without a CS
+  // GPIO. The BSP already set every CH422G pin to output after begin().
+  if (!boardReady || !board.getIO_Expander() || !board.getIO_Expander()->getBase()) return false;
+  constexpr uint8_t SD_CS_EXIO = 4;
+  return board.getIO_Expander()->getBase()->digitalWrite(SD_CS_EXIO, 0);
+}
 }
 
 namespace lgfx {
