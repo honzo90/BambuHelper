@@ -35,7 +35,9 @@ WebUI end-to-end (read-only, against a live panel; Playwright, `npm install` onc
 Never commit the panel address.
 
 Release-profile build environment:
-`WS43B_ARDUINO_DATA=<dir with core 3.3.11> WS43B_SDK_PROFILE=cache64_xip WS43B_RGB_PCLK_HZ=12000000`.
+`WS43B_ARDUINO_DATA=<dir with core 3.3.11> WS43B_SDK_PROFILE=cache64_xip WS43B_RGB_PCLK_HZ=16000000`.
+PCLK 16 MHz (~39 Hz refresh, manufacturer value) since v4.1.1-beta.7: at 12 MHz (~29 Hz)
+bright full-screen content (photo screensaver) visibly flickers on the panel.
 Arduino ESP32 core must be exactly **3.3.11**. `build.py` fails if local paths leak
 into the binary (`-ffile-prefix-map`); keep it that way.
 
