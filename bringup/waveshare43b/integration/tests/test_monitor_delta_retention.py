@@ -79,10 +79,16 @@ void domain_isolation() {
   assert(!ws43b_live::amsHumidityUsesRaw(m.amsUnits[0],61001));
   assert(report(m,R"({"print":{"chamber_temper":37}})",61002));
   assert(m.nozzleTemp.current(61002) && m.amsUnits[1].temp.current(61002));
-  assert(!m.status.current(61002) && !m.progress.current(61002));
-  assert(!m.printStage.current(61002));
-  assert(!ws43b_view::statusCurrent(m,true,61002));
-  assert(ws43b_live::needsRefresh(m,ws43b_live::View::Dashboard,0,true,61002));
+  // Live core traffic keeps the job stream within BAMBU_MONITOR_JOB_GRACE_MS
+  // of the last job report (100): no "outdated" flash between deltas.
+  assert(m.status.current(61002) && m.progress.current(61002));
+  assert(m.printStage.current(61002) && m.status.updatedMs==100);
+  assert(ws43b_view::statusCurrent(m,true,61002));
+  // Beyond the grace it cannot: a dropped job delta still surfaces.
+  assert(report(m,R"({"print":{"chamber_temper":38}})",121003));
+  assert(m.nozzleTemp.current(121003) && !m.status.current(121003) && !m.progress.current(121003));
+  assert(!m.printStage.current(121003) && !ws43b_view::statusCurrent(m,true,121003));
+  assert(ws43b_live::needsRefresh(m,ws43b_live::View::Dashboard,0,true,121003));
 
   seed(m);
   assert(report(m,R"({"print":{"subtask_name":"renamed metadata"}})",61001));
@@ -93,10 +99,13 @@ void domain_isolation() {
   assert(!m.status.current(61002));
 
   seed(m);
-  // Other valid live core families retain non-job values, never the job stream.
+  // Other valid live core families retain non-job values, and the job stream
+  // only within the job grace.
   assert(report(m,R"({"print":{"fan_gear":0,"spd_lvl":3}})",61001));
   assert(m.nozzleTemp.current(61001) && m.amsUnits[0].temp.current(61001));
-  assert(!m.status.current(61001) && !m.progress.current(61001));
+  assert(m.status.current(61001) && m.progress.current(61001));
+  assert(report(m,R"({"print":{"fan_gear":0,"spd_lvl":2}})",121002));
+  assert(m.nozzleTemp.current(121002) && !m.status.current(121002) && !m.progress.current(121002));
 }
 
 void invalid_and_empty() {

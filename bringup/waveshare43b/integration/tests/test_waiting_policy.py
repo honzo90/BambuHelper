@@ -111,19 +111,24 @@ void unrelated_traffic_isolation() {
   assert(m.amsUnits[0].temp.current(61001));
   assert(m.amsUnits[0].humidityRaw.current(61001));
   expect_waiting(m,61001);
+  // Temperatures renew the job stream only within the job grace (from 100).
   assert(report(m,R"({"print":{"nozzle_temper":219,"bed_temper":59}})",61002));
   assert(m.nozzleTemp.current(61002) && m.bedTemp.current(61002));
   assert(m.amsUnits[0].temp.current(61002));
-  expect_waiting(m,61002);
-  assert(m.status.updatedMs==100 && m.status.retainedMs==100);
-  assert(m.progress.updatedMs==100 && m.progress.retainedMs==100);
-  assert(m.layerNum.updatedMs==100 && m.layerNum.retainedMs==100);
-  assert(m.remainingMinutes.updatedMs==100 && m.remainingMinutes.retainedMs==100);
+  assert(statusCurrent(m,true,61002) && progressCurrent(m,true,61002));
+  assert(m.status.updatedMs==100 && m.status.retainedMs==61002);
+  assert(report(m,R"({"print":{"nozzle_temper":220,"bed_temper":60}})",120200));
+  assert(m.status.retainedMs==61002 && m.progress.retainedMs==61002);
+  expect_waiting(m,121003);
+  // Never a new observation: job timestamps and values stay those of 100.
+  assert(m.status.updatedMs==100 && m.progress.updatedMs==100);
+  assert(m.layerNum.updatedMs==100 && m.layerNum.retainedMs==61002);
+  assert(m.remainingMinutes.updatedMs==100 && m.remainingMinutes.retainedMs==61002);
   assert(m.progress.value==42 && m.layerNum.value==84 && m.remainingMinutes.value==30);
   assert(report(m,R"({"print":{"nozzle_temper":218,"ams":{"ams":[{"id":"0","humidity_raw":"13"}]}}})",3600100));
   assert(m.nozzleTemp.current(3600100) && m.amsUnits[0].humidityRaw.current(3600100));
   expect_waiting(m,3600100);
-  assert(m.status.retainedMs==100 && m.progress.retainedMs==100);
+  assert(m.status.retainedMs==61002 && m.progress.retainedMs==61002);
 }
 
 void actual_job_delta_resumption() {

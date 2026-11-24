@@ -17,7 +17,7 @@ int main(){
  assert(m.printStage.updatedMs==100 && monitorFilamentStage(m,true,200)==4);
  assert(monitorFilamentStage(m,false,200)==0);
  report(R"({"print":{"bed_temper":56}})",60101);
- assert(monitorFilamentStage(m,true,60101)==0); // Temperatures cannot renew job stages.
+ assert(monitorFilamentStage(m,true,60101)==4); // Live temperatures keep the stage within the job grace.
  report(R"({"print":{"gcode_state":"RUNNING"}})",60101);
  assert(monitorFilamentStage(m,true,60101)==4); // Same-job delta retains omitted stage.
  assert(m.printStage.updatedMs==100 && !m.printStage.fresh(60101));
@@ -32,6 +32,10 @@ int main(){
  report(R"({"print":{"gcode_state":"PAUSE"}})",60107);assert(!m.printStage.valid);
  report(R"({"print":{"gcode_state":"RUNNING"}})",60108);assert(monitorFilamentStage(m,true,60108)==0);
  report(R"({"print":{"gcode_state":"FINISH","stg_cur":4}})",60109);assert(monitorFilamentStage(m,true,60109)==0);
+ m.newSession();
+ report(R"({"print":{"gcode_state":"RUNNING","stg_cur":4}})",1000);
+ report(R"({"print":{"bed_temper":57}})",121001);
+ assert(monitorFilamentStage(m,true,121001)==0); // Beyond the grace temperatures cannot renew stages.
  m.newSession();assert(!m.printStage.valid);
  report(R"({"print":{"gcode_state":"RUNNING","stg_cur":24}})",UINT32_MAX-20);
  assert(monitorFilamentStage(m,true,10)==24);
